@@ -1,0 +1,122 @@
+/* Glass Card Component Styles */
+.glass-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  pointer-events: none;
+}
+
+.glass-card:hover::before {
+  left: 100%;
+}
+
+/* Variants */
+.glass-card--default {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.glass-card--subtle {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.glass-card--accent {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.2), rgba(175, 82, 222, 0.2));
+  border-color: rgba(0, 122, 255, 0.3);
+}
+
+/* Padding */
+.glass-card--padding-sm {
+  padding: 0.75rem;
+}
+
+.glass-card--padding-default {
+  padding: 1.5rem;
+}
+
+.glass-card--padding-lg {
+  padding: 2rem;
+}
+
+.glass-card--padding-xl {
+  padding: 3rem;
+}
+
+/* Shadows */
+.glass-card--shadow-none {
+  box-shadow: none;
+}
+
+.glass-card--shadow-default {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.glass-card--shadow-lg {
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+}
+
+.glass-card--shadow-xl {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+/* Interactive */
+.glass-card--interactive {
+  cursor: pointer;
+}
+
+.glass-card--interactive:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.glass-card--interactive:active {
+  transform: translateY(-2px);
+}
+
+.glass-card--interactive:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .glass-card--padding-lg {
+    padding: 1.5rem;
+  }
+  
+  .glass-card--padding-xl {
+    padding: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .glass-card--padding-default {
+    padding: 1rem;
+  }
+  
+  .glass-card--padding-lg {
+    padding: 1.25rem;
+  }
+  
+  .glass-card--padding-xl {
+    padding: 1.5rem;
+  }
+}

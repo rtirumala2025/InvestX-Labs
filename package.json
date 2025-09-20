@@ -1,0 +1,47 @@
+{
+  "name": "investx-labs",
+  "version": "1.0.0",
+  "description": "A React-based investment education and portfolio tracking platform for high school students",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend/functions"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspace=frontend",
+    "test": "npm run test --workspace=frontend",
+    "start": "npm run start --workspace=frontend",
+    "lint": "npm run lint --workspace=frontend",
+    "format": "npm run format --workspace=frontend",
+    "setup": "npm install && npm run setup:firebase",
+    "setup:firebase": "node scripts/firestore-setup.js",
+    "setup:database": "node scripts/initialize-database.js",
+    "add:sample-data": "node scripts/add-sample-data.js",
+    "test:database": "node scripts/test-database.js"
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  },
+  "keywords": [
+    "react",
+    "investment",
+    "education",
+    "portfolio",
+    "finance",
+    "students",
+    "firebase",
+    "ai",
+    "monorepo"
+  ],
+  "author": "InvestX Labs Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/investx-labs/investx-labs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/investx-labs/investx-labs/issues"
+  },
+  "homepage": "https://investx-labs.web.app"
+}
