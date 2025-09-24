@@ -21,7 +21,9 @@ const Card = ({
     large: 'shadow-lg'
   };
   
-  const classes = `bg-white rounded-lg border border-gray-200 ${paddingClasses[padding]} ${shadowClasses[shadow]} ${className}`;
+  // Glass UI styles
+  const glassBase = 'backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl';
+  const classes = `${glassBase} ${paddingClasses[padding]} ${shadowClasses[shadow]} ${className}`;
   
   return (
     <div className={classes} {...props}>

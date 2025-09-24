@@ -18,7 +18,9 @@
     "setup:firebase": "node scripts/firestore-setup.js",
     "setup:database": "node scripts/initialize-database.js",
     "add:sample-data": "node scripts/add-sample-data.js",
-    "test:database": "node scripts/test-database.js"
+    "test:database": "node scripts/test-database.js",
+    "migrate": "node scripts/migrate-data-to-firestore.js",
+    "seed:landing-features": "node scripts/seed-landing-features.js"
   },
   "devDependencies": {
     "concurrently": "^7.6.0"
@@ -43,5 +45,8 @@
   "bugs": {
     "url": "https://github.com/investx-labs/investx-labs/issues"
   },
-  "homepage": "https://investx-labs.web.app"
+  "homepage": "https://investx-labs.web.app",
+  "dependencies": {
+    "firebase-admin": "^13.5.0"
+  }
 }

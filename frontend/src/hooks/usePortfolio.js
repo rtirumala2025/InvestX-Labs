@@ -13,14 +13,18 @@ import { getPortfolioMarketData } from '../services/market/marketData';
 export const usePortfolio = () => {
   const { user } = useAuth();
   const { documents: portfolioData, addDocument, updateDocument } = useFirestore('portfolios', user?.uid);
-  const { documents: holdings, addDocument: addHolding, updateDocument: updateHolding, deleteDocument: deleteHolding } = useFirestore('holdings');
+  // Use user-scoped portfolio subcollection for holdings
+  const { documents: holdings, addDocument: addHolding, updateDocument: updateHolding, deleteDocument: deleteHolding } = useFirestore(
+    user ? `users/${user.uid}/portfolio` : null
+  );
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [marketData, setMarketData] = useState(null);
 
   const portfolio = portfolioData?.[0] || null;
-  const userHoldings = holdings?.filter(holding => holding.userId === user?.uid) || [];
+  // Holdings are already scoped to the user via subcollection
+  const userHoldings = holdings || [];
 
   // Update portfolio when holdings change
   useEffect(() => {
@@ -104,7 +108,6 @@ export const usePortfolio = () => {
 
       const newHolding = {
         ...holdingData,
-        userId: user.uid,
         currentPrice: holdingData.purchasePrice, // Initial current price
         value: holdingData.shares * holdingData.purchasePrice,
         gainLoss: 0,

@@ -101,6 +101,8 @@ temp/
 .firebase/
 firebase-debug.log
 firebase-debug.*.log
+scripts/firebase-admin-key.json
+scripts/*firebase-adminsdk*.json
 
 # Python
 __pycache__/

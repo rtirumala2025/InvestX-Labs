@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { usePortfolio } from '../../hooks/usePortfolio';
 
 const AddHolding = () => {
   const [formData, setFormData] = useState({
@@ -7,11 +8,26 @@ const AddHolding = () => {
     purchasePrice: '',
     purchaseDate: ''
   });
+  const { addHoldingToPortfolio, loading } = usePortfolio();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle adding holding
-    console.log('Adding holding:', formData);
+    if (!formData.symbol || !formData.shares || !formData.purchasePrice) return;
+    const payload = {
+      symbol: formData.symbol.toUpperCase().trim(),
+      companyName: formData.companyName || '',
+      shares: Number(formData.shares),
+      purchasePrice: Number(formData.purchasePrice),
+      purchaseDate: formData.purchaseDate || new Date().toISOString().slice(0, 10),
+      sector: formData.sector || '',
+      assetType: formData.assetType || 'Stock'
+    };
+    try {
+      await addHoldingToPortfolio(payload);
+      setFormData({ symbol: '', shares: '', purchasePrice: '', purchaseDate: '' });
+    } catch (err) {
+      console.error('Failed to add holding', err);
+    }
   };
 
   return (
@@ -60,9 +76,10 @@ const AddHolding = () => {
         </div>
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
         >
-          Add Holding
+          {loading ? 'Adding…' : 'Add Holding'}
         </button>
       </form>
     </div>

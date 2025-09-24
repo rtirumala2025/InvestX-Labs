@@ -54,7 +54,7 @@ Start the development server:
 npm run dev
 ```
 
-This will start the frontend development server on `http://localhost:3000`.
+This will start the frontend development server on `http://localhost:3002`.
 
 ### Available Scripts
 
@@ -76,6 +76,31 @@ This will start the frontend development server on `http://localhost:3000`.
 - **Services**: API calls and external service integrations
 - **Utils**: Helper functions and utilities
 - **Assets**: Images, fonts, and static data
+
+## Firebase-backed data
+
+The app uses Firebase (Auth + Firestore) for all runtime data. Local JSON under `frontend/src/assets/` is used only as a migration seed and must not be imported at runtime.
+
+### One-time data migration
+
+1. Create a Firebase project and enable Firestore and Auth.
+2. Download a Firebase Admin service account key and place it at `scripts/firebase-admin-key.json` (do not commit this file).
+3. Configure `.env` in `frontend/` using keys defined in `.env.example`.
+4. Run the migration to seed Firestore collections from `frontend/src/assets/`:
+
+   ```bash
+   npm run migrate
+   ```
+
+Collections seeded include `investmentStrategies`, `riskProfiles`, `educationalContent`, and others mapped from assets. After migration, the app reads only from Firestore.
+
+### Smoke-test checklist
+
+- Home loads without blank screen with the glass UI hero and feature cards.
+- Sign up a user and verify a user document is created under `users/{uid}`.
+- Visit Suggestions page — suggestions load from Firestore or show an empty state if none.
+- Add a holding — verify a document appears under `holdings` (or user-specific path as implemented).
+- Sign out and verify protected routes redirect to login.
 
 ### Backend (Python)
 - **AI Models**: Machine learning models for investment recommendations

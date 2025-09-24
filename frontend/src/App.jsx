@@ -6,8 +6,8 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import DisclaimerBanner from './components/common/DisclaimerBanner';
 import NetworkStatus from './components/common/NetworkStatus';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import SmartRedirect from './components/common/SmartRedirect';
-import SimpleHeader from './components/common/SimpleHeader';
+import Header from './components/common/Header';
+import Footer from './components/common/Footer';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -41,15 +41,13 @@ function App() {
             <div className="min-h-screen flex flex-col">
               <DisclaimerBanner />
               <NetworkStatus />
-              <SimpleHeader />
+              <Header />
               
               <main className="flex-1">
                 <Routes>
-                  {/* Smart Redirect Route */}
-                  <Route path="/" element={<SmartRedirect />} />
-                  <Route path="/home" element={<HomePage />} />
-                  
                   {/* Public Routes */}
+                  <Route path="/" element={<HomePage />} />
+                  
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/signup" element={<SignupPage />} />
                   
@@ -60,11 +58,6 @@ function App() {
                     </ProtectedRoute>
                   } />
                   
-                  <Route path="/diagnostic" element={
-                    <ProtectedRoute>
-                      <DiagnosticPage />
-                    </ProtectedRoute>
-                  } />
                   
                   <Route path="/dashboard" element={
                     <ProtectedRoute>
@@ -102,11 +95,8 @@ function App() {
                     </ProtectedRoute>
                   } />
                   
-                  <Route path="/privacy" element={
-                    <ProtectedRoute>
-                      <PrivacyPage />
-                    </ProtectedRoute>
-                  } />
+                  {/* Optional: public privacy page */}
+                  <Route path="/privacy" element={<PrivacyPage />} />
                   
                   {/* Catch all route */}
                   <Route path="*" element={<Navigate to="/" replace />} />
@@ -115,6 +105,7 @@ function App() {
               
               {/* Floating Chat Button - appears on all pages */}
               <FloatingChatButton />
+              <Footer />
             </div>
           </Router>
         </ThemeProvider>

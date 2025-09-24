@@ -22,6 +22,14 @@ import {
 
 // Firestore service for InvestX Labs
 
+// Support slash-delimited collection paths like 'users/{uid}/portfolio'
+const toSegments = (pathOrName) => {
+  if (!pathOrName) return [];
+  if (Array.isArray(pathOrName)) return pathOrName;
+  if (typeof pathOrName === 'string') return pathOrName.split('/').filter(Boolean);
+  return [String(pathOrName)];
+};
+
 /**
  * Add a new document to a collection
  * @param {string} collectionName - Name of the collection
@@ -31,7 +39,7 @@ import {
 export const addDocument = async (collectionName, data) => {
   const networkAwareAdd = createNetworkAwareOperation(
     async () => {
-      const docRef = await addDoc(collection(db, collectionName), {
+      const docRef = await addDoc(collection(db, ...toSegments(collectionName)), {
         ...data,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -60,7 +68,7 @@ export const addDocument = async (collectionName, data) => {
 export const getDocument = async (collectionName, docId) => {
   const networkAwareGet = createNetworkAwareOperation(
     async () => {
-      const docRef = doc(db, collectionName, docId);
+      const docRef = doc(db, ...toSegments(collectionName), docId);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
@@ -91,7 +99,7 @@ export const getDocument = async (collectionName, docId) => {
 export const getDocuments = async (collectionName, constraints = []) => {
   return withFirebaseErrorHandling(
     async () => {
-      const collectionRef = collection(db, collectionName);
+      const collectionRef = collection(db, ...toSegments(collectionName));
       const q = constraints.length > 0 ? query(collectionRef, ...constraints) : collectionRef;
       const querySnapshot = await getDocs(q);
       
@@ -116,7 +124,7 @@ export const getDocuments = async (collectionName, constraints = []) => {
 export const updateDocument = async (collectionName, docId, data) => {
   return withFirebaseErrorHandling(
     async () => {
-      const docRef = doc(db, collectionName, docId);
+      const docRef = doc(db, ...toSegments(collectionName), docId);
       await updateDoc(docRef, {
         ...data,
         updatedAt: new Date()
@@ -135,7 +143,7 @@ export const updateDocument = async (collectionName, docId, data) => {
 export const deleteDocument = async (collectionName, docId) => {
   return withFirebaseErrorHandling(
     async () => {
-      const docRef = doc(db, collectionName, docId);
+      const docRef = doc(db, ...toSegments(collectionName), docId);
       await deleteDoc(docRef);
     },
     `deleteDocument ${collectionName}/${docId}`
@@ -150,7 +158,7 @@ export const deleteDocument = async (collectionName, docId) => {
  * @returns {Function} Unsubscribe function
  */
 export const subscribeToCollection = (collectionName, constraints = [], callback) => {
-  const collectionRef = collection(db, collectionName);
+  const collectionRef = collection(db, ...toSegments(collectionName));
   const q = constraints.length > 0 ? query(collectionRef, ...constraints) : collectionRef;
   
   return onSnapshot(q, 
@@ -180,7 +188,7 @@ export const subscribeToCollection = (collectionName, constraints = [], callback
  * @returns {Function} Unsubscribe function
  */
 export const subscribeToDocument = (collectionName, docId, callback) => {
-  const docRef = doc(db, collectionName, docId);
+  const docRef = doc(db, ...toSegments(collectionName), docId);
   
   return onSnapshot(docRef, 
     (docSnap) => {
