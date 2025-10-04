@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useFirestore } from './useFirestore';
 import { calculatePerformanceMetrics } from '../services/portfolio/portfolioCalculations';
@@ -12,6 +12,9 @@ import { getPortfolioMarketData } from '../services/market/marketData';
  */
 export const usePortfolio = () => {
   const { user } = useAuth();
+  
+  console.log('🔥 [usePortfolio] Hook initialized for user:', user?.uid || 'No user');
+  
   const { documents: portfolioData, addDocument, updateDocument } = useFirestore('portfolios', user?.uid);
   // Use user-scoped portfolio subcollection for holdings
   const { documents: holdings, addDocument: addHolding, updateDocument: updateHolding, deleteDocument: deleteHolding } = useFirestore(
@@ -25,6 +28,22 @@ export const usePortfolio = () => {
   const portfolio = portfolioData?.[0] || null;
   // Holdings are already scoped to the user via subcollection
   const userHoldings = holdings || [];
+  
+  // Log Firestore data state
+  React.useEffect(() => {
+    if (user) {
+      console.log('🔥 [usePortfolio] Firestore Data Update:');
+      console.log('  📊 Portfolio Data:', portfolioData);
+      console.log('  📈 Holdings Raw:', holdings);
+      console.log('  🎯 User Holdings Count:', userHoldings.length);
+      
+      if (userHoldings.length === 0) {
+        console.log('  ⚠️ Empty portfolio detected - no holdings found');
+      } else {
+        console.log('  ✅ Holdings found:', userHoldings.map(h => `${h.symbol}: ${h.shares} shares`));
+      }
+    }
+  }, [user, portfolioData, holdings, userHoldings.length]);
 
   // Update portfolio when holdings change
   useEffect(() => {
@@ -51,12 +70,20 @@ export const usePortfolio = () => {
   };
 
   const updatePortfolioMetrics = async () => {
+    console.log('🔥 [usePortfolio] updatePortfolioMetrics called with', userHoldings.length, 'holdings');
+    
     try {
       setLoading(true);
       setError(null);
 
       // Calculate performance metrics
+      console.log('🔥 [usePortfolio] Calculating performance metrics for holdings:', userHoldings.map(h => h.symbol));
       const performanceMetrics = calculatePerformanceMetrics(userHoldings, marketData);
+      console.log('🔥 [usePortfolio] Performance metrics calculated:', {
+        totalValue: performanceMetrics.totalValue,
+        totalGainLoss: performanceMetrics.totalGainLoss,
+        diversificationScore: performanceMetrics.diversificationScore
+      });
       
       // Track performance over time
       const performanceData = trackPortfolioPerformance(userHoldings, portfolio?.historicalData || []);
@@ -84,8 +111,10 @@ export const usePortfolio = () => {
       };
 
       if (portfolio) {
+        console.log('🔥 [usePortfolio] Updating existing portfolio document:', portfolio.id);
         await updateDocument(portfolio.id, updatedPortfolio);
       } else {
+        console.log('🔥 [usePortfolio] Creating new portfolio document for user:', user.uid);
         await addDocument({
           ...updatedPortfolio,
           userId: user.uid,
@@ -93,15 +122,19 @@ export const usePortfolio = () => {
         });
       }
       
+      console.log('🔥 [usePortfolio] Portfolio metrics update completed successfully');
+      
     } catch (err) {
+      console.error('🔥 [usePortfolio] Error updating portfolio metrics:', err);
       setError(err.message);
-      console.error('Error updating portfolio metrics:', err);
     } finally {
       setLoading(false);
     }
   };
 
   const addHoldingToPortfolio = async (holdingData) => {
+    console.log('🔥 [usePortfolio] Adding new holding:', holdingData.symbol, holdingData.shares, 'shares');
+    
     try {
       setLoading(true);
       setError(null);
@@ -115,7 +148,9 @@ export const usePortfolio = () => {
         createdAt: new Date().toISOString()
       };
 
+      console.log('🔥 [usePortfolio] Saving holding to Firestore:', newHolding);
       await addHolding(newHolding);
+      console.log('🔥 [usePortfolio] Holding added successfully to portfolio');
       
     } catch (err) {
       setError(err.message);
