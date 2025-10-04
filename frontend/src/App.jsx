@@ -22,10 +22,12 @@ import EducationPage from './pages/EducationPage';
 import ProfilePage from './pages/ProfilePage';
 import PrivacyPage from './pages/PrivacyPage';
 import ChatPage from './pages/ChatPage';
-import FloatingChatButton from './components/chat/FloatingChatButton';
+import DevTools from './components/dev/DevTools';
+import FirebaseDebug from './components/debug/FirebaseDebug';
 
 // Styles
 import './styles/liquid-glass.css';
+import './styles/liquid-glass-enhanced.css';
 
 function App() {
   return (
@@ -40,7 +42,7 @@ function App() {
           >
             <div className="min-h-screen flex flex-col">
               <DisclaimerBanner />
-              <NetworkStatus />
+              {/* <NetworkStatus /> */}
               <Header />
               
               <main className="flex-1">
@@ -103,8 +105,10 @@ function App() {
                 </Routes>
               </main>
               
-              {/* Floating Chat Button - appears on all pages */}
-              <FloatingChatButton />
+              {/* Developer Tools - only in development */}
+              {process.env.NODE_ENV === 'development' && <DevTools />}
+              {process.env.NODE_ENV === 'development' && <FirebaseDebug />}
+              
               <Footer />
             </div>
           </Router>

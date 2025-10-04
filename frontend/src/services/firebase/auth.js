@@ -5,6 +5,8 @@ import {
   updateProfile,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   getIdToken,
   reload
@@ -88,41 +90,129 @@ export const onAuthStateChange = (callback) => {
 export const signInWithGoogle = async () => {
   return withFirebaseErrorHandling(
     async () => {
+      // Check if Firebase is properly configured
+      if (!auth.app.options.apiKey || auth.app.options.apiKey === 'your_firebase_api_key_here') {
+        throw new Error('Firebase is not properly configured. Please check your environment variables.');
+      }
+
       const provider = new GoogleAuthProvider();
       
       // Add custom parameters for better user experience
       provider.addScope('email');
       provider.addScope('profile');
       provider.setCustomParameters({
-        prompt: 'select_account'
+        prompt: 'select_account',
+        access_type: 'offline'
       });
       
-      // Check if popup is blocked
-      let result;
+      // First, try to detect if popups are blocked
+      let testPopup;
       try {
-        result = await signInWithPopup(auth, provider);
-      } catch (error) {
-        // Handle popup blocked error
-        if (error.code === 'auth/popup-blocked') {
+        testPopup = window.open('', '_blank', 'width=1,height=1');
+        if (!testPopup || testPopup.closed || typeof testPopup.closed === 'undefined') {
           throw new Error('Popup blocked. Please allow popups for this site and try again.');
         }
-        // Handle popup closed error
-        if (error.code === 'auth/popup-closed-by-user') {
-          throw new Error('Sign-in cancelled. Please try again.');
+        testPopup.close();
+      } catch (error) {
+        throw new Error('Popup blocked. Please allow popups for this site and try again.');
+      }
+
+      let result;
+      try {
+        // Add a timeout to prevent hanging
+        const signInPromise = signInWithPopup(auth, provider);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Sign-in timed out. Please try again.')), 30000);
+        });
+        
+        result = await Promise.race([signInPromise, timeoutPromise]);
+        
+        // Verify the result
+        if (!result || !result.user) {
+          throw new Error('Sign-in failed. No user data received.');
         }
-        // Handle other auth errors
-        if (error.code === 'auth/account-exists-with-different-credential') {
-          throw new Error('An account already exists with this email using a different sign-in method.');
+        
+      } catch (error) {
+        console.error('Google sign-in error details:', error);
+        
+        // Handle specific Firebase Auth errors
+        switch (error.code) {
+          case 'auth/popup-blocked':
+            throw new Error('Popup blocked. Please allow popups for this site and try again.');
+          case 'auth/popup-closed-by-user':
+            throw new Error('Sign-in cancelled. Please try again.');
+          case 'auth/cancelled-popup-request':
+            throw new Error('Sign-in cancelled. Please try again.');
+          case 'auth/account-exists-with-different-credential':
+            throw new Error('An account already exists with this email using a different sign-in method.');
+          case 'auth/operation-not-allowed':
+            throw new Error('Google sign-in is not enabled. Please contact support.');
+          case 'auth/unauthorized-domain':
+            throw new Error('This domain is not authorized for Google sign-in. Please contact support.');
+          case 'auth/invalid-api-key':
+            throw new Error('Invalid Firebase configuration. Please contact support.');
+          case 'auth/network-request-failed':
+            throw new Error('Network error. Please check your internet connection and try again.');
+          case 'auth/too-many-requests':
+            throw new Error('Too many failed attempts. Please try again later.');
+          default:
+            if (error.message.includes('timed out')) {
+              throw error;
+            }
+            throw new Error(`Sign-in failed: ${error.message || 'Unknown error occurred'}`);
         }
-        if (error.code === 'auth/operation-not-allowed') {
-          throw new Error('Google sign-in is not enabled. Please contact support.');
-        }
-        throw error;
       }
       
       return result;
     },
     'signInWithGoogle'
+  );
+};
+
+/**
+ * Sign in with Google using redirect (fallback for popup issues)
+ * @returns {Promise<Object>} User credential object
+ */
+export const signInWithGoogleRedirect = async () => {
+  return withFirebaseErrorHandling(
+    async () => {
+      // Check if Firebase is properly configured
+      if (!auth.app.options.apiKey || auth.app.options.apiKey === 'your_firebase_api_key_here') {
+        throw new Error('Firebase is not properly configured. Please check your environment variables.');
+      }
+
+      const provider = new GoogleAuthProvider();
+      
+      // Add custom parameters for better user experience
+      provider.addScope('email');
+      provider.addScope('profile');
+      provider.setCustomParameters({
+        prompt: 'select_account',
+        access_type: 'offline'
+      });
+      
+      // Use redirect instead of popup
+      await signInWithRedirect(auth, provider);
+      
+      // Note: This function will cause a page redirect, so it won't return normally
+      // The result should be handled by getGoogleRedirectResult() after redirect
+      return null;
+    },
+    'signInWithGoogleRedirect'
+  );
+};
+
+/**
+ * Get the result of Google redirect sign-in
+ * @returns {Promise<Object|null>} User credential object or null
+ */
+export const getGoogleRedirectResult = async () => {
+  return withFirebaseErrorHandling(
+    async () => {
+      const result = await getRedirectResult(auth);
+      return result;
+    },
+    'getGoogleRedirectResult'
   );
 };
 

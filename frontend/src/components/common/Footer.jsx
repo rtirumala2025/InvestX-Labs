@@ -1,10 +1,17 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import GlassCard from '../ui/GlassCard';
 import './Footer.css';
 
 const Footer = () => {
   return (
-    <footer className="glass-footer">
+    <footer className="relative bg-gradient-to-t from-gray-950 via-gray-900 to-gray-950 border-t border-white/10">
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-orange-500/5" />
+      <GlassCard 
+        variant="subtle" 
+        padding="none" 
+        className="relative z-10 rounded-none border-0 border-t border-white/10"
+      >
       <div className="footer-content">
         <div className="footer-brand">
           <h3 className="footer-logo">InvestX Labs</h3>
@@ -45,11 +52,12 @@ const Footer = () => {
         </div>
       </div>
       
-      <div className="footer-bottom">
-        <p className="footer-disclaimer">
-          © 2024 InvestX Labs. All rights reserved. This is for educational purposes only.
-        </p>
-      </div>
+        <div className="footer-bottom">
+          <p className="footer-disclaimer">
+            © 2024 InvestX Labs. All rights reserved. This is for educational purposes only.
+          </p>
+        </div>
+      </GlassCard>
     </footer>
   );
 };

@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, createContext } from 'react';
-import { createUser, signInUser, signOutUser, onAuthStateChange, signInWithGoogle } from '../services/firebase/auth';
+import { createUser, signInUser, signOutUser, onAuthStateChange, signInWithGoogle, signInWithGoogleRedirect, getGoogleRedirectResult } from '../services/firebase/auth';
 import { auth } from '../services/firebase/config';
 import { createUserProfile, getUserProfile, updateUserProfile as updateUserProfileService } from '../services/firebase/userService';
 
@@ -42,6 +42,21 @@ export const useAuthProvider = () => {
       
       setLoading(false);
     });
+
+    // Check for redirect result on app load
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getGoogleRedirectResult();
+        if (result?.user) {
+          console.log('Google redirect sign-in successful');
+          // User profile will be handled by the auth state change above
+        }
+      } catch (error) {
+        console.error('Error handling redirect result:', error);
+      }
+    };
+
+    checkRedirectResult();
 
     return unsubscribe;
   }, []);
@@ -109,7 +124,7 @@ export const useAuthProvider = () => {
     }
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (useRedirect = false) => {
     try {
       setLoading(true);
       
@@ -118,10 +133,32 @@ export const useAuthProvider = () => {
         throw new Error('Firebase is not properly configured. Please check your environment variables.');
       }
       
-      const userCredential = await signInWithGoogle();
+      let userCredential;
       
-      // Check if user profile exists, create if not
-      if (userCredential.user) {
+      if (useRedirect) {
+        // Use redirect method as fallback
+        await signInWithGoogleRedirect();
+        return null; // Redirect will handle the rest
+      } else {
+        try {
+          // Try popup method first
+          userCredential = await signInWithGoogle();
+        } catch (error) {
+          console.warn('Popup method failed, trying redirect:', error.message);
+          
+          // If popup fails due to blocking or other issues, try redirect
+          if (error.message.includes('popup') || error.message.includes('blocked') || error.message.includes('timed out')) {
+            await signInWithGoogleRedirect();
+            return null; // Redirect will handle the rest
+          }
+          
+          // Re-throw other errors
+          throw error;
+        }
+      }
+      
+      // Handle successful popup sign-in
+      if (userCredential?.user) {
         try {
           const existingProfile = await getUserProfile(userCredential.user.uid);
           if (!existingProfile) {
