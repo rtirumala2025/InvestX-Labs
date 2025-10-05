@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -11,7 +11,7 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, loginWithGoogle } = useAuth();
+  const { signIn: login } = useAuth(); // Using signIn as login for backward compatibility
   const navigate = useNavigate();
 
   const fadeIn = {
@@ -33,41 +33,13 @@ const LoginPage = () => {
       setLoading(false);
     }
   };
-
-  const handleGoogleSignIn = async () => {
-    try {
-      setError('');
-      setLoading(true);
-      
-      // First try popup method
-      const result = await loginWithGoogle();
-      
-      // If result is null, it means redirect was used
-      if (result === null) {
-        // Redirect is in progress, don't navigate or set loading to false
-        return;
-      }
-      
-      // Successful popup sign-in
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Google sign-in error:', error);
-      
-      // Handle specific error cases
-      if (error.message.includes('popup') || error.message.includes('blocked')) {
-        setError('Popup was blocked. Please allow popups for this site and try again.');
-      } else if (error.message.includes('cancelled')) {
-        setError('Sign-in cancelled. Please try again.');
-      } else {
-        setError('Failed to sign in with Google. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
+  // Google Sign In is not implemented in the new AuthContext yet
+  const handleGoogleSignIn = () => {
+    setError('Google Sign In is currently unavailable. Please use email and password.');
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden font-sans">
+    <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden font-sans">
       {/* Floating gradient orbs - matching homepage */}
       <motion.div
         className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-blue-500/40 to-purple-500/30 rounded-full blur-3xl"

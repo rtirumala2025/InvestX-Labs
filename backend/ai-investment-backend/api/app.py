@@ -13,6 +13,7 @@ from datetime import datetime
 from api.chat_endpoints import chat_router
 from api.data_endpoints import data_router
 from api.user_endpoints import user_router
+from api.llama_scout_endpoints import include_routers as include_llama_routers
 from config.settings import settings
 from utils.logging_config import setup_logging
 from utils.error_handlers import setup_error_handlers
@@ -85,15 +86,17 @@ app.add_middleware(
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["*"]  # Configure appropriately for production
-)
 
 # Setup error handlers
 setup_error_handlers(app)
 
 # Include routers
-app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
-app.include_router(data_router, prefix="/api/data", tags=["data"])
-app.include_router(user_router, prefix="/api/user", tags=["user"])
+app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
+app.include_router(data_router, prefix="/api/data", tags=["Data"])
+app.include_router(user_router, prefix="/api/users", tags=["Users"])
+
+# Include LLaMA 4 Scout endpoints
+include_llama_routers(app)
 
 
 @app.get("/")
