@@ -4,8 +4,10 @@ import { Link } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
+import { useAuth } from '../hooks/useAuth';
 
 export default function HomePage() {
+  const { user } = useAuth();
   // Static feature data - no need for Firestore dependency
   const features = [
     { 
@@ -118,12 +120,12 @@ export default function HomePage() {
 
         <GlassButton
           as={Link}
-          to="/signup"
+          to={user ? "/dashboard" : "/signup"}
           variant="primary"
           size="large"
           className="relative z-10"
         >
-          Get Started
+          {user ? 'Go to Dashboard' : 'Get Started'}
         </GlassButton>
       </motion.section>
 
