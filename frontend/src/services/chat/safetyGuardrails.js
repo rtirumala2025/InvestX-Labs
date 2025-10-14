@@ -1,3 +1,5 @@
+import { RESPONSE_TEMPLATES } from './promptTemplates';
+
 /**
  * Safety guardrails for chatbot responses
  */
@@ -55,12 +57,110 @@ const RISK_WARNINGS = {
   low: 'While lower risk, all investments carry some level of risk. Consider your financial situation carefully.'
 };
 
+// New safety patterns for enhanced protection
+const SAFETY_PATTERNS = {
+  specificStock: /\b(?:should\s+I|buy|invest\s+in|purchase)\s+(?:stock|shares?)\s+(?:of|in|for)?\s*([A-Z]{1,5}|Apple|Tesla|Amazon|Google|Microsoft|Meta|Netflix|Nvidia|AMD|Intel|Spotify|Disney|Nike)\b/i,
+  crypto: /\b(bitcoin|BTC|ethereum|ETH|crypto|cryptocurrency|nft|web3|defi|blockchain|dogecoin|doge|altcoin|token)\b/i,
+  ageRestricted: /\b(margin|options?|futures?|forex|leverage|leveraged|short|shorting|short.?sell|day.?trad(?:e|ing)|swing.?trad(?:e|ing)|derivatives|call.?option|put.?option)\b/i,
+  parentalGuidance: /\b(open(?:ing)?\s+account|deposit|withdraw|withdrawal|real\s+money|funding|transfer|custodial|cash\s+out)\b/i
+};
+
 /**
- * Applies safety checks to a response
- * @param {string|Object} response - The AI response to check
- * @param {Object} userContext - User context including age and risk tolerance
- * @returns {Object} Safe response with appropriate disclaimers
+ * Enhanced safety check for user queries
+ * @param {string} query - User's query
+ * @param {Object} userContext - User context including age
+ * @returns {Object} Safety check result
  */
+export async function checkSafety(query, userContext = {}) {
+  const startTime = Date.now();
+  
+  // Run all checks in PARALLEL for speed
+  const checkPromises = [
+    checkSpecificStock(query),
+    checkCrypto(query),
+    checkAgeRestricted(query),
+    checkParentalGuidance(query)
+  ];
+
+  const results = await Promise.all(checkPromises);
+  
+  const detected = results.find(result => result?.detected);
+  
+  if (detected) {
+    console.log(`Safety check (${Date.now() - startTime}ms):`, detected.type);
+    return {
+      ...detected,
+      timestamp: Date.now(),
+      userAge: userContext.age,
+      responseTime: Date.now() - startTime
+    };
+  }
+
+  return { 
+    detected: false,
+    responseTime: Date.now() - startTime
+  };
+}
+
+async function checkSpecificStock(query) {
+  const match = query.match(SAFETY_PATTERNS.specificStock);
+  if (match) {
+    const stock = match[1] || 'that stock';
+    return {
+      detected: true,
+      type: 'specificStock',
+      entity: stock,
+      response: RESPONSE_TEMPLATES?.safety_redirect?.specific_stock?.(stock) || 
+        `I can teach you how to evaluate ${stock}, but I can't tell you whether to buy it. Let's learn how to analyze it together!`,
+      severity: 'high'
+    };
+  }
+  return { detected: false };
+}
+
+async function checkCrypto(query) {
+  if (SAFETY_PATTERNS.crypto.test(query)) {
+    return {
+      detected: true,
+      type: 'crypto',
+      response: RESPONSE_TEMPLATES?.safety_redirect?.crypto || 
+        'Cryptocurrency is complex and volatile - not ideal for learning basics. Start with stocks because they are easier to understand and more regulated for beginners.',
+      severity: 'high'
+    };
+  }
+  return { detected: false };
+}
+
+async function checkAgeRestricted(query) {
+  const match = query.match(SAFETY_PATTERNS.ageRestricted);
+  if (match) {
+    const strategy = match[1];
+    return {
+      detected: true,
+      type: 'ageRestricted',
+      entity: strategy,
+      response: RESPONSE_TEMPLATES?.safety_redirect?.age_restricted?.(strategy) ||
+        `${strategy} is an advanced strategy that's not suitable for beginners. Let's start with the basics of long-term investing first!`,
+      severity: 'high'
+    };
+  }
+  return { detected: false };
+}
+
+async function checkParentalGuidance(query) {
+  if (SAFETY_PATTERNS.parentalGuidance.test(query)) {
+    return {
+      detected: true,
+      type: 'parentalGuidance',
+      response: RESPONSE_TEMPLATES?.safety_redirect?.parental_guidance ||
+        'That sounds like something you should discuss with a parent or guardian. Would you like me to help explain the basics first?',
+      severity: 'medium'
+    };
+  }
+  return { detected: false };
+}
+
+// Existing functions (keep these as they are)
 export function applySafetyChecks(response, userContext = {}) {
   // Handle both string and object responses
   const content = typeof response === 'string' ? response : response.content || '';
@@ -127,9 +227,6 @@ export function applySafetyChecks(response, userContext = {}) {
   };
 }
 
-/**
- * Checks for restricted content in the response
- */
 function checkRestrictedContent(content) {
   if (!content) return null;
   
@@ -143,9 +240,6 @@ function checkRestrictedContent(content) {
   return null;
 }
 
-/**
- * Detects risk level in content
- */
 function detectRiskLevel(content, userRiskTolerance = 'moderate') {
   const lowerContent = content.toLowerCase();
   
@@ -185,9 +279,6 @@ function detectRiskLevel(content, userRiskTolerance = 'moderate') {
   return userRiskTolerance || 'medium';
 }
 
-/**
- * Sanitizes user input to prevent injection attacks
- */
 export function sanitizeInput(input) {
   if (typeof input !== 'string') return '';
   
@@ -201,9 +292,6 @@ export function sanitizeInput(input) {
     .trim();
 }
 
-/**
- * Validates user input before processing
- */
 export function validateInput(input, options = {}) {
   const { maxLength = 500, minLength = 1 } = options;
   
@@ -258,9 +346,6 @@ export function validateInput(input, options = {}) {
   return { valid: true };
 }
 
-/**
- * Logs safety-related events
- */
 export function logSafetyEvent(eventType, details = {}) {
   const timestamp = new Date().toISOString();
   const event = {
