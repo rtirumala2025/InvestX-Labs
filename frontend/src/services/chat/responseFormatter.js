@@ -75,23 +75,86 @@ const DEFAULT_TEMPLATE = RESPONSE_TEMPLATES.general;
 export function formatResponse(response, queryType = 'general') {
   const template = RESPONSE_TEMPLATES[queryType] || DEFAULT_TEMPLATE;
   
+  // Handle response object with type and data
+  if (response && typeof response === 'object' && response.type && response.data) {
+    return formatStructuredResponse(response, queryType);
+  }
+  
   // Extract content from response
   const { content, metadata = {} } = typeof response === 'string' 
     ? { content: response } 
     : response;
   
   // If content is already formatted, return as is
-  if (content.includes('## ')) {
+  if (content && content.includes('## ')) {
     return content;
   }
   
   // Simple formatting for general responses
   if (queryType === 'general') {
-    return formatGeneralResponse(content);
+    return formatGeneralResponse(content || '');
   }
   
   // For other types, use template
-  return applyTemplate(template, content, metadata);
+  return applyTemplate(template, content || '', metadata);
+}
+
+/**
+ * Formats a structured response object
+ */
+function formatStructuredResponse(response, queryType) {
+  const { type, data } = response;
+  const template = RESPONSE_TEMPLATES[type] || RESPONSE_TEMPLATES[queryType] || DEFAULT_TEMPLATE;
+  
+  let result = [];
+  
+  // Add header
+  if (template.header && data.title) {
+    result.push(replacePlaceholders(template.header, data));
+    result.push('');
+  }
+  
+  // Add sections based on data
+  if (type === 'education') {
+    if (data.explanation) {
+      result.push('## 📖 Explanation');
+      result.push(data.explanation);
+      result.push('');
+    }
+    if (data.example) {
+      result.push('## 💡 Example');
+      result.push(data.example);
+      result.push('');
+    }
+    if (data.keyPoints && data.keyPoints.length > 0) {
+      result.push('## 🔍 Key Points');
+      data.keyPoints.forEach(point => result.push(`- ${point}`));
+      result.push('');
+    }
+  } else if (type === 'suggestion') {
+    if (data.overview) {
+      result.push('## 📊 Overview');
+      result.push(data.overview);
+      result.push('');
+    }
+    if (data.considerations) {
+      result.push('## 🔍 Considerations');
+      result.push(data.considerations);
+      result.push('');
+    }
+    if (data.disclaimer) {
+      result.push('## ⚠️ Important Reminder');
+      result.push(data.disclaimer);
+      result.push('');
+    }
+  }
+  
+  // Add footer
+  if (template.footer) {
+    result.push(template.footer);
+  }
+  
+  return result.join('\n').trim();
 }
 
 /**

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from './useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { useFirestore } from './useFirestore';
 import { calculatePerformanceMetrics } from '../services/portfolio/portfolioCalculations';
 import { trackPortfolioPerformance } from '../services/portfolio/performanceTracking';
@@ -11,14 +11,14 @@ import { getPortfolioMarketData } from '../services/market/marketData';
  * @returns {Object} Portfolio data and operations
  */
 export const usePortfolio = () => {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   
-  console.log('🔥 [usePortfolio] Hook initialized for user:', user?.uid || 'No user');
+  console.log(' [usePortfolio] Hook initialized for user:', currentUser?.uid || 'No user');
   
-  const { documents: portfolioData, addDocument, updateDocument } = useFirestore('portfolios', user?.uid);
+  const { documents: portfolioData, addDocument, updateDocument } = useFirestore('portfolios', currentUser?.uid);
   // Use user-scoped portfolio subcollection for holdings
   const { documents: holdings, addDocument: addHolding, updateDocument: updateHolding, deleteDocument: deleteHolding } = useFirestore(
-    user ? `users/${user.uid}/portfolio` : null
+    currentUser ? `portfolios/${currentUser.uid}/holdings` : null
   );
   
   const [loading, setLoading] = useState(false);
@@ -31,19 +31,19 @@ export const usePortfolio = () => {
   
   // Log Firestore data state
   React.useEffect(() => {
-    if (user) {
-      console.log('🔥 [usePortfolio] Firestore Data Update:');
-      console.log('  📊 Portfolio Data:', portfolioData);
-      console.log('  📈 Holdings Raw:', holdings);
-      console.log('  🎯 User Holdings Count:', userHoldings.length);
+    if (currentUser) {
+      console.log(' [usePortfolio] Firestore Data Update:');
+      console.log('  Portfolio Data:', portfolioData);
+      console.log('  Holdings Raw:', holdings);
+      console.log('  User Holdings Count:', userHoldings.length);
       
       if (userHoldings.length === 0) {
-        console.log('  ⚠️ Empty portfolio detected - no holdings found');
+        console.log('  Empty portfolio detected - no holdings found');
       } else {
-        console.log('  ✅ Holdings found:', userHoldings.map(h => `${h.symbol}: ${h.shares} shares`));
+        console.log('  Holdings found:', userHoldings.map(h => `${h.symbol}: ${h.shares} shares`));
       }
     }
-  }, [user, portfolioData, holdings, userHoldings.length]);
+  }, [currentUser, portfolioData, holdings, userHoldings.length]);
 
   // Update portfolio when holdings change
   useEffect(() => {
@@ -70,16 +70,16 @@ export const usePortfolio = () => {
   };
 
   const updatePortfolioMetrics = async () => {
-    console.log('🔥 [usePortfolio] updatePortfolioMetrics called with', userHoldings.length, 'holdings');
+    console.log(' [usePortfolio] updatePortfolioMetrics called with', userHoldings.length, 'holdings');
     
     try {
       setLoading(true);
       setError(null);
 
       // Calculate performance metrics
-      console.log('🔥 [usePortfolio] Calculating performance metrics for holdings:', userHoldings.map(h => h.symbol));
+      console.log(' [usePortfolio] Calculating performance metrics for holdings:', userHoldings.map(h => h.symbol));
       const performanceMetrics = calculatePerformanceMetrics(userHoldings, marketData);
-      console.log('🔥 [usePortfolio] Performance metrics calculated:', {
+      console.log(' [usePortfolio] Performance metrics calculated:', {
         totalValue: performanceMetrics.totalValue,
         totalGainLoss: performanceMetrics.totalGainLoss,
         diversificationScore: performanceMetrics.diversificationScore
@@ -111,18 +111,18 @@ export const usePortfolio = () => {
       };
 
       if (portfolio) {
-        console.log('🔥 [usePortfolio] Updating existing portfolio document:', portfolio.id);
+        console.log(' [usePortfolio] Updating existing portfolio document:', portfolio.id);
         await updateDocument(portfolio.id, updatedPortfolio);
       } else {
-        console.log('🔥 [usePortfolio] Creating new portfolio document for user:', user.uid);
+        console.log(' [usePortfolio] Creating new portfolio document for user:', currentUser.uid);
         await addDocument({
           ...updatedPortfolio,
-          userId: user.uid,
+          userId: currentUser.uid,
           createdAt: new Date().toISOString()
         });
       }
       
-      console.log('🔥 [usePortfolio] Portfolio metrics update completed successfully');
+      console.log(' [usePortfolio] Portfolio metrics update completed successfully');
       
     } catch (err) {
       console.error('🔥 [usePortfolio] Error updating portfolio metrics:', err);

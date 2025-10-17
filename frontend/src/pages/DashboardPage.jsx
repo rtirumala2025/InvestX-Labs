@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { usePortfolio } from '../hooks/usePortfolio';
 import { useAlphaVantageData } from '../hooks/useAlphaVantageData';
 import { calculatePerformanceMetrics } from '../services/portfolio/portfolioCalculations';
@@ -11,7 +11,8 @@ import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export default function DashboardPage() {
-  const { user, userProfile } = useAuth();
+  const { currentUser } = useAuth();
+  const userProfile = currentUser?.profile;
   const { portfolio, holdings, loading, error } = usePortfolio();
   const { 
     portfolioMetrics: liveMetrics, 
@@ -255,7 +256,7 @@ export default function DashboardPage() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 mb-2">
-                Welcome back, {user?.displayName?.split(' ')[0] || userProfile?.firstName || 'Investor'}! 👋
+                Welcome back, {currentUser?.displayName?.split(' ')[0] || userProfile?.firstName || 'Investor'}! 👋
               </h1>
               <p className="text-gray-300 text-lg">Here's your investment journey overview</p>
             </div>

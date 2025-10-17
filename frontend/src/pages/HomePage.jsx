@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function HomePage() {
   const { user } = useAuth();

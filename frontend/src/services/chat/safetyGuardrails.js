@@ -1,4 +1,4 @@
-import { RESPONSE_TEMPLATES } from './promptTemplates';
+import { RESPONSE_TEMPLATES } from './responseTemplates.js';
 
 /**
  * Safety guardrails for chatbot responses
@@ -108,7 +108,7 @@ async function checkSpecificStock(query) {
     const stock = match[1] || 'that stock';
     return {
       detected: true,
-      type: 'specificStock',
+      type: 'specific_stock',
       entity: stock,
       response: RESPONSE_TEMPLATES?.safety_redirect?.specific_stock?.(stock) || 
         `I can teach you how to evaluate ${stock}, but I can't tell you whether to buy it. Let's learn how to analyze it together!`,
@@ -137,7 +137,7 @@ async function checkAgeRestricted(query) {
     const strategy = match[1];
     return {
       detected: true,
-      type: 'ageRestricted',
+      type: 'age_restricted',
       entity: strategy,
       response: RESPONSE_TEMPLATES?.safety_redirect?.age_restricted?.(strategy) ||
         `${strategy} is an advanced strategy that's not suitable for beginners. Let's start with the basics of long-term investing first!`,

@@ -1,10 +1,19 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
-import { AuthProvider } from './hooks/useAuth';
+import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import './services/firebase/config';
 import App from './App';
 import './index.css';
+
+// Debug: Check if AuthProvider is properly imported
+console.log('AuthProvider:', AuthProvider);
+
+// Debug: Check if window is available
+if (typeof window !== 'undefined') {
+  console.log('Window is available');
+}
 
 // Global error handler for unhandled promise rejections
 window.addEventListener('unhandledrejection', (event) => {
@@ -25,15 +34,28 @@ window.addEventListener('error', (event) => {
   }
 });
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <Router>
-      <AuthProvider>
-        <ThemeProvider>
-          <App />
-        </ThemeProvider>
-      </AuthProvider>
-    </Router>
-  </React.StrictMode>
-);
+
+// Ensure the root element exists
+const rootElement = document.getElementById('root');
+
+if (!rootElement) {
+  console.error('Failed to find the root element');
+} else {
+  const root = ReactDOM.createRoot(rootElement);
+  
+  // Wrap the app with all necessary providers
+  const AppWithProviders = () => (
+    <React.StrictMode>
+      <Router>
+        <AuthProvider>
+          <ThemeProvider>
+            <App />
+          </ThemeProvider>
+        </AuthProvider>
+      </Router>
+    </React.StrictMode>
+  );
+
+  root.render(<AppWithProviders />);
+  console.log('App rendered with all providers');
+}

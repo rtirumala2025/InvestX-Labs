@@ -1,31 +1,21 @@
-/**
- * Classifies user queries into categories for appropriate handling
- */
-
-// Keywords for query classification
 const QUERY_KEYWORDS = {
   education: [
-    // Basic concepts
     'what is', 'how does', 'explain', 'meaning of', 'difference between',
     'what are', 'how to', 'basics of', 'understand', 'learn about',
     'tell me about', 'can you explain', 'what does', 'how do',
-    // Specific topics
     'compound interest', 'stocks', 'bonds', 'etf', 'index fund',
     'diversification', 'risk', 'inflation', 'tax', 'saving', 'budgeting'
   ],
-  
   suggestion: [
     'should i', 'what should', 'recommend', 'suggest', 'best way to',
     'good investment', 'where to invest', 'how to invest', 'what to buy',
     'which stock', 'which fund', 'pick for me', 'choose', 'advise'
   ],
-  
   portfolio: [
     'my portfolio', 'my investments', 'how am i doing', 'portfolio performance',
     'investment performance', 'track my', 'how is my', 'analyze my',
     'portfolio review', 'investment review'
   ],
-  
   calculation: [
     'calculate', 'how much', 'what will', 'future value', 'savings calculator',
     'investment calculator', 'compound calculator', 'if i invest',
@@ -33,37 +23,66 @@ const QUERY_KEYWORDS = {
   ]
 };
 
-/**
- * Classifies a user query into a specific category
- * @param {string} query - The user's query
- * @returns {string} The query type ('education', 'suggestion', 'portfolio', 'calculation', or 'general')
- */
-export function classifyQuery(query) {
-  if (!query || typeof query !== 'string') return 'general';
+function checkSafetyRequirements(query) {
+  if (!query) return false;
+  
+  const safetyKeywords = [
+    'buy', 'sell', 'invest in', 'trade', 'purchase', 'stock', 'stocks',
+    'bitcoin', 'ethereum', 'crypto', 'cryptocurrency', 'coin', 'token',
+    'nft', 'defi', 'leverage', 'margin', 'short', 'long', 'call', 'put',
+    'option', 'futures', 'forex', 'day trading', 'tsla', 'tesla'
+  ];
   
   const lowerQuery = query.toLowerCase();
+  return safetyKeywords.some(keyword => lowerQuery.includes(keyword));
+}
+
+export function classifyQuery(query) {
+  if (!query || typeof query !== 'string' || !query.trim()) {
+    return {
+      categories: ['general'],
+      primary: 'general',
+      requiresSafety: false
+    };
+  }
+
+  const lowerQuery = query.toLowerCase();
+  const categories = [];
   
-  // Check for each query type
-  for (const [type, keywords] of Object.entries(QUERY_KEYWORDS)) {
+  const cryptoKeywords = ['bitcoin', 'ethereum', 'crypto', 'cryptocurrency', 'blockchain'];
+  const isCryptoRelated = cryptoKeywords.some(keyword => lowerQuery.includes(keyword));
+  
+  if (isCryptoRelated) {
+    categories.push('crypto');
+  }
+  
+  for (const [category, keywords] of Object.entries(QUERY_KEYWORDS)) {
     if (keywords.some(keyword => lowerQuery.includes(keyword))) {
-      // Special case: If it's a suggestion but asks for education
-      if (type === 'suggestion' && 
-          (lowerQuery.includes('how to') || lowerQuery.includes('what is'))) {
-        return 'education';
-      }
-      return type;
+      categories.push(category);
     }
   }
   
-  // Default to general if no specific category matched
-  return 'general';
+  if (categories.includes('suggestion') && 
+      (lowerQuery.includes('how to') || lowerQuery.includes('what is'))) {
+    categories.splice(categories.indexOf('suggestion'), 1);
+    if (!categories.includes('education')) {
+      categories.push('education');
+    }
+  }
+  
+  if (categories.length === 0) {
+    categories.push('general');
+  }
+  
+  const requiresSafety = checkSafetyRequirements(lowerQuery);
+  
+  return {
+    categories,
+    primary: categories[0],
+    requiresSafety
+  };
 }
 
-/**
- * Extracts key entities from the query
- * @param {string} query - The user's query
- * @returns {Object} Extracted entities
- */
 export function extractEntities(query) {
   const entities = {
     amount: null,
@@ -72,13 +91,11 @@ export function extractEntities(query) {
     goal: null
   };
   
-  // Extract amount (e.g., $100, 500 dollars)
   const amountMatch = query.match(/\$?(\d+(?:\.\d{1,2})?)(?:\s*(?:dollars?|usd|\$))?/i);
   if (amountMatch) {
     entities.amount = parseFloat(amountMatch[1]);
   }
   
-  // Extract timeframe (e.g., 5 years, in 10 years)
   const yearMatch = query.match(/(\d+)\s*years?/i);
   const monthMatch = query.match(/(\d+)\s*months?/i);
   
@@ -94,7 +111,6 @@ export function extractEntities(query) {
     };
   }
   
-  // Extract investment type
   const investmentTypes = ['stocks', 'bonds', 'etf', 'crypto', 'savings', 'index fund'];
   for (const type of investmentTypes) {
     if (query.toLowerCase().includes(type)) {
@@ -103,7 +119,6 @@ export function extractEntities(query) {
     }
   }
   
-  // Extract goal if mentioned
   const goalMatch = query.match(/to (save|invest|buy|achieve|reach|have)\s+(.+?)(?:\?|\.|$)/i);
   if (goalMatch) {
     entities.goal = goalMatch[2];
@@ -112,11 +127,6 @@ export function extractEntities(query) {
   return entities;
 }
 
-/**
- * Determines if the query requires a disclaimer
- * @param {string} query - The user's query
- * @returns {boolean} True if a disclaimer is needed
- */
 export function requiresDisclaimer(query) {
   if (!query) return false;
   
@@ -129,12 +139,6 @@ export function requiresDisclaimer(query) {
   return disclaimerTriggers.some(trigger => lowerQuery.includes(trigger));
 }
 
-/**
- * Gets additional context for the query
- * @param {string} query - The user's query
- * @param {Object} userContext - User context
- * @returns {string} Additional context for the prompt
- */
 export function getQueryContext(query, userContext = {}) {
   const context = [];
   const entities = extractEntities(query);
@@ -155,7 +159,6 @@ export function getQueryContext(query, userContext = {}) {
     context.push(`User's goal: ${entities.goal}.`);
   }
   
-  // Add user context if available
   if (userContext.age) {
     context.push(`User is ${userContext.age} years old.`);
   }
@@ -166,3 +169,4 @@ export function getQueryContext(query, userContext = {}) {
   
   return context.join(' ');
 }
+

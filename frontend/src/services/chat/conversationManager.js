@@ -1,284 +1,300 @@
-/**
- * Manages conversation state, history, and summarization
- */
+import { getPromptTemplate, generateConversationSummary, compressLongConversation } from './promptTemplates.js';
+import { classifyQuery } from './queryClassifier.js';
 
-import { v4 as uuidv4 } from 'uuid';
-import { getFirestore, doc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
-import { generateConversationSummary } from './promptTemplates';
-import { extractStructuredData } from './responseFormatter';
-
-const db = getFirestore();
-const MAX_MESSAGES_PER_CONVERSATION = 50;
-const MAX_CONVERSATION_AGE_DAYS = 30;
-
-/**
- * Manages conversation state and persistence
- */
-class ConversationManager {
-  constructor(userId, conversationId = null) {
+export class ConversationManager {
+  constructor(userId, options = {}) {
     this.userId = userId;
-    this.conversationId = conversationId || `conv_${uuidv4()}`;
     this.messages = [];
-    this.summary = '';
     this.metadata = {
+      conversationId: `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       messageCount: 0,
-      tokensUsed: 0,
-      version: '1.0'
+      totalTokensEstimate: 0
     };
+    this.userPreferences = options.userPreferences || {};
+    this.maxMessages = options.maxMessages || 50;
+    this.compressionThreshold = options.compressionThreshold || 30;
   }
 
-  /**
-   * Initializes conversation from Firestore or creates a new one
-   */
-  async initialize() {
-    if (!this.conversationId) {
-      this.conversationId = `conv_${uuidv4()}`;
-      return this._createNewConversation();
+  addMessage(role, content, metadata = {}) {
+    if (!['user', 'assistant', 'system'].includes(role)) {
+      throw new Error('Invalid message role');
     }
-
-    try {
-      const conversation = await this._loadConversation();
-      if (conversation) {
-        this.messages = conversation.messages || [];
-        this.summary = conversation.summary || '';
-        this.metadata = { ...this.metadata, ...(conversation.metadata || {}) };
-        return { exists: true, isNew: false };
-      }
-      
-      return this._createNewConversation();
-    } catch (error) {
-      console.error('Error initializing conversation:', error);
-      return this._createNewConversation();
+    if (!content || typeof content !== 'string') {
+      throw new Error('Message content is required');
     }
-  }
-
-  /**
-   * Adds a message to the conversation
-   */
-  async addMessage(role, content, metadata = {}) {
-    const message = {
-      id: `msg_${Date.now()}`,
-      role,
-      content,
+    
+    // Classify user messages for metadata
+    let classification = null;
+    if (role === 'user') {
+      classification = classifyQuery(content);
+    }
+    
+    const message = { 
+      role, 
+      content, 
       timestamp: new Date().toISOString(),
       metadata: {
-        tokens: this._estimateTokenCount(content),
-        ...metadata
+        ...metadata,
+        classification,
+        tokenEstimate: this.estimateTokens(content),
+        messageId: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       }
     };
-
+    
     this.messages.push(message);
     this.metadata.messageCount++;
-    this.metadata.tokens += (message.metadata.tokens || 0);
     this.metadata.updatedAt = new Date().toISOString();
-
-    // Update conversation summary periodically
-    if (this.messages.length % 5 === 0) {
-      this.summary = await this._generateSummary();
+    this.metadata.totalTokensEstimate += message.metadata.tokenEstimate;
+    
+    // Auto-compress if needed
+    if (this.messages.length > this.compressionThreshold) {
+      this.compressHistory();
     }
-
-    // Save to Firestore
-    await this._saveMessage(message);
-
+    
     return message;
   }
 
-  /**
-   * Clears the current conversation
-   */
-  async clear() {
-    // Archive current conversation
-    await this._archiveConversation();
-    
-    // Start fresh
-    this.conversationId = `conv_${uuidv4()}`;
+  getLastMessage() {
+    return this.messages.length > 0 ? this.messages[this.messages.length - 1] : null;
+  }
+
+  clearHistory() {
     this.messages = [];
-    this.summary = '';
-    this.metadata = {
-      ...this.metadata,
-      messageCount: 0,
-      tokensUsed: 0,
-      updatedAt: new Date().toISOString()
+    this.metadata.messageCount = 0;
+    this.metadata.totalTokensEstimate = 0;
+    this.metadata.updatedAt = new Date().toISOString();
+  }
+
+  getConversationHistory(limit = 10) {
+    return this.messages.slice(-limit);
+  }
+
+  getTemplateForQuery(type) {
+    return getPromptTemplate(type);
+  }
+
+  getSummary(options = {}) {
+    return generateConversationSummary(this.messages, options);
+  }
+
+  compressHistory() {
+    if (this.messages.length <= this.compressionThreshold) return;
+    
+    const compressed = compressLongConversation(this.messages, 2000);
+    this.messages = compressed;
+    this.metadata.compressed = true;
+    this.metadata.compressionDate = new Date().toISOString();
+  }
+
+  getRelevantContext(query, maxMessages = 5, options = {}) {
+    const {
+      useSemanticRanking = true,
+      prioritizeRecent = true,
+      maxTokens = 2000
+    } = options;
+
+    // Always include recent messages
+    const recentMessages = this.messages.slice(-maxMessages);
+    
+    if (!useSemanticRanking || this.messages.length <= maxMessages) {
+      return recentMessages;
+    }
+
+    // Extract keywords and topics from query
+    const queryKeywords = this.extractKeywords(query);
+    const queryTopics = this.identifyTopics(query);
+    
+    // Find older messages with semantic relevance
+    const olderMessages = this.messages.slice(0, -maxMessages);
+    const rankedOlderMessages = this.rankMessagesBySimilarity(
+      olderMessages,
+      queryKeywords,
+      queryTopics
+    );
+
+    // Select top relevant older messages
+    const relevantOlder = rankedOlderMessages.slice(0, 3);
+    
+    // Combine and ensure token limit
+    const combinedMessages = [...relevantOlder, ...recentMessages];
+    return this.trimToTokenLimit(combinedMessages, maxTokens);
+  }
+
+  extractKeywords(text) {
+    const words = text.toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length > 3);
+    
+    // Remove common words
+    const stopWords = new Set(['what', 'when', 'where', 'which', 'this', 'that', 'these', 'those', 'with', 'from', 'about']);
+    return words.filter(w => !stopWords.has(w));
+  }
+
+  identifyTopics(text) {
+    const topicKeywords = {
+      stocks: ['stock', 'stocks', 'share', 'shares', 'equity'],
+      bonds: ['bond', 'bonds', 'treasury', 'fixed income'],
+      etf: ['etf', 'index fund', 'mutual fund', 'fund'],
+      crypto: ['crypto', 'bitcoin', 'ethereum', 'cryptocurrency'],
+      savings: ['save', 'saving', 'savings', 'deposit'],
+      risk: ['risk', 'risky', 'volatile', 'volatility', 'safe'],
+      portfolio: ['portfolio', 'diversif', 'allocation', 'balance'],
+      retirement: ['retirement', '401k', 'ira', 'roth', 'pension']
     };
 
-    return this._createNewConversation();
-  }
+    const lowerText = text.toLowerCase();
+    const identifiedTopics = [];
 
-  /**
-   * Gets conversation context for LLM
-   */
-  getContext(maxTokens = 2000) {
-    // Start with the most recent messages
-    const recentMessages = [...this.messages].reverse();
-    let tokenCount = 0;
-    const contextMessages = [];
-    
-    // Add messages until we hit the token limit
-    for (const msg of recentMessages) {
-      const msgTokens = msg.metadata?.tokens || this._estimateTokenCount(msg.content);
-      
-      if (tokenCount + msgTokens > maxTokens) break;
-      
-      contextMessages.unshift(msg); // Add to beginning to maintain order
-      tokenCount += msgTokens;
-    }
-    
-    // Add summary if we have space
-    if (this.summary && tokenCount < maxTokens * 0.3) {
-      const summaryTokens = this._estimateTokenCount(this.summary);
-      if (tokenCount + summaryTokens <= maxTokens) {
-        contextMessages.unshift({
-          role: 'system',
-          content: `Conversation summary: ${this.summary}`,
-          metadata: { isSummary: true }
-        });
+    for (const [topic, keywords] of Object.entries(topicKeywords)) {
+      if (keywords.some(keyword => lowerText.includes(keyword))) {
+        identifiedTopics.push(topic);
       }
     }
-    
-    return contextMessages;
+
+    return identifiedTopics;
   }
 
-  // Private methods
-  
-  async _loadConversation() {
-    if (!this.userId || !this.conversationId) return null;
-    
-    // In a real implementation, this would load from Firestore
-    // For now, we'll just return null to simulate a new conversation
-    return null;
-  }
-  
-  async _createNewConversation() {
-    this.metadata.createdAt = new Date().toISOString();
-    this.metadata.updatedAt = new Date().toISOString();
-    
-    // In a real implementation, this would save to Firestore
-    // await updateDoc(doc(db, 'users', this.userId), {
-    //   conversations: arrayUnion({
-    //     id: this.conversationId,
-    //     userId: this.userId,
-    //     summary: this.summary,
-    //     messages: this.messages,
-    //     metadata: this.metadata,
-    //     createdAt: serverTimestamp(),
-    //     updatedAt: serverTimestamp()
-    //   })
-    // });
-    
-    return { exists: false, isNew: true };
-  }
-  
-  async _saveMessage(message) {
-    if (!this.userId) return;
-    
-    // In a real implementation, this would update Firestore
-    // const userRef = doc(db, 'users', this.userId);
-    // await updateDoc(userRef, {
-    //   'conversations.$[conv].messages': arrayUnion(message),
-    //   'conversations.$[conv].summary': this.summary,
-    //   'conversations.$[conv].metadata': this.metadata,
-    //   'conversations.$[conv].updatedAt': serverTimestamp()
-    // }, {
-    //   arrayFilters: [{ 'conv.id': this.conversationId }]
-    // });
-  }
-  
-  async _archiveConversation() {
-    if (!this.userId || !this.conversationId) return;
-    
-    // In a real implementation, this would move the conversation to an archive collection
-    // and clean up the active conversations
-  }
-  
-  async _generateSummary() {
-    if (this.messages.length === 0) return '';
-    
-    // Use the last few messages to generate a summary
-    const recentMessages = this.messages.slice(-5);
-    const conversationText = recentMessages
-      .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-      .join('\n');
-    
-    // In a real implementation, you might use an LLM to generate a better summary
-    // For now, we'll use a simple approach
-    return generateConversationSummary(conversationText);
-  }
-  
-  _estimateTokenCount(text) {
-    // Rough estimate: ~4 characters per token
-    return Math.ceil((text?.length || 0) / 4);
-  }
-}
-
-/**
- * Manages multiple conversations for a user
- */
-export class ConversationHistoryManager {
-  constructor(userId) {
-    this.userId = userId;
-    this.conversations = [];
-    this.currentConversation = null;
+  rankMessagesBySimilarity(messages, queryKeywords, queryTopics) {
+    return messages
+      .map(msg => {
+        const msgKeywords = this.extractKeywords(msg.content);
+        const msgTopics = this.identifyTopics(msg.content);
+        
+        // Calculate keyword overlap score
+        const keywordOverlap = msgKeywords.filter(k => 
+          queryKeywords.includes(k)
+        ).length;
+        
+        // Calculate topic overlap score
+        const topicOverlap = msgTopics.filter(t => 
+          queryTopics.includes(t)
+        ).length;
+        
+        // Boost score for user messages (they contain the actual questions)
+        const roleBoost = msg.role === 'user' ? 1.5 : 1.0;
+        
+        // Calculate recency score (newer messages get slight boost)
+        const recencyScore = 1.0; // Could add timestamp-based scoring
+        
+        const score = (keywordOverlap * 2 + topicOverlap * 3) * roleBoost * recencyScore;
+        
+        return { msg, score };
+      })
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.msg);
   }
 
-  /**
-   * Loads conversation history for the user
-   */
-  async loadHistory(limit = 10) {
-    // In a real implementation, this would load from Firestore
-    // For now, we'll return an empty array
-    this.conversations = [];
-    return this.conversations;
-  }
+  trimToTokenLimit(messages, maxTokens) {
+    let totalTokens = 0;
+    const trimmedMessages = [];
 
-  /**
-   * Gets a conversation by ID
-   */
-  async getConversation(conversationId) {
-    if (this.currentConversation?.conversationId === conversationId) {
-      return this.currentConversation;
+    // Add messages from most recent backwards until token limit
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msgTokens = this.estimateTokens(messages[i].content);
+      if (totalTokens + msgTokens <= maxTokens) {
+        trimmedMessages.unshift(messages[i]);
+        totalTokens += msgTokens;
+      } else {
+        break;
+      }
     }
 
-    // In a real implementation, this would load from Firestore
-    const conversation = new ConversationManager(this.userId, conversationId);
-    await conversation.initialize();
-    
-    this.currentConversation = conversation;
-    return conversation;
+    return trimmedMessages;
   }
 
-  /**
-   * Creates a new conversation
-   */
-  async createConversation() {
-    const conversation = new ConversationManager(this.userId);
-    await conversation.initialize();
+  estimateTokens(text) {
+    // Rough estimate: ~4 characters per token
+    return Math.ceil(text.length / 4);
+  }
+
+  getMetadata() {
+    return {
+      ...this.metadata,
+      currentMessageCount: this.messages.length,
+      topics: this.extractTopics(),
+      averageMessageLength: this.messages.length > 0 
+        ? Math.round(this.messages.reduce((sum, msg) => sum + msg.content.length, 0) / this.messages.length)
+        : 0
+    };
+  }
+
+  extractTopics() {
+    const topics = new Set();
+    const keywords = ['stock', 'bond', 'etf', 'crypto', 'savings', 'budget', 'invest', 'portfolio'];
     
-    this.currentConversation = conversation;
-    this.conversations.unshift({
-      id: conversation.conversationId,
-      summary: 'New conversation',
-      updatedAt: new Date().toISOString(),
-      messageCount: 0
+    this.messages.forEach(msg => {
+      const content = msg.content.toLowerCase();
+      keywords.forEach(keyword => {
+        if (content.includes(keyword)) {
+          topics.add(keyword);
+        }
+      });
     });
     
-    return conversation;
+    return Array.from(topics);
   }
 
-  /**
-   * Deletes a conversation
-   */
-  async deleteConversation(conversationId) {
-    // In a real implementation, this would delete from Firestore
-    this.conversations = this.conversations.filter(c => c.id !== conversationId);
+  async saveToFirestore(db) {
+    if (!db || !this.userId) return null;
     
-    if (this.currentConversation?.conversationId === conversationId) {
-      this.currentConversation = null;
+    try {
+      const conversationData = {
+        userId: this.userId,
+        conversationId: this.metadata.conversationId,
+        messages: this.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+          metadata: msg.metadata
+        })),
+        metadata: this.getMetadata(),
+        updatedAt: new Date()
+      };
+      
+      // This would integrate with Firebase
+      // await setDoc(doc(db, 'conversations', this.metadata.conversationId), conversationData);
+      
+      return conversationData;
+    } catch (error) {
+      console.error('Error saving conversation:', error);
+      throw error;
     }
+  }
+
+  static async loadFromFirestore(db, userId, conversationId) {
+    if (!db || !userId || !conversationId) return null;
     
-    return true;
+    try {
+      // This would integrate with Firebase
+      // const docRef = doc(db, 'conversations', conversationId);
+      // const docSnap = await getDoc(docRef);
+      
+      // if (docSnap.exists()) {
+      //   const data = docSnap.data();
+      //   const manager = new ConversationManager(userId);
+      //   manager.messages = data.messages || [];
+      //   manager.metadata = data.metadata || manager.metadata;
+      //   return manager;
+      // }
+      
+      return null;
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+      throw error;
+    }
+  }
+
+  exportConversation() {
+    return {
+      userId: this.userId,
+      conversationId: this.metadata.conversationId,
+      messages: this.messages,
+      metadata: this.getMetadata(),
+      exportedAt: new Date().toISOString()
+    };
   }
 }
-
-export default ConversationManager;

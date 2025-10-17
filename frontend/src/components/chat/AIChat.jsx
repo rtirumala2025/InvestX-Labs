@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { 
   FiSend, 
   FiRefreshCw, 
@@ -9,7 +9,8 @@ import {
   FiLoader
 } from 'react-icons/fi';
 import { usePortfolio } from '../../hooks/usePortfolio';
-import { useLlamaAI } from '../../hooks/useLlamaAI';
+import { useAuth } from '../../contexts/AuthContext';
+import { useInvestIQChat } from '../../hooks/useInvestIQChat';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import styles from './AIChat.module.css';
 
@@ -21,7 +22,20 @@ const AIChat = () => {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const { portfolio } = usePortfolio();
-  const { sendMessage } = useLlamaAI();
+  const { currentUser } = useAuth();
+  const { sendMessage: sendInvestMessage } = useInvestIQChat();
+  
+  // Build user profile payload for backend
+  const userProfile = useMemo(() => {
+    const profile = currentUser?.profile || {};
+    return {
+      age: profile.age ?? 16,
+      riskTolerance: profile.riskTolerance ?? 'moderate',
+      investmentGoals: profile.investmentGoals ?? ['growth', 'education'],
+      investmentExperience: profile.investmentExperience ?? 'beginner',
+      timeHorizon: profile.timeHorizon ?? 'long_term',
+    };
+  }, [currentUser]);
   
   // Focus input on mount
   useEffect(() => {
@@ -89,21 +103,8 @@ const AIChat = () => {
         timestamp: new Date().toISOString()
       }]);
 
-      // Call the backend API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: userMessage,
-          portfolioData: portfolio // Include portfolio data if available
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from AI service');
-      }
-
-      const data = await response.json();
+      // Call backend via InvestIQ hook with userProfile
+      const { reply, structuredData } = await sendInvestMessage(userMessage, userProfile);
       
       // Remove typing indicator and add AI response
       setMessages(prev => [
@@ -111,7 +112,7 @@ const AIChat = () => {
         {
           id: `ai-${Date.now()}`,
           type: 'assistant',
-          content: data.reply || 'Sorry, I could not process your request.',
+          content: reply || 'Sorry, I could not process your request.',
           timestamp: new Date().toISOString()
         }
       ]);
@@ -124,7 +125,7 @@ const AIChat = () => {
         {
           id: `error-${Date.now()}`,
           type: 'assistant',
-          content: 'Sorry, something went wrong while connecting to the AI service. Please try again later.',
+          content: 'AI service unavailable. Please try again shortly.',
           timestamp: new Date().toISOString(),
           isError: true
         }

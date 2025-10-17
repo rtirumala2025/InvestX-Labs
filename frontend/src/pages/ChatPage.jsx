@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import AIChat from '../components/chat/AIChat';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { FiMessageSquare, FiSend } from 'react-icons/fi';
 
 const ChatPage = () => {

@@ -11,7 +11,7 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn: login } = useAuth(); // Using signIn as login for backward compatibility
+  const { signIn: login, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const fadeIn = {
@@ -25,22 +25,45 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      const result = await login(email, password);
+      if (result.success) {
+        navigate('/dashboard');
+      } else {
+        setError(result.error || 'Failed to log in. Please check your credentials.');
+      }
     } catch (error) {
-      setError('Failed to log in. Please check your credentials.');
+      setError('An unexpected error occurred. Please try again.');
       console.error('Login error:', error);
+    } finally {
       setLoading(false);
     }
   };
-  // Google Sign In is not implemented in the new AuthContext yet
-  const handleGoogleSignIn = () => {
-    setError('Google Sign In is currently unavailable. Please use email and password.');
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
+    
+    try {
+      const result = await signInWithGoogle();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to sign in with Google');
+      }
+      
+      // If we're not redirecting, navigate to dashboard
+      if (!result.redirecting) {
+        navigate('/dashboard');
+      }
+      // If redirecting, the redirect flow will handle the navigation
+    } catch (error) {
+      setError(error.message);
+      console.error('Google sign-in error:', error);
+      setLoading(false);
+    }
   };
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden font-sans">
-      {/* Floating gradient orbs - matching homepage */}
+      {/* Floating gradient orbs */}
       <motion.div
         className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-blue-500/40 to-purple-500/30 rounded-full blur-3xl"
         animate={{ y: [0, 20, 0] }}
@@ -221,7 +244,7 @@ const LoginPage = () => {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                Sign in with Google
+                {loading ? 'Signing in...' : 'Sign in with Google'}
               </GlassButton>
             </form>
 
