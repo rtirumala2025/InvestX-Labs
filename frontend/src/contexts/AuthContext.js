@@ -1,8 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { signInUser, signOutUser, onAuthStateChange } from '../services/firebase/auth';
+import { signInUser, signOutUser, onAuthStateChange, signInWithGoogle as signInWithGoogleAuth } from '../services/firebase/auth';
 import { getUserProfile } from '../services/firebase/userService';
 
-const AuthContext = createContext();
+const AuthContext = createContext({
+  currentUser: null,
+  loading: true,
+  signIn: async () => ({}),
+  signInWithGoogle: async () => ({}),  // Add this line
+  signOut: async () => {},
+  updateProfile: async () => ({})
+});
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -64,16 +71,29 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
   };
+const signInWithGoogle = async () => {
+  try {
+    setLoading(true);
+    const result = await signInWithGoogleAuth();
+    return { success: true, user: result.user };
+  } catch (error) {
+    console.error('Google Sign-In error:', error);
+    return { success: false, error: error.message };
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const value = {
-    currentUser,
-    loading,
-    signIn,
-    signOut,
-    // Add other auth methods as needed
-    login: signIn, // Alias for backward compatibility
-    logout: signOut // Alias for backward compatibility
-  };
+// Then the value object
+const value = {
+  currentUser,
+  loading,
+  signIn,
+  signInWithGoogle,  // Now this is defined above
+  signOut,
+  login: signIn,
+  logout: signOut
+};
 
   // Always render children, but provide loading state in the context
   return (
