@@ -86,6 +86,7 @@ app.add_middleware(
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["*"]  # Configure appropriately for production
+)
 
 # Setup error handlers
 setup_error_handlers(app)

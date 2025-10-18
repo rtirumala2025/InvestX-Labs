@@ -3,7 +3,8 @@ Configuration settings for the AI Investment Backend
 """
 import os
 from typing import Optional
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -15,12 +16,8 @@ class Settings(BaseSettings):
     api_debug: bool = Field(default=False, env="API_DEBUG")
     
     # OpenAI Configuration
-    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-3.5-turbo", env="OPENAI_MODEL")
-    
-    # Anthropic Configuration
-    anthropic_api_key: Optional[str] = Field(default=None, env="ANTHROPIC_API_KEY")
-    
+    openrouter_api_key: str = Field(..., env="OPENROUTER_API_KEY")
+
     # Firebase Configuration
     firebase_project_id: str = Field(..., env="FIREBASE_PROJECT_ID")
     firebase_private_key_id: str = Field(..., env="FIREBASE_PRIVATE_KEY_ID")

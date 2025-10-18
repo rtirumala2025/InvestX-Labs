@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, Sparkles, TrendingUp, BookOpen, DollarSign } from 'lucide-react';
-import { chatAPI } from '../../services/chat/api';
 
 const AIChat = () => {
   const [messages, setMessages] = useState([]);
@@ -14,7 +13,7 @@ const AIChat = () => {
     setMessages([{
       id: 'welcome',
       type: 'assistant',
-      content: "Hello! I'm InvestX Labs, your AI investment assistant. I can help you understand investing concepts, analyze your portfolio, and answer any financial questions you have. What would you like to learn about today?",
+      content: "Hello! I'm InvestIQ, your AI investment assistant. I can help you understand investing concepts, analyze your portfolio, and answer any financial questions you have. What would you like to learn about today?",
       timestamp: new Date().toISOString()
     }]);
   }, []);
@@ -32,7 +31,6 @@ const AIChat = () => {
     setInputMessage('');
     setIsLoading(true);
 
-    // Add user message to chat
     const userMsg = {
       id: `user-${Date.now()}`,
       type: 'user',
@@ -42,34 +40,25 @@ const AIChat = () => {
 
     setMessages(prev => [...prev, userMsg]);
 
-    try {
-      // Call the backend API using our service
-      const response = await chatAPI.sendMessage(message);
+    // Simulate AI response
+    setTimeout(() => {
+      const responses = [
+        "That's a great question! Let me explain...",
+        "I can help you with that. Here's what you need to know...",
+        "Interesting topic! From an investment perspective...",
+        "Let me break that down for you in simple terms..."
+      ];
       
-      // Add assistant's response to chat
       const assistantMsg = {
         id: `assistant-${Date.now()}`,
         type: 'assistant',
-        content: response.response || response.message || "I'm here to help with your investment questions!",
+        content: responses[Math.floor(Math.random() * responses.length)] + " " + message,
         timestamp: new Date().toISOString()
       };
       
       setMessages(prev => [...prev, assistantMsg]);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      
-      // Show error message to user
-      const errorMsg = {
-        id: `error-${Date.now()}`,
-        type: 'assistant',
-        content: error.response?.data?.message || "I'm having trouble connecting to the server. Please try again later.",
-        timestamp: new Date().toISOString()
-      };
-      
-      setMessages(prev => [...prev, errorMsg]);
-    } finally {
       setIsLoading(false);
-    }
+    }, 1500);
   };
 
   const quickPrompts = [
@@ -85,7 +74,7 @@ const AIChat = () => {
   };
 
   return (
-    <div className="h-full bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 relative overflow-hidden">
       {/* Animated Background Orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-10 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
@@ -93,7 +82,7 @@ const AIChat = () => {
         <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto h-full flex flex-col">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 py-8 h-screen flex flex-col">
         {/* Header */}
         <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6 shadow-2xl">
           <div className="flex items-center gap-3">
@@ -102,16 +91,16 @@ const AIChat = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                InvestX Labs Assistant
+                InvestIQ Assistant
               </h1>
-              <p className="text-sm text-gray-400">Your personal AI investment assistant</p>
+              <p className="text-sm text-gray-400">Your personal AI investing guide</p>
             </div>
           </div>
         </div>
 
         {/* Messages Container */}
         <div className="flex-1 backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {messages.length === 1 && (
               <div className="mb-6">
                 <p className="text-gray-400 text-sm mb-4 text-center">Try asking about:</p>
@@ -156,7 +145,7 @@ const AIChat = () => {
                       <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-purple-600">
                         <Sparkles className="w-3 h-3 text-white" />
                       </div>
-                      <span className="text-xs text-gray-400 font-medium">InvestX Labs</span>
+                      <span className="text-xs text-gray-400 font-medium">InvestIQ</span>
                     </div>
                   )}
                   <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
@@ -209,7 +198,7 @@ const AIChat = () => {
               </button>
             </form>
             <p className="text-xs text-gray-500 mt-3 text-center">
-              InvestX Labs provides educational information only. Not financial advice.
+              InvestIQ provides educational information only. Not financial advice.
             </p>
           </div>
         </div>
