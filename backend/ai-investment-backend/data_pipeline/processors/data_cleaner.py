@@ -464,3 +464,29 @@ class DataCleaner:
 
 # Global data cleaner instance
 data_cleaner = DataCleaner()
+
+
+def is_content_safe(self, content: str) -> bool:
+    """
+    Run semantic and heuristic checks to detect unsafe content.
+    """
+    try:
+        # Basic checks
+        if not content or len(content.strip()) == 0:
+            return False
+
+        # Example heuristic: block content with banned keywords
+        banned_keywords = ['gamble', 'scam', 'illegal']
+        if any(keyword in content.lower() for keyword in banned_keywords):
+            return False
+
+        # TODO: Integrate semantic moderation API call here
+        # e.g., response = moderation_api.check(content)
+        # if response.flagged:
+        #     return False
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Error during content safety check: {e}")
+        return False
