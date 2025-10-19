@@ -4,6 +4,20 @@ const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
+const cors = require('cors');
+const { handleChatMessage } = require('./chat/chatService');
+
+// Configure CORS
+const corsHandler = cors({
+  origin: [
+    'http://localhost:3000',
+    'https://investx-labs.web.app',
+    'https://investx-labs.firebaseapp.com'
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+});
 
 // Initialize Firebase Admin
 initializeApp();
@@ -247,11 +261,73 @@ exports.weeklyPortfolioAnalysis = onSchedule('0 10 * * 1', async (event) => {
   }
 });
 
+// Chat Endpoint
+exports.chat = onRequest(async (req, res) => {
+  console.log('Received chat request:', {
+    method: req.method,
+    headers: req.headers,
+    body: req.body
+  });
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request');
+    return corsHandler(req, res, () => {
+      res.status(204).send('');
+    });
+  }
+
+  // Handle actual request with CORS
+  return corsHandler(req, res, async () => {
+    try {
+      if (req.method !== 'POST') {
+        console.error('Method not allowed:', req.method);
+        return res.status(405).json({ 
+          error: 'Method not allowed',
+          allowed: ['POST']
+        });
+      }
+
+      console.log('Processing chat message:', req.body);
+      const { message, userId = 'anonymous', sessionId = 'default' } = req.body;
+
+      if (!message) {
+        console.error('No message provided in request');
+        return res.status(400).json({ 
+          error: 'Message is required',
+          received: req.body
+        });
+      }
+
+      console.log('Calling handleChatMessage with:', { message, userId, sessionId });
+      const response = await handleChatMessage(message, userId, sessionId);
+      
+      console.log('Sending response:', response);
+      res.json(response);
+      
+    } catch (error) {
+      console.error('Error in chat endpoint:', {
+        error: error.message,
+        stack: error.stack,
+        body: req.body
+      });
+      
+      res.status(500).json({ 
+        error: 'Failed to process chat message',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+});
+
 // Health Check Endpoint
 exports.healthCheck = onRequest(async (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0'
+  cors(req, res, () => {
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0'
+    });
   });
 });

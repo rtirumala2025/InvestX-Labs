@@ -26,11 +26,12 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "2.0.3",
-    "@testing-library/jest-dom": "^5.16.4",
-    "@testing-library/react": "^13.3.0",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "autoprefixer": "^10.4.7",
     "jest-axe": "^7.0.0",
+    "nock": "^14.0.10",
     "postcss": "^8.4.14"
   },
   "scripts": {
