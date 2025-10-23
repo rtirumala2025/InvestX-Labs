@@ -1,17 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  signInUser, 
-  signOutUser, 
+import {
+  signInUser,
+  signUpUser,
+  signOutUser,
   onAuthStateChange,
   getCurrentUser,
-  signInWithGoogle as signInWithGoogleAuth,
-  getGoogleRedirectResult
-} from '../services/firebase/auth';
-import { 
-  getUserProfile, 
-  createUserProfile,
-  updateUserProfile  // Added missing import
-} from '../services/firebase/userService';
+  signInWithGoogle,
+  updateUserProfile
+} from '../services/supabase/auth';
+import { supabase } from '../services/supabase/config';
 
 const AuthContext = createContext({
   currentUser: null,
@@ -36,15 +33,30 @@ export function AuthProvider({ children }) {
     const handleAuthStateChange = async (user) => {
       if (user) {
         try {
-          let profile = await getUserProfile(user.uid);
+          // Get user profile from Supabase
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
           if (!profile) {
             // Create a new profile if it doesn't exist
-            profile = {
+            const newProfile = {
+              id: user.id,
               email: user.email,
-              displayName: user.displayName || user.email,
-              profileCompleted: false
+              full_name: user.user_metadata?.full_name || user.email.split('@')[0],
+              username: user.user_metadata?.username || user.email.split('@')[0],
+              profile_completed: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
             };
-            await createUserProfile(user.uid, profile);
+
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert([newProfile]);
+
+            if (insertError) throw insertError;
           }
 
           setCurrentUser({
@@ -73,14 +85,7 @@ export function AuthProvider({ children }) {
     // Set up the initial auth state
     const initializeAuth = async () => {
       try {
-        // First check for a redirect result
-        const result = await getGoogleRedirectResult();
-        if (result?.user) {
-          await handleAuthStateChange(result.user);
-          return;
-        }
-        
-        // If no redirect result, check current auth state
+        // Check current auth state
         const user = await getCurrentUser();
         if (user) {
           await handleAuthStateChange(user);
@@ -106,13 +111,49 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // Sign in function
+  // Sign in with email and password
   const signIn = async (email, password) => {
     try {
       setLoading(true);
-      const result = await signInUser(email, password);
-      return { success: true, user: result.user };
+      const { user, error } = await signInUser(email, password);
+      
+      if (error) throw error;
+      
+      // Get user profile after successful sign in
+      if (user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        if (profileError) throw profileError;
+        setCurrentUser({ ...user, ...profile });
+      }
+      
+      return { success: true };
     } catch (error) {
+      console.error('Sign in error:', error);
+      return { success: false, error: error.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sign up with email and password
+  const signUp = async (email, password, userData) => {
+    try {
+      setLoading(true);
+      const { user, error } = await signUpUser(email, password, userData);
+      
+      if (error) throw error;
+      
+      // User profile is created in the auth state change handler
+      // which is triggered automatically after sign up
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Sign up error:', error);
       return { success: false, error: error.message };
     } finally {
       setLoading(false);
@@ -130,30 +171,10 @@ export function AuthProvider({ children }) {
         sessionStorage.setItem('preAuthUrl', window.location.pathname);
       }
       
-      const result = await signInWithGoogleAuth();
+      // This will redirect to Google OAuth page
+      const { error } = await signInWithGoogle();
       
-      if (result?.user) {
-        // For popup flow
-        const profile = {
-          email: result.user.email,
-          displayName: result.user.displayName || result.user.email,
-          profileCompleted: false
-        };
-        
-        // Create or update user profile
-        await createUserProfile(result.user.uid, profile);
-        
-        setCurrentUser({
-          ...result.user,
-          profile
-        });
-        
-        return { 
-          success: true, 
-          user: result.user,
-          redirecting: false
-        };
-      }
+      if (error) throw error;
       
       // If we get here, it's a redirect flow
       return { 

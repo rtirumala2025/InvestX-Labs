@@ -1,16 +1,65 @@
-import { get, post, patch, handleApiError } from './apiClient';
+import apiClient from './apiClient';
 import { getSession } from './auth';
 import { logError, logInfo } from '../../utils/logger';
 
+const { get, post, put, del, patch, handleApiError, withRetry } = apiClient;
+
+// Cache configuration
+const CACHE_TTL = {
+  SHORT: 5 * 60 * 1000, // 5 minutes
+  MEDIUM: 15 * 60 * 1000, // 15 minutes
+  LONG: 60 * 60 * 1000, // 1 hour
+};
+
+// Cache storage
+const cache = new Map();
+
+/**
+ * Get cached data if available and not expired
+ * @param {string} key - Cache key
+ * @returns {any|null} Cached data or null if not found/expired
+ */
+const getCachedData = (key) => {
+  const cached = cache.get(key);
+  if (!cached) return null;
+  
+  const { data, timestamp, ttl } = cached;
+  if (Date.now() - timestamp > ttl) {
+    cache.delete(key);
+    return null;
+  }
+  
+  return data;
+};
+
+/**
+ * Set data in cache
+ * @param {string} key - Cache key
+ * @param {any} data - Data to cache
+ * @param {number} [ttl=CACHE_TTL.MEDIUM] - Time to live in ms
+ */
+const setCachedData = (key, data, ttl = CACHE_TTL.MEDIUM) => {
+  cache.set(key, {
+    data,
+    timestamp: Date.now(),
+    ttl
+  });
+};
+
+/**
+ * Invalidate cache entries matching a key pattern
+ * @param {string} pattern - Cache key pattern (supports startsWith)
+ */
+const invalidateCache = (pattern) => {
+  for (const key of cache.keys()) {
+    if (key.startsWith(pattern)) {
+      cache.delete(key);
+    }
+  }
+};
+
 // API Base URL - should be set in environment variables
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-
-// Cache time constants (in milliseconds)
-const CACHE_TTL = {
-  SHORT: 60 * 1000, // 1 minute
-  MEDIUM: 5 * 60 * 1000, // 5 minutes
-  LONG: 30 * 60 * 1000, // 30 minutes
-};
 
 // Maximum retry attempts for API calls
 const MAX_RETRIES = 3;
@@ -19,72 +68,77 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 
 /**
- * Get MCP context for the current user with retry logic
- * @param {Object} options - Additional options
- * @param {boolean} options.useCache - Whether to use cache (default: true)
- * @param {number} options.retries - Number of retry attempts (default: MAX_RETRIES)
+ * Get MCP context for a user
+ * @param {string} userId - User ID
+ * @param {Object} [options] - Options
+ * @param {boolean} [options.useCache=true] - Whether to use cache
+ * @param {number} [options.cacheTtl=CACHE_TTL.MEDIUM] - Cache TTL in ms
+ * @param {number} [options.retries=2] - Number of retry attempts
  * @returns {Promise<Object>} MCP context data
  */
-export const getMCPContext = async (options = {}) => {
-  const { useCache = true, retries = MAX_RETRIES } = options;
+export const getMCPContext = async (userId, options = {}) => {
+  const { 
+    useCache = true, 
+    cacheTtl = CACHE_TTL.MEDIUM,
+    retries = 2
+  } = options;
   
-  const attempt = async (attemptNumber = 1) => {
-    try {
-      logInfo('Fetching MCP context', { attempt: attemptNumber });
-      
-      const response = await get(
-        `${API_BASE_URL}/mcp/context`,
+  const cacheKey = `mcp:context:${userId}`;
+  
+  // Return cached data if available and cache is enabled
+  if (useCache) {
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      logInfo('Returning cached MCP context');
+      return cached;
+    }
+  }
+  
+  try {
+    logInfo(`Fetching MCP context for user ${userId}`);
+    
+    const response = await withRetry(
+      () => get(
+        `${API_BASE_URL}/mcp/context/${userId}`,
         {
-          // Include any additional context needed by the backend
-          timestamp: new Date().toISOString(),
-          sessionId: getSession()?.sessionId,
-          userAgent: navigator?.userAgent
-        },
-        {
-          useCache,
-          cacheTtl: CACHE_TTL.MEDIUM,
           headers: {
             'Authorization': `Bearer ${getSession()?.accessToken || ''}`,
-            'X-Request-ID': `mcp-context-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            'X-Request-ID': `mcp-ctx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
           }
         }
-      );
-      
-      logInfo('Successfully fetched MCP context');
-      return response.data || {};
-      
-    } catch (error) {
-      logError('Error getting MCP context:', error);
-      
-      // If we have retries left, wait and try again
-      if (attemptNumber < retries) {
-        const delay = RETRY_DELAY * Math.pow(2, attemptNumber - 1);
-        logInfo(`Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return attempt(attemptNumber + 1);
-      }
-      
-      // If we're out of retries, handle the error
-      handleApiError(error, 'Failed to fetch MCP context');
-      
-      // In development, return mock data if the API call fails
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('Using mock MCP context due to error');
-        return {
-          riskProfile: 'moderate',
-          investmentGoals: ['growth', 'income'],
-          timeHorizon: 5, // years
-          lastUpdated: new Date().toISOString(),
-          disclaimer: 'This is mock data for development purposes only.'
-        };
-      }
-      
-      // In production, rethrow the error to be handled by the caller
-      throw error;
+      ),
+      { retries, delay: 1000 }
+    );
+    
+    const data = response?.data || {};
+    
+    // Cache the response if successful
+    if (useCache) {
+      setCachedData(cacheKey, data, cacheTtl);
     }
-  };
-  
-  return attempt();
+    
+    logInfo('Successfully fetched MCP context');
+    return data;
+  } catch (error) {
+    logError('Error fetching MCP context:', error);
+    
+    // In development, return mock data if the API call fails
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Using mock MCP context due to error');
+      return {
+        userId,
+        riskProfile: 'moderate',
+        investmentGoals: ['growth', 'income'],
+        riskTolerance: 5,
+        timeHorizon: 5,
+        preferredAssetClasses: ['stocks', 'etfs'],
+        lastUpdated: new Date().toISOString(),
+        _mock: true
+      };
+    }
+    
+    throw error;
+  }
 };
 
 /**
@@ -189,7 +243,7 @@ export const getMCPRecommendations = async (options = {}, fetchOptions = {}) => 
         contextId
       });
       
-            const response = await get(
+      const response = await get(
         `${API_BASE_URL}/mcp/recommendations`,
         {
           type,
@@ -258,53 +312,92 @@ export const getMCPRecommendations = async (options = {}, fetchOptions = {}) => 
 };
 
 /**
-* Send user feedback on MCP recommendations with retry logic
-* @param {string} recommendationId - ID of the recommendation
-* @param {Object} feedback - Feedback data
-* @param {string} feedback.rating - User rating (e.g., 'helpful', 'not_helpful')
-* @param {string} [feedback.comment] - Optional comment
-* @param {string} [feedback.userId] - Optional user ID (will use current session if not provided)
-* @param {Object} options - Additional options
-* @param {number} [options.retries=MAX_RETRIES] - Number of retry attempts
-* @returns {Promise<Object>} Confirmation of feedback submission
-*/
-export const submitMCPFeedback = async (recommendationId, feedback, options = {}) => {
-const { retries = MAX_RETRIES } = options;
-const session = getSession();
-  
-if (!session && !feedback.userId) {
-const error = new Error('User not authenticated and no userId provided in feedback');
-logError('Authentication required for submitting MCP feedback', error);
-throw error;
-}
-  
-const attempt = async (attemptNumber = 1) => {
-  
-  return attempt();
-};
-
+ * Submit feedback for MCP content
+ * @param {Object} feedback - Feedback data
+ * @param {string} feedback.userId - User ID
+ * @param {string} feedback.contentId - ID of the content
+ * @param {number} feedback.rating - Rating (1-5)
+ * @param {string} [feedback.comment] - Optional comment
+ * @param {Object} [feedback.metadata] - Additional metadata
+ * @returns {Promise<Object>} Submission response
+ */
 /**
-* Track MCP recommendation interaction
-* @param {string} recommendationId - ID of the recommendation
-* @param {string} interactionType - Type of interaction (e.g., 'view', 'click', 'dismiss')
-* @param {Object} [metadata] - Additional metadata about the interaction
-* @returns {Promise<Object>} - Confirmation of interaction tracking
-*/
-export const trackMCPInteraction = async (recommendationId, interactionType, metadata = {}) => {
+ * Submit feedback for MCP content
+ * @param {Object} feedback - Feedback data
+ * @param {string} feedback.userId - User ID
+ * @param {string} feedback.contentId - ID of the content
+ * @param {number} feedback.rating - Rating (1-5)
+ * @param {string} [feedback.comment] - Optional comment
+ * @param {Object} [feedback.metadata] - Additional metadata
+ * @returns {Promise<Object>} Submission response
+ */
+export const submitFeedback = async (feedback) => {
+  const { userId, contentId, rating, comment = '', metadata = {} } = feedback;
+  const session = getSession();
+  
   try {
-    const session = getSession();
+    logInfo(`Submitting feedback for content ${contentId}`);
     
-    // Don't fail the app if tracking fails
     const response = await post(
-      `${API_BASE_URL}/mcp/interactions/track`,
+      '/api/mcp/feedback',
       {
-        recommendationId,
-        interactionType,
+        userId: session?.user?.id || userId,
+        contentId,
+        rating,
+        comment,
         metadata: {
           ...metadata,
           timestamp: new Date().toISOString(),
-          url: window.location.href,
-          userAgent: navigator?.userAgent
+          url: typeof window !== 'undefined' ? window.location.href : '',
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+        },
+        sessionId: session?.sessionId
+      },
+      {
+        useCache: false,
+        headers: {
+          'Authorization': `Bearer ${session?.accessToken || ''}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    return response?.data || { success: true };
+  } catch (error) {
+    // Log the error but don't throw - we don't want to break the UI for tracking
+    logError('Error submitting MCP feedback:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to submit feedback' 
+    };
+  }
+};
+
+/**
+ * Track user interaction with MCP content
+ * @param {Object} interaction - Interaction data
+ * @param {string} interaction.type - Type of interaction (e.g., 'view', 'click', 'dismiss')
+ * @param {string} interaction.contentId - ID of the content
+ * @param {Object} [interaction.metadata] - Additional metadata
+ * @returns {Promise<Object>} Tracking response
+ */
+export const trackMCPInteraction = async (interaction) => {
+  const { type, contentId, metadata = {} } = interaction;
+  const session = getSession();
+  
+  try {
+    logInfo(`Tracking MCP interaction: ${type} for content ${contentId}`);
+    
+    const response = await post(
+      '/api/mcp/interactions',
+      {
+        type,
+        contentId,
+        metadata: {
+          ...metadata,
+          timestamp: new Date().toISOString(),
+          url: typeof window !== 'undefined' ? window.location.href : '',
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
         },
         userId: session?.user?.id,
         sessionId: session?.sessionId
@@ -318,40 +411,18 @@ export const trackMCPInteraction = async (recommendationId, interactionType, met
       }
     );
     
-    return response.data;
+    return response?.data || { success: true };
   } catch (error) {
-    // Log the error but don't throw - we don't want to break the UI for tracking
     logError('Error tracking MCP interaction:', error);
     return { success: false, error: error.message };
   }
-url: window.location.href,
-userAgent: navigator?.userAgent
-},
-userId: session?.user?.id,
-sessionId: session?.sessionId
-},
-{
-useCache: false,
-headers: {
-'Authorization': `Bearer ${session?.accessToken || ''}`,
-'Content-Type': 'application/json'
-}
-}
-);
-  
-return response.data;
-} catch (error) {
-// Log the error but don't throw - we don't want to break the UI for tracking
-logError('Error tracking MCP interaction:', error);
-return { success: false, error: error.message };
-}
 };
 
 // Export all functions
 export default {
-getMCPContext,
-updateMCPContext,
-getMCPRecommendations,
-submitMCPFeedback,
-trackMCPInteraction
+  getMCPContext,
+  updateMCPContext,
+  getMCPRecommendations,
+  submitFeedback,
+  trackMCPInteraction
 };

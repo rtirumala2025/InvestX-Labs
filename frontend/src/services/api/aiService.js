@@ -1,6 +1,8 @@
-import { get, post, handleApiError, withRetry } from './apiClient';
+import apiClient from './apiClient';
 import { getSession } from './auth';
 import { logError, logInfo } from '../../utils/logger';
+
+const { get, post, handleApiError, withRetry } = apiClient;
 
 // Cache configuration
 const CACHE_TTL = {
@@ -42,13 +44,6 @@ const setCachedData = (key, data, ttl = CACHE_TTL.MEDIUM) => {
     timestamp: Date.now(),
     ttl
   });
-};
-
-// Cache time constants (in milliseconds)
-const CACHE_TTL = {
-  SHORT: 60 * 1000, // 1 minute
-  MEDIUM: 5 * 60 * 1000, // 5 minutes
-  LONG: 30 * 60 * 1000, // 30 minutes
 };
 
 // Maximum retry attempts for API calls
@@ -446,11 +441,4 @@ export const trackRecommendationInteraction = async (recommendationId, interacti
   }
 };
 
-// Export all functions as named exports
-export {
-  getAIRecommendations,
-  getRecommendationExplanation,
-  getMarketInsights,
-  submitFeedback,
-  trackRecommendationInteraction
-};
+// Functions are already exported as named exports above

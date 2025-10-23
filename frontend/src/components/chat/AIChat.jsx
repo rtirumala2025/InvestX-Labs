@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useContext } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { Send, Loader2, Sparkles, TrendingUp, BookOpen, DollarSign, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { chatAPI } from '../../services/chat/api';
 import { useChat } from '../../contexts/ChatContext';

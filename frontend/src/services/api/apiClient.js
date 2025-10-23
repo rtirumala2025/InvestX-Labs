@@ -181,5 +181,64 @@ const put = (url, data = {}, options = {}) =>
 const del = (url, options = {}) => 
   request({ method: 'delete', url }, options);
 
-export { get, post, put, del };
+/**
+ * Wrapper for API calls with retry logic
+ * @param {Function} fn - The function to retry
+ * @param {Object} options - Retry options
+ * @param {number} [options.retries=2] - Number of retry attempts
+ * @param {number} [options.delay=1000] - Base delay between retries in ms
+ * @returns {Promise} - Promise that resolves with the function result or rejects after all retries
+ */
+const withRetry = async (fn, { retries = 2, delay = 1000 } = {}) => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries <= 0) {
+      throw error;
+    }
+    
+    // Use exponential backoff
+    const waitTime = delay * (2 ** (2 - retries));
+    console.warn(`Retrying after error (${error.message}). ${retries} attempts left.`);
+    
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+    return withRetry(fn, { retries: retries - 1, delay });
+  }
+};
+
+/**
+ * Handle API errors consistently
+ * @param {Error} error - The error object
+ * @param {Object} context - Additional context for error handling
+ * @returns {Object} - Normalized error object
+ */
+const handleApiError = (error, context = {}) => {
+  console.error('API Error:', {
+    message: error.message,
+    status: error.response?.status,
+    url: error.config?.url,
+    ...context
+  });
+  
+  // Return a normalized error object
+  return {
+    success: false,
+    error: {
+      message: error.response?.data?.message || error.message,
+      status: error.response?.status,
+      code: error.code,
+      ...context
+    }
+  };
+};
+
+export { 
+  get, 
+  post, 
+  put, 
+  del, 
+  withRetry, 
+  handleApiError 
+};
+
 export default apiClient;

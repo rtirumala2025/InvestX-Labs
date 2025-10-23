@@ -1,11 +1,17 @@
 import { useState, useEffect, useContext, createContext } from 'react';
-import { createUser, signInUser, signOutUser, onAuthStateChange, signInWithGoogle, signInWithGoogleRedirect, getGoogleRedirectResult } from '../services/firebase/auth';
-import { auth } from '../services/firebase/config';
-import { createUserProfile, getUserProfile, updateUserProfile as updateUserProfileService } from '../services/firebase/userService';
+import {
+  signInUser,
+  signUpUser,
+  signOutUser,
+  onAuthStateChange,
+  signInWithGoogle,
+  getCurrentUser,
+  updateUserProfile as updateSupabaseProfile
+} from '../services/supabase/auth';
 
 const AuthContext = createContext();
 
-export const useAuth = () => {
+const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
@@ -13,208 +19,196 @@ export const useAuth = () => {
   return context;
 };
 
-export const useAuthProvider = () => {
+const useAuthProvider = () => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // Initialize auth state and set up listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChange(async (user) => {
-      setUser(user);
-      
-      if (user) {
-        // Load user profile from Firestore when authenticated
-        try {
-          const profile = await getUserProfile(user.uid);
-          setUserProfile(profile);
-        } catch (error) {
-          console.warn('Error loading user profile (Firestore may not be configured):', error);
-          // Set a basic profile if Firestore fails
-          setUserProfile({
-            email: user.email,
-            displayName: user.displayName || user.email,
-            profileCompleted: false
-          });
-        }
-      } else {
-        setUserProfile(null);
-      }
-      
-      setLoading(false);
-    });
+    let mounted = true;
 
-    // Check for redirect result on app load
-    const checkRedirectResult = async () => {
+    const initializeAuth = async () => {
       try {
-        const result = await getGoogleRedirectResult();
-        if (result?.user) {
-          console.log('Google redirect sign-in successful');
-          // User profile will be handled by the auth state change above
+        // First check if there's an existing session
+        const { data: { session } } = await getCurrentUser();
+        
+        if (mounted) {
+          if (session?.user) {
+            await handleAuthStateChange(session.user);
+          } else {
+            setUser(null);
+            setUserProfile(null);
+          }
+          setLoading(false);
         }
-      } catch (error) {
-        console.error('Error handling redirect result:', error);
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+        if (mounted) {
+          setError(err);
+          setLoading(false);
+        }
       }
     };
 
-    checkRedirectResult();
+    // Set up auth state change listener
+    const { data: { subscription } } = onAuthStateChange((event, session) => {
+      if (session?.user) {
+        handleAuthStateChange(session.user);
+      } else {
+        setUser(null);
+        setUserProfile(null);
+      }
+    });
 
-    return unsubscribe;
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
   }, []);
 
-  const signup = async (email, password, additionalData = {}) => {
+  const handleAuthStateChange = async (userData) => {
+    setUser(userData);
+    
+    if (userData) {
+      setUserProfile({
+        ...userData.user_metadata,
+        email: userData.email,
+        displayName: userData.user_metadata?.full_name || userData.email,
+        profileCompleted: !!userData.user_metadata?.full_name
+      });
+    } else {
+      setUserProfile(null);
+    }
+  };
+
+  const signup = async (email, password, userData = {}) => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      const userCredential = await createUser(email, password, additionalData);
+      const { data, error } = await signUpUser(email, password, {
+        fullName: userData.displayName || email.split('@')[0],
+        username: email.split('@')[0],
+        ...userData
+      });
+
+      if (error) throw error;
       
-      // Auto-create user document in Firestore on signup
-      if (userCredential.user) {
-        const userData = {
-          email: userCredential.user.email,
-          displayName: userCredential.user.displayName || `${additionalData.firstName || ''} ${additionalData.lastName || ''}`.trim(),
-          firstName: additionalData.firstName || '',
-          lastName: additionalData.lastName || '',
-          profileCompleted: false,
-          profile: {
-            age: null,
-            monthlyAllowance: null,
-            interests: [],
-            riskTolerance: null,
-            investmentGoals: [],
-            experienceLevel: 'beginner'
-          },
-          notifications: {
-            email: true,
-            push: true,
-            marketUpdates: true,
-            educationalContent: true
-          }
-        };
-        
-        await createUserProfile(userCredential.user.uid, userData);
-      }
-      
-      return userCredential;
-    } catch (error) {
-      throw error;
+      return { 
+        success: true,
+        user: {
+          ...data.user,
+          displayName: userData.displayName || email.split('@')[0]
+        } 
+      };
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError(err);
+      return { success: false, error: err.message };
     } finally {
       setLoading(false);
     }
   };
 
   const login = async (email, password) => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      const userCredential = await signInUser(email, password);
-      return userCredential;
-    } catch (error) {
-      throw error;
+      const { data, error } = await signInUser(email, password);
+      if (error) throw error;
+      
+      return { 
+        success: true,
+        user: data.user
+      };
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err);
+      return { success: false, error: err.message };
     } finally {
       setLoading(false);
     }
   };
 
   const logout = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      await signOutUser();
-    } catch (error) {
-      throw error;
+      const { error } = await signOutUser();
+      if (error) throw error;
+      
+      setUser(null);
+      setUserProfile(null);
+      return { success: true };
+    } catch (err) {
+      console.error('Logout error:', err);
+      setError(err);
+      return { success: false, error: err.message };
     } finally {
       setLoading(false);
     }
   };
 
-  const loginWithGoogle = async (useRedirect = false) => {
+  const loginWithGoogle = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
+      const { data, error } = await signInWithGoogle();
+      if (error) throw error;
       
-      // Check if Firebase is properly configured
-      if (!auth.app.options.apiKey || auth.app.options.apiKey === 'your_firebase_api_key_here') {
-        throw new Error('Firebase is not properly configured. Please check your environment variables.');
-      }
-      
-      let userCredential;
-      
-      if (useRedirect) {
-        // Use redirect method as fallback
-        await signInWithGoogleRedirect();
-        return null; // Redirect will handle the rest
-      } else {
-        try {
-          // Try popup method first
-          userCredential = await signInWithGoogle();
-        } catch (error) {
-          console.warn('Popup method failed, trying redirect:', error.message);
-          
-          // If popup fails due to blocking or other issues, try redirect
-          if (error.message.includes('popup') || error.message.includes('blocked') || error.message.includes('timed out')) {
-            await signInWithGoogleRedirect();
-            return null; // Redirect will handle the rest
-          }
-          
-          // Re-throw other errors
-          throw error;
-        }
-      }
-      
-      // Handle successful popup sign-in
-      if (userCredential?.user) {
-        try {
-          const existingProfile = await getUserProfile(userCredential.user.uid);
-          if (!existingProfile) {
-            // Create user profile for Google sign-in users
-            const userData = {
-              email: userCredential.user.email,
-              displayName: userCredential.user.displayName || '',
-              firstName: userCredential.user.displayName?.split(' ')[0] || '',
-              lastName: userCredential.user.displayName?.split(' ').slice(1).join(' ') || '',
-              profileCompleted: false,
-              profile: {
-                age: null,
-                monthlyAllowance: null,
-                interests: [],
-                riskTolerance: null,
-                investmentGoals: [],
-                experienceLevel: 'beginner'
-              },
-              notifications: {
-                email: true,
-                push: true,
-                marketUpdates: true,
-                educationalContent: true
-              }
-            };
-            
-            await createUserProfile(userCredential.user.uid, userData);
-          }
-        } catch (error) {
-          console.error('Error handling Google sign-in profile:', error);
-          // Don't throw here - user is still signed in, just profile creation failed
-        }
-      }
-      
-      return userCredential;
-    } catch (error) {
-      console.error('Google sign-in error:', error);
-      throw error;
+      return { 
+        success: true,
+        user: data.user
+      };
+    } catch (err) {
+      console.error('Google sign in error:', err);
+      setError(err);
+      return { success: false, error: err.message };
     } finally {
       setLoading(false);
     }
   };
 
   const updateUserProfile = async (updates) => {
+    if (!user) return { success: false, error: 'No user is signed in' };
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      if (!user) throw new Error('No user logged in');
+      const { data, error } = await updateSupabaseProfile({
+        data: {
+          full_name: updates.displayName,
+          ...updates
+        }
+      });
       
-      await updateUserProfileService(user.uid, updates);
+      if (error) throw error;
       
-      // Refresh user profile
-      const updatedProfile = await getUserProfile(user.uid);
-      setUserProfile(updatedProfile);
+      // Update local state
+      setUserProfile(prev => ({
+        ...prev,
+        ...updates,
+        displayName: updates.displayName || prev.displayName,
+        profileCompleted: true
+      }));
       
-      return updatedProfile;
-    } catch (error) {
-      throw error;
+      return { success: true };
+    } catch (err) {
+      console.error('Update profile error:', err);
+      setError(err);
+      return { success: false, error: err.message };
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -222,6 +216,7 @@ export const useAuthProvider = () => {
     user,
     userProfile,
     loading,
+    error,
     signup,
     login,
     logout,
@@ -230,7 +225,7 @@ export const useAuthProvider = () => {
   };
 };
 
-export const AuthProvider = ({ children }) => {
+const AuthProvider = ({ children }) => {
   const auth = useAuthProvider();
   
   return (
@@ -239,3 +234,5 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+export { AuthProvider, useAuth };
