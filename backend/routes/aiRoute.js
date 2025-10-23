@@ -1,10 +1,80 @@
 import express from "express";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
+import { generateRequestId } from "../ai-services/utils.js";
+import logger from "../utils/logger.js";
 
 dotenv.config();
 
 const router = express.Router();
+
+// Mock data for recommendations
+const mockRecommendations = [
+  {
+    id: 'rec_001',
+    type: 'stock',
+    symbol: 'AAPL',
+    name: 'Apple Inc.',
+    recommendation: 'BUY',
+    confidence: 0.85,
+    reason: 'Strong financials and consistent growth',
+    riskLevel: 'low',
+    timeHorizon: 'long',
+    lastUpdated: new Date().toISOString(),
+    educational_disclaimer: 'This is not financial advice. Please do your own research before making investment decisions.'
+  },
+  {
+    id: 'rec_002',
+    type: 'etf',
+    symbol: 'VTI',
+    name: 'Vanguard Total Stock Market ETF',
+    recommendation: 'HOLD',
+    confidence: 0.78,
+    reason: 'Broad market exposure with low fees',
+    riskLevel: 'medium',
+    timeHorizon: 'long',
+    lastUpdated: new Date().toISOString(),
+    educational_disclaimer: 'This is not financial advice. Please do your own research before making investment decisions.'
+  },
+  {
+    id: 'rec_003',
+    type: 'crypto',
+    symbol: 'BTC-USD',
+    name: 'Bitcoin',
+    recommendation: 'SELL',
+    confidence: 0.65,
+    reason: 'High volatility and regulatory concerns',
+    riskLevel: 'high',
+    timeHorizon: 'short',
+    lastUpdated: new Date().toISOString(),
+    educational_disclaimer: 'This is not financial advice. Please do your own research before making investment decisions.'
+  }
+];
+
+// Get AI recommendations based on user profile
+router.get('/ai/recommendations', (req, res) => {
+  try {
+    // In a real implementation, we would use the user's profile to generate personalized recommendations
+    const recommendations = mockRecommendations.map(rec => ({
+      ...rec,
+      requestId: generateRequestId('rec')
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: recommendations,
+      timestamp: new Date().toISOString(),
+      educational_disclaimer: 'This is not financial advice. Please consult with a financial advisor before making investment decisions.'
+    });
+  } catch (error) {
+    console.error('Error generating recommendations:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate recommendations',
+      details: error.message
+    });
+  }
+});
 
 router.post("/chat", async (req, res) => {
   try {

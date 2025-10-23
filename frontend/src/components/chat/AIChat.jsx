@@ -1,23 +1,64 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Sparkles, TrendingUp, BookOpen, DollarSign } from 'lucide-react';
+import React, { useRef, useEffect, useContext } from 'react';
+import { Send, Loader2, Sparkles, TrendingUp, BookOpen, DollarSign, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { chatAPI } from '../../services/chat/api';
+import { useChat } from '../../contexts/ChatContext';
+import analytics from '../../services/analytics/mockAnalytics';
 
 const AIChat = () => {
-  const [messages, setMessages] = useState([]);
+  const {
+    messages,
+    isLoading,
+    error,
+    isOnline,
+    addMessage,
+    setError,
+    setLoading,
+  } = useChat();
+  
   const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const formRef = useRef(null);
+  
+  // Input validation and sanitization
+  const validateAndSanitizeInput = (input) => {
+    // Trim whitespace
+    let sanitized = input.trim();
+    
+    // Remove HTML tags
+    sanitized = sanitized.replace(/<[^>]*>?/gm, '');
+    
+    // Limit to 2000 characters
+    if (sanitized.length > 2000) {
+      throw new Error('Message exceeds maximum length of 2000 characters');
+    }
+    
+    // Check for empty message after sanitization
+    if (!sanitized) {
+      throw new Error('Message cannot be empty');
+    }
+    
+    return sanitized;
+  };
 
-  // Initialize with welcome message
+  // Initialize with welcome message if no messages exist
   useEffect(() => {
-    setMessages([{
-      id: 'welcome',
-      type: 'assistant',
-      content: "Hello! I'm InvestX Labs, your AI investment assistant. I can help you understand investing concepts, analyze your portfolio, and answer any financial questions you have. What would you like to learn about today?",
-      timestamp: new Date().toISOString()
-    }]);
-  }, []);
+    if (messages.length === 0) {
+      addMessage({
+        id: 'welcome',
+        type: 'assistant',
+        content: "Hello! I'm InvestX Labs, your AI investment assistant. I can help you understand investing concepts, analyze your portfolio, and answer any financial questions you have. What would you like to learn about today?",
+        timestamp: new Date().toISOString()
+      });
+      
+      // Log initial chat start
+      analytics.logEvent('chat_session_start', {
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        online: navigator.onLine,
+      });
+    }
+  }, [messages.length, addMessage]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -26,49 +67,114 @@ const AIChat = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    const message = inputMessage.trim();
-    if (!message || isLoading) return;
+    setError(null);
+    
+    let sanitizedMessage;
+    try {
+      sanitizedMessage = validateAndSanitizeInput(inputMessage);
+    } catch (err) {
+      setError(err.message);
+      analytics.logError(err, 'input_validation');
+      return;
+    }
+    
+    if (isLoading) return;
 
     setInputMessage('');
-    setIsLoading(true);
+    setLoading(true);
+    
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    const timestamp = new Date().toISOString();
 
     // Add user message to chat
-    const userMsg = {
-      id: `user-${Date.now()}`,
+    addMessage({
+      id: messageId,
       type: 'user',
-      content: message,
-      timestamp: new Date().toISOString()
-    };
-
-    setMessages(prev => [...prev, userMsg]);
+      content: sanitizedMessage,
+      timestamp,
+      status: 'sending'
+    });
+    
+    // Log message sent
+    analytics.logChatMessage(
+      messageId,
+      'user',
+      'user_message',
+      null,
+      { contentLength: sanitizedMessage.length }
+    );
+    
+    // Auto-scroll to bottom after adding message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
 
     try {
-      // Call the backend API using our service
-      const response = await chatAPI.sendMessage(message);
+      const startTime = Date.now();
+      
+      // Call the backend API with sanitized message
+      const response = await chatAPI.sendMessage(sanitizedMessage);
+      const responseTime = Date.now() - startTime;
+      
+      const assistantMessageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      const responseContent = response.response || response.message || "I'm here to help with your investment questions!";
       
       // Add assistant's response to chat
-      const assistantMsg = {
-        id: `assistant-${Date.now()}`,
+      addMessage({
+        id: assistantMessageId,
         type: 'assistant',
-        content: response.response || response.message || "I'm here to help with your investment questions!",
-        timestamp: new Date().toISOString()
-      };
+        content: responseContent,
+        timestamp: new Date().toISOString(),
+        status: 'delivered'
+      });
       
-      setMessages(prev => [...prev, assistantMsg]);
+      // Log successful response
+      analytics.logChatMessage(
+        assistantMessageId,
+        'assistant',
+        response.intent || 'general',
+        responseTime,
+        {
+          contentLength: responseContent.length,
+          cached: response.cached || false
+        }
+      );
+      
+      // Log performance metric
+      analytics.logMetric('api_response_time', responseTime, 'ms', {
+        intent: response.intent || 'general',
+        cached: response.cached || false
+      });
     } catch (error) {
       console.error('Error sending message:', error);
       
-      // Show error message to user
-      const errorMsg = {
+      // Log the error
+      analytics.logError(error, 'send_message', {
+        messageId,
+        contentLength: sanitizedMessage.length,
+        online: isOnline
+      });
+      
+      // Update message status to failed
+      const errorMessage = error.response?.data?.message || "I'm having trouble connecting to the server. Please try again later.";
+      
+      // Add error message to chat
+      addMessage({
         id: `error-${Date.now()}`,
         type: 'assistant',
-        content: error.response?.data?.message || "I'm having trouble connecting to the server. Please try again later.",
-        timestamp: new Date().toISOString()
-      };
+        content: errorMessage,
+        timestamp: new Date().toISOString(),
+        isError: true
+      });
       
-      setMessages(prev => [...prev, errorMsg]);
+      setError(errorMessage);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+      
+      // Return focus to input after processing
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
   };
 
@@ -82,6 +188,12 @@ const AIChat = () => {
   const handleQuickPrompt = (text) => {
     setInputMessage(text);
     inputRef.current?.focus();
+    
+    // Log quick prompt usage
+    analytics.logInteraction('quick_prompt_selected', 'quick_prompt', {
+      promptText: text,
+      timestamp: new Date().toISOString()
+    });
   };
 
   return (
@@ -186,31 +298,95 @@ const AIChat = () => {
 
           {/* Input Container */}
           <div className="p-6 border-t border-white/10 backdrop-blur-xl bg-white/5">
-            <form onSubmit={handleSendMessage} className="flex gap-3">
-              <input
-                type="text"
-                ref={inputRef}
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Ask me anything about investing..."
-                disabled={isLoading}
-                className="flex-1 bg-white/10 backdrop-blur-xl border border-white/10 rounded-xl px-6 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all disabled:opacity-50"
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !inputMessage.trim()}
-                className="p-3 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Send className="w-5 h-5" />
-                )}
-              </button>
+            {/* Connection status indicator */}
+            <div className={`flex items-center gap-2 mb-3 text-sm ${
+              isOnline ? 'text-green-400' : 'text-yellow-400'
+            }`}>
+              {isOnline ? (
+                <>
+                  <Wifi className="w-4 h-4" />
+                  <span>Online</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-4 h-4" />
+                  <span>Offline - Messages will be sent when back online</span>
+                </>
+              )}
+            </div>
+            
+            <form ref={formRef} onSubmit={handleSendMessage} className="flex flex-col gap-2">
+              {error && (
+                <div 
+                  className="flex items-center gap-2 p-2 text-sm text-red-400 bg-red-900/20 rounded-lg mb-2"
+                  role="alert"
+                  aria-live="assertive"
+                >
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                  <span>{error}</span>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    ref={inputRef}
+                    value={inputMessage}
+                    onChange={(e) => {
+                      setInputMessage(e.target.value);
+                      if (error) setError(null);
+                    }}
+                    placeholder="Ask me anything about investing..."
+                    disabled={isLoading}
+                    aria-label="Type your message"
+                    aria-required="true"
+                    aria-invalid={!!error}
+                    className="w-full bg-white/10 backdrop-blur-xl border border-white/10 rounded-xl px-6 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all disabled:opacity-50 pr-12"
+                    maxLength={2000}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage(e);
+                      }
+                    }}
+                  />
+                  {inputMessage.length > 0 && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
+                      {2000 - inputMessage.length}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading || !inputMessage.trim()}
+                  aria-label="Send message"
+                  className="p-3 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  onClick={(e) => {
+                    analytics.logInteraction('send_button_click', 'button', {
+                      inputLength: inputMessage.length,
+                      timestamp: new Date().toISOString()
+                    });
+                  }}
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Send className="w-5 h-5" aria-hidden="true" />
+                  )}
+                  <span className="sr-only">Send message</span>
+                </button>
+              </div>
             </form>
-            <p className="text-xs text-gray-500 mt-3 text-center">
-              InvestX Labs provides educational information only. Not financial advice.
-            </p>
+            <div className="text-center mt-3">
+              <p className="text-xs text-gray-500">
+                InvestX Labs provides educational information only. Not financial advice.
+              </p>
+              {!isOnline && (
+                <p className="text-xs text-yellow-400 mt-1">
+                  You're currently offline. Messages will be sent when you're back online.
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

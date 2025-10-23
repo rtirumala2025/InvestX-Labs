@@ -1,157 +1,184 @@
-import { useState, useEffect } from 'react';
-import { getStockQuote, getMultipleStockQuotes, getHistoricalData, searchStocks } from '../services/market/yahooFinance';
-import { getMarketIndices, getSectorPerformance, getMarketNews, getEconomicIndicators } from '../services/market/marketData';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useErrorHandler } from 'react-error-boundary';
+import { 
+  getMarketData, 
+  getHistoricalData, 
+  searchStocks, 
+  getMarketNews,
+  getBatchMarketData
+} from '../services/api/marketService';
+
+// Default symbols to track
+const DEFAULT_SYMBOLS = ['^GSPC', '^DJI', '^IXIC', '^RUT', '^VIX'];
 
 /**
- * Custom hook for market data
+ * Custom hook for market data with caching and retry logic
  * @param {Array} symbols - Array of stock symbols to track
+ * @param {Object} options - Additional options
+ * @param {boolean} [options.autoFetch=true] - Whether to fetch data on mount
+ * @param {boolean} [options.useCache=true] - Whether to use cached data
  * @returns {Object} Market data and operations
  */
-export const useMarketData = (symbols = []) => {
-  const [quotes, setQuotes] = useState([]);
+export const useMarketData = (symbols = DEFAULT_SYMBOLS, options = {}) => {
+  const { autoFetch = true, useCache = true } = options;
+  const [marketData, setMarketData] = useState({});
   const [historicalData, setHistoricalData] = useState({});
-  const [marketIndices, setMarketIndices] = useState(null);
-  const [sectorPerformance, setSectorPerformance] = useState([]);
   const [marketNews, setMarketNews] = useState([]);
-  const [economicIndicators, setEconomicIndicators] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(autoFetch);
   const [error, setError] = useState(null);
-
-  // Fetch quotes for specified symbols
-  useEffect(() => {
-    if (symbols.length > 0) {
-      fetchQuotes();
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const handleError = useErrorHandler();
+  
+  // Keep track of pending requests to avoid duplicate calls
+  const pendingRequests = useRef(new Map());
+  
+  // Fetch market data for all symbols
+  const fetchMarketData = useCallback(async (symbolsToFetch = symbols, options = {}) => {
+    const { forceRefresh = false } = options;
+    const cacheKey = symbolsToFetch.sort().join(',');
+    
+    // Skip if already loading these symbols
+    if (pendingRequests.current.has(cacheKey)) {
+      return pendingRequests.current.get(cacheKey);
     }
-  }, [symbols]);
-
-  // Fetch market data on component mount
-  useEffect(() => {
-    fetchMarketData();
-  }, []);
-
-  const fetchQuotes = async () => {
+    
+    const fetchPromise = (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch batch data for all symbols
+        const batchData = await getBatchMarketData(symbolsToFetch, { 
+          useCache: useCache && !forceRefresh 
+        });
+        
+        // Update market data state
+        setMarketData(prev => ({
+          ...prev,
+          ...batchData
+        }));
+        
+        setLastUpdated(new Date().toISOString());
+        return batchData;
+      } catch (err) {
+        console.error('Error fetching market data:', err);
+        setError(err.message || 'Failed to fetch market data');
+        handleError(err);
+        throw err;
+      } finally {
+        pendingRequests.current.delete(cacheKey);
+        if (pendingRequests.current.size === 0) {
+          setLoading(false);
+        }
+      }
+    })();
+    
+    pendingRequests.current.set(cacheKey, fetchPromise);
+    return fetchPromise;
+  }, [symbols, useCache, handleError]);
+  
+  // Fetch historical data for a symbol
+  const fetchHistoricalData = useCallback(async (symbol, options = {}) => {
+    const { period = '1y', interval = '1d', forceRefresh = false } = options;
+    const cacheKey = `${symbol}-${period}-${interval}`;
+    
+    // Return cached data if available
+    if (!forceRefresh && historicalData[cacheKey]) {
+      return historicalData[cacheKey];
+    }
+    
     try {
       setLoading(true);
-      setError(null);
       
-      const quotesData = await getMultipleStockQuotes(symbols);
-      setQuotes(quotesData);
+      const data = await getHistoricalData(symbol, { 
+        period, 
+        interval,
+        useCache: useCache && !forceRefresh
+      });
       
-    } catch (err) {
-      setError(err.message);
-      console.error('Error fetching quotes:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMarketData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const [indices, sectors, news, indicators] = await Promise.all([
-        getMarketIndices(),
-        getSectorPerformance(),
-        getMarketNews(),
-        getEconomicIndicators()
-      ]);
-      
-      setMarketIndices(indices);
-      setSectorPerformance(sectors);
-      setMarketNews(news);
-      setEconomicIndicators(indicators);
-      
-    } catch (err) {
-      setError(err.message);
-      console.error('Error fetching market data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchHistoricalData = async (symbol, period = '1y', interval = '1d') => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const data = await getHistoricalData(symbol, period, interval);
+      // Update historical data state
       setHistoricalData(prev => ({
         ...prev,
-        [symbol]: data
+        [cacheKey]: data
       }));
       
       return data;
     } catch (err) {
-      setError(err.message);
+      console.error(`Error fetching historical data for ${symbol}:`, err);
+      setError(`Failed to fetch historical data for ${symbol}`);
+      handleError(err);
       throw err;
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchStockQuote = async (symbol) => {
+  }, [historicalData, useCache, handleError]);
+  
+  // Fetch market news
+  const fetchMarketNews = useCallback(async (options = {}) => {
+    const { limit = 10, forceRefresh = false } = options;
+    
     try {
       setLoading(true);
-      setError(null);
       
-      const quote = await getStockQuote(symbol);
-      
-      // Update quotes array
-      setQuotes(prev => {
-        const existingIndex = prev.findIndex(q => q.symbol === symbol);
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = quote;
-          return updated;
-        } else {
-          return [...prev, quote];
-        }
+      const news = await getMarketNews({ 
+        limit,
+        useCache: useCache && !forceRefresh
       });
       
-      return quote;
+      setMarketNews(news);
+      return news;
     } catch (err) {
-      setError(err.message);
+      console.error('Error fetching market news:', err);
+      setError('Failed to fetch market news');
+      handleError(err);
       throw err;
     } finally {
       setLoading(false);
     }
-  };
-
-  const searchForStocks = async (query) => {
+  }, [useCache, handleError]);
+  
+  // Search for stocks
+  const searchForStocks = useCallback(async (query, options = {}) => {
+    const { useCache: useCacheOption = true } = options;
+    
+    if (!query?.trim()) {
+      return [];
+    }
+    
     try {
       setLoading(true);
-      setError(null);
       
-      const results = await searchStocks(query);
+      const results = await searchStocks(query, { 
+        useCache: useCache && useCacheOption 
+      });
+      
       return results;
     } catch (err) {
-      setError(err.message);
-      throw err;
+      console.error('Error searching stocks:', err);
+      setError('Failed to search for stocks');
+      handleError(err);
+      return [];
     } finally {
       setLoading(false);
     }
-  };
-
-  const getQuoteBySymbol = (symbol) => {
-    return quotes.find(quote => quote.symbol === symbol);
-  };
-
-  const getHistoricalDataBySymbol = (symbol) => {
-    return historicalData[symbol] || null;
-  };
-
-  const refreshData = async () => {
-    await Promise.all([
-      fetchQuotes(),
-      fetchMarketData()
-    ]);
-  };
-
-  const getMarketSummary = () => {
-    if (!marketIndices) return null;
+  }, [useCache, handleError]);
+  
+  // Get quote for a single symbol
+  const getQuote = useCallback((symbol) => {
+    return marketData[symbol] || null;
+  }, [marketData]);
+  
+  // Get quotes for multiple symbols
+  const getQuotes = useCallback((symbols = []) => {
+    return symbols.map(symbol => marketData[symbol] || null).filter(Boolean);
+  }, [marketData]);
+  
+  // Get market summary
+  const getMarketSummary = useCallback(() => {
+    const indices = getQuotes(['^GSPC', '^DJI', '^IXIC']);
     
-    const indices = [marketIndices.sp500, marketIndices.dowJones, marketIndices.nasdaq];
+    if (indices.length === 0) return null;
+    
     const totalChange = indices.reduce((sum, index) => sum + (index?.change || 0), 0);
     const averageChange = totalChange / indices.length;
     
@@ -160,51 +187,96 @@ export const useMarketData = (symbols = []) => {
       averageChange,
       indices
     };
-  };
-
-  const getTopSectors = (limit = 5) => {
-    return sectorPerformance
+  }, [getQuotes]);
+  
+  // Get top gainers
+  const getTopGainers = useCallback((limit = 5) => {
+    return Object.values(marketData)
+      .filter(stock => stock.changePercent > 0)
       .sort((a, b) => b.changePercent - a.changePercent)
       .slice(0, limit);
-  };
-
-  const getWorstSectors = (limit = 5) => {
-    return sectorPerformance
+  }, [marketData]);
+  
+  // Get top losers
+  const getTopLosers = useCallback((limit = 5) => {
+    return Object.values(marketData)
+      .filter(stock => stock.changePercent < 0)
       .sort((a, b) => a.changePercent - b.changePercent)
       .slice(0, limit);
-  };
-
-  const getLatestNews = (limit = 5) => {
+  }, [marketData]);
+  
+  // Get latest news
+  const getLatestNews = useCallback((limit = 5) => {
     return marketNews
-      .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
-      .slice(0, limit);
-  };
-
-  const getNewsBySentiment = (sentiment) => {
-    return marketNews.filter(news => news.sentiment === sentiment);
-  };
-
+      .slice(0, limit)
+      .map(news => ({
+        ...news,
+        publishedAt: new Date(news.publishedAt).toLocaleDateString()
+      }));
+  }, [marketNews]);
+  
+  // Refresh all data
+  const refreshData = useCallback(async () => {
+    return Promise.all([
+      fetchMarketData(symbols, { forceRefresh: true }),
+      fetchMarketNews({ forceRefresh: true })
+    ]);
+  }, [symbols, fetchMarketData, fetchMarketNews]);
+  
+  // Initial data fetch
+  useEffect(() => {
+    if (autoFetch) {
+      fetchMarketData();
+      fetchMarketNews();
+    }
+  }, [autoFetch, fetchMarketData, fetchMarketNews]);
+  
+  // Set up auto-refresh interval
+  useEffect(() => {
+    if (!autoFetch) return;
+    
+    const interval = setInterval(() => {
+      refreshData();
+    }, 5 * 60 * 1000); // Refresh every 5 minutes
+    
+    return () => clearInterval(interval);
+  }, [autoFetch, refreshData]);
+  
   return {
-    quotes,
+    // State
+    marketData,
     historicalData,
-    marketIndices,
-    sectorPerformance,
     marketNews,
-    economicIndicators,
     loading,
     error,
-    fetchQuotes,
+    lastUpdated,
+    
+    // Actions
     fetchMarketData,
     fetchHistoricalData,
-    fetchStockQuote,
+    fetchMarketNews,
     searchForStocks,
-    getQuoteBySymbol,
-    getHistoricalDataBySymbol,
     refreshData,
+    
+    // Selectors
+    getQuote,
+    getQuotes,
     getMarketSummary,
-    getTopSectors,
-    getWorstSectors,
+    getTopGainers,
+    getTopLosers,
     getLatestNews,
-    getNewsBySentiment
+    
+    // For backward compatibility
+    quotes: getQuotes(symbols),
+    getQuoteBySymbol: getQuote,
+    getHistoricalDataBySymbol: (symbol) => {
+      const cacheKey = `${symbol}-1y-1d`;
+      return historicalData[cacheKey] || null;
+    },
+    getTopSectors: () => [], // Not implemented in this version
+    getWorstSectors: () => [], // Not implemented in this version
+    getNewsBySentiment: () => [], // Not implemented in this version
+    fetchQuotes: () => fetchMarketData(symbols),
+    fetchStockQuote: (symbol) => fetchMarketData([symbol]).then(() => getQuote(symbol))
   };
 };

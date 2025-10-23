@@ -1,18 +1,21 @@
 import axios from 'axios';
 
 // Configuration
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/chat';
+const API_URL = 'http://localhost:5001/investx-labs/us-central1/chat';
 const REQUEST_TIMEOUT = 10000; // 10 seconds
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000; // 1 second
 
 // Development logging
-if (import.meta.env.MODE === 'development') {
+const isDevelopment = process.env.NODE_ENV === 'development' || 
+                     (typeof window !== 'undefined' && window.location.hostname === 'localhost');
+
+if (isDevelopment) {
   console.log('🔧 Chat API Configuration:', {
     API_URL,
-    NODE_ENV: import.meta.env.MODE,
     timeout: `${REQUEST_TIMEOUT}ms`,
-    maxRetries: MAX_RETRIES
+    maxRetries: MAX_RETRIES,
+    retryDelay: `${RETRY_DELAY}ms`
   });
 }
 

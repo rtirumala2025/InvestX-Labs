@@ -1,6 +1,11 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import { AppProvider } from './contexts/AppContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { ChatProvider } from './contexts/ChatContext';
+import theme from './theme';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import DisclaimerBanner from './components/common/DisclaimerBanner';
 import NetworkStatus from './components/common/NetworkStatus';
@@ -46,7 +51,8 @@ function App() {
   return (
     <AuthProvider>
       <ErrorBoundary>
-        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+        <ChatProvider>
+          <div className="min-h-screen flex flex-col bg-gray-900 text-white">
           <NetworkStatus />
           <DisclaimerBanner />
           <Header />
@@ -115,8 +121,9 @@ function App() {
           {/* Developer Tools */}
           <DevToolsWrapper />
           
-          <Footer />
-        </div>
+            <Footer />
+          </div>
+        </ChatProvider>
       </ErrorBoundary>
     </AuthProvider>
   );

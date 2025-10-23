@@ -17,7 +17,7 @@ from api.llama_scout_endpoints import include_routers as include_llama_routers
 from config.settings import settings
 from utils.logging_config import setup_logging
 from utils.error_handlers import setup_error_handlers
-from database.firestore_client import firestore_client
+from services.supabase_service import supabase_service
 from database.cache_manager import cache_manager
 from data_pipeline.scheduler import data_pipeline_scheduler
 
@@ -34,8 +34,13 @@ async def lifespan(app: FastAPI):
     
     try:
         # Initialize database connections
-        await firestore_client._initialize_firebase()
-        logger.info("Database connections initialized")
+        try:
+            # This will initialize the Supabase client
+            supabase_service.supabase
+            logger.info("Supabase client initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Supabase: {str(e)}")
+            raise
         
         # Start data pipeline scheduler
         data_pipeline_scheduler.start_scheduler()

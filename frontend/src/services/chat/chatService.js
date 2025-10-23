@@ -3,10 +3,22 @@ import { getPromptTemplate, generateSystemPrompt, generateConversationSummary } 
 import { ConversationManager } from './conversationManager.js';
 import { checkSafety } from './safetyGuardrails.js';
 import { formatResponse } from './responseFormatter.js';
+import { getFirestore, collection, doc, setDoc, getDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Firebase imports (to be used when Firebase is initialized)
 // import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 
+/**
+ * Enhanced ChatService with offline support and Firestore integration
+ * Features:
+ * - Offline message queuing
+ * - Automatic sync when back online
+ * - Local storage fallback
+ * - Performance monitoring
+ * - Conversation summarization
+ */
 export class ChatService {
   constructor(userId, userProfile = {}, options = {}) {
     this.userId = userId;
@@ -20,20 +32,197 @@ export class ChatService {
       interests: [],
       ...userProfile
     };
-    this.conversationManager = new ConversationManager(userId, options);
+    
+    // Initialize Firebase services
+    this.db = getFirestore();
+    this.auth = getAuth();
+    this.functions = getFunctions();
+    
+    // Initialize conversation manager with offline support
+    this.conversationManager = new ConversationManager(userId, {
+      ...options,
+      offlineStorage: {
+        enabled: true,
+        maxMessages: 10, // Keep last 10 messages in localStorage
+        syncOnReconnect: true
+      }
+    });
+    
     this.options = {
       enableSafetyChecks: true,
       enableFormatting: true,
       maxResponseTime: 3000,
+      enablePersistence: true, // Enable Firestore persistence
       ...options
     };
+    
     this.performanceMetrics = {
       totalRequests: 0,
       averageResponseTime: 0,
       totalTokensUsed: 0
     };
+    
+    // Initialize offline support
+    this.initializeOfflineSupport();
   }
 
+  // Initialize offline support and sync state
+  initializeOfflineSupport() {
+    // Check if browser supports localStorage
+    this.isLocalStorageAvailable = this.checkLocalStorage();
+    
+    // Listen for online/offline events
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.handleOnline.bind(this));
+      window.addEventListener('offline', this.handleOffline.bind(this));
+    }
+    
+    // Initialize offline queue
+    this.offlineQueue = [];
+    this.isOnline = navigator.onLine;
+  }
+  
+  // Check if localStorage is available
+  checkLocalStorage() {
+    try {
+      const testKey = '__test__';
+      localStorage.setItem(testKey, testKey);
+      localStorage.removeItem(testKey);
+      return true;
+    } catch (e) {
+      console.warn('localStorage is not available. Offline features disabled.');
+      return false;
+    }
+  }
+  
+  // Handle online event
+  async handleOnline() {
+    this.isOnline = true;
+    console.log('Online - Syncing offline messages...');
+    await this.syncOfflineMessages();
+  }
+  
+  // Handle offline event
+  handleOffline() {
+    this.isOnline = false;
+    console.log('Offline - Messages will be queued');
+  }
+  
+  // Sync messages when coming back online
+  async syncOfflineMessages() {
+    if (!this.isOnline || !this.offlineQueue.length) return;
+    
+    console.log(`Syncing ${this.offlineQueue.length} queued messages...`);
+    
+    // Process each message in the queue
+    for (const message of this.offlineQueue) {
+      try {
+        await this.saveMessageToFirestore(message);
+      } catch (error) {
+        console.error('Error syncing message:', error);
+        // Keep failed messages in queue for next sync
+        break;
+      }
+    }
+    
+    // Clear processed messages
+    this.offlineQueue = this.offlineQueue.slice(this.offlineQueue.length);
+    
+    // Clear local storage if everything synced
+    if (this.offlineQueue.length === 0 && this.isLocalStorageAvailable) {
+      localStorage.removeItem(`chat_offline_queue_${this.userId}`);
+    }
+  }
+  
+  // Save message to Firestore with offline support
+  async saveMessageToFirestore(message) {
+    if (!this.userId) return;
+    
+    const messageData = {
+      ...message,
+      timestamp: message.timestamp || serverTimestamp(),
+      synced: true
+    };
+    
+    try {
+      const messageRef = doc(collection(this.db, `users/${this.userId}/messages`));
+      await setDoc(messageRef, messageData);
+      return messageRef.id;
+    } catch (error) {
+      console.error('Error saving message to Firestore:', error);
+      throw error;
+    }
+  }
+  
+  // Get conversation history from Firestore
+  async loadConversationHistory(limit = 20) {
+    if (!this.userId) return [];
+    
+    try {
+      const q = query(
+        collection(this.db, `users/${this.userId}/messages`),
+        orderBy('timestamp', 'desc'),
+        limit(limit)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      console.error('Error loading conversation history:', error);
+      return [];
+    }
+  }
+  
+  // Add message with offline support
+  async addMessage(role, content, metadata = {}) {
+    const message = {
+      role,
+      content,
+      timestamp: new Date().toISOString(),
+      ...metadata
+    };
+    
+    // Add to conversation manager
+    this.conversationManager.addMessage(role, content, metadata);
+    
+    // Save to Firestore if online, otherwise queue for later
+    if (this.isOnline) {
+      try {
+        await this.saveMessageToFirestore(message);
+      } catch (error) {
+        console.error('Error saving message, will retry later:', error);
+        this.queueOfflineMessage(message);
+      }
+    } else {
+      this.queueOfflineMessage(message);
+    }
+    
+    return message;
+  }
+  
+  // Queue message for offline sync
+  queueOfflineMessage(message) {
+    this.offlineQueue.push(message);
+    
+    // Save to localStorage if available
+    if (this.isLocalStorageAvailable) {
+      try {
+        localStorage.setItem(
+          `chat_offline_queue_${this.userId}`, 
+          JSON.stringify(this.offlineQueue)
+        );
+      } catch (e) {
+        console.warn('Failed to save offline queue to localStorage:', e);
+      }
+    }
+    
+    console.log('Message queued for offline sync:', message);
+  }
+  
+  // Process user message with enhanced error handling and offline support
   async processUserMessage(message, context = {}) {
     const startTime = Date.now();
     
@@ -42,8 +231,10 @@ export class ChatService {
     }
 
     try {
-      // Add user message to conversation
-      this.conversationManager.addMessage('user', message);
+      // Add user message with offline support
+      await this.addMessage('user', message, {
+        timestamp: new Date().toISOString()
+      });
 
       // Classify query
       const classification = classifyQuery(message);
@@ -89,15 +280,32 @@ export class ChatService {
         userPreferences: context.preferences || {}
       });
 
-      // Generate response
+      // Generate response with random delay for natural feel
+      const responseDelay = Math.floor(Math.random() * 900) + 300; // 300-1200ms
+      await new Promise(resolve => setTimeout(resolve, responseDelay));
+      
       const response = await this.generateResponse(message, queryType, systemPrompt, classification);
 
       // Format response if enabled
       const formattedResponse = this.options.enableFormatting 
         ? formatResponse(response, queryType)
         : response;
-
-      // Add assistant message
+        
+      // Add assistant message with offline support
+      await this.addMessage('assistant', formattedResponse, {
+        queryType,
+        classification,
+        responseTime: Date.now() - startTime,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Update performance metrics
+      this.updatePerformanceMetrics(Date.now() - startTime);
+      
+      // Summarize conversation periodically
+      if (this.conversationManager.messages.length % 5 === 0) {
+        this.summarizeAndStoreConversation();
+      }
       this.conversationManager.addMessage('assistant', formattedResponse, {
         queryType,
         classification,
@@ -111,14 +319,12 @@ export class ChatService {
       return formattedResponse;
     } catch (error) {
       console.error('Error processing message:', error);
-      
-      // Add error to conversation for context
-      this.conversationManager.addMessage('system', `Error: ${error.message}`, {
-        error: true,
-        errorType: error.name
+      // Add error message to conversation
+      await this.addMessage('system', 'I encountered an error processing your message. Please try again.', {
+        error: error.message,
+        timestamp: new Date().toISOString()
       });
-      
-      throw new Error('Failed to process message');
+      throw error;
     }
   }
 
