@@ -6,7 +6,13 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "start:mcp": "node scripts/start-mcp-server.js",
+    "dev:mcp": "nodemon scripts/start-mcp-server.js",
+    "start:ws": "node scripts/simple-websocket-server.js",
+    "dev:ws": "nodemon scripts/simple-websocket-server.js",
+    "start:basic": "node scripts/basic-websocket-server.js",
+    "dev:basic": "nodemon scripts/basic-websocket-server.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.1",
@@ -15,10 +21,13 @@
     "dotenv": "^16.6.1",
     "express": "^4.18.2",
     "got": "^11.8.6",
+    "helmet": "^8.1.0",
     "node-fetch": "^2.7.0",
+    "response-time": "^2.3.4",
     "undici": "^7.16.0",
     "winston": "^3.18.3",
-    "winston-daily-rotate-file": "^5.0.0"
+    "winston-daily-rotate-file": "^5.0.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"

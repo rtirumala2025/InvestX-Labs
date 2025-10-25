@@ -4,6 +4,15 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'mcp-service',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Mock user context data
 const mockUserContext = {
   userId: 'user_12345',

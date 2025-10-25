@@ -1,92 +1,10 @@
-import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { getSession } from './auth';
-
-// Create axios instance with default config
-const apiClient = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
-  timeout: 30000, // 30 seconds
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Request-Id': () => uuidv4(),
-  },
-});
-
-// Request interceptor for API calls
-apiClient.interceptors.request.use(
-  async (config) => {
-    // Add auth token if available
-    const session = getSession();
-    if (session?.accessToken) {
-      config.headers.Authorization = `Bearer ${session.accessToken}`;
-    }
-    
-    // Add request timestamp for caching
-    config.metadata = { 
-      ...config.metadata, 
-      startTime: new Date(),
-      requestId: config.headers['X-Request-Id']
-    };
-    
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor for API calls
-apiClient.interceptors.response.use(
-  (response) => {
-    const endTime = new Date();
-    const duration = endTime - response.config.metadata.startTime;
-    
-    // Log successful API call
-    console.debug(`API ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status} (${duration}ms)`, {
-      url: response.config.url,
-      status: response.status,
-      duration,
-      requestId: response.config.metadata.requestId,
-    });
-    
-    return response;
-  },
-  async (error) => {
-    const originalRequest = error.config;
-    const response = error.response;
-    
-    // Log error
-    console.error(`API Error: ${error.message}`, {
-      url: originalRequest?.url,
-      status: response?.status,
-      requestId: originalRequest?.headers['X-Request-Id'],
-      error: error.message,
-    });
-
-    // Handle 401 Unauthorized
-    if (response?.status === 401) {
-      // Handle token refresh logic here if needed
-      // const session = getSession();
-      // if (session?.refreshToken) {
-      //   try {
-      //     const newToken = await refreshToken(session.refreshToken);
-      //     originalRequest.headers.Authorization = `Bearer ${newToken}`;
-      //     return apiClient(originalRequest);
-      // } catch (refreshError) {
-      //   clearSession();
-      //   window.location.href = '/login';
-      //   return Promise.reject(refreshError);
-      // }
-    }
-
-    return Promise.reject(error);
-  }
-);
+import { supabase } from '../../lib/supabaseClient';
 
 // Cache configuration
 const cacheConfig = {
-  defaultTtl: 5 * 60 * 1000, // 5 minutes default cache time
-  maxSize: 100, // Max number of items in cache
+  defaultTtl: 5 * 60 * 1000, // 5 minutes
+  enabled: process.env.NODE_ENV === 'production',
 };
 
 // Simple in-memory cache
@@ -94,92 +12,131 @@ const cache = new Map();
 
 /**
  * Make an API request with caching and retry logic
- * @param {Object} config - Axios request config
- * @param {Object} options - Additional options
- * @param {number} options.retries - Number of retry attempts (default: 2)
- * @param {boolean} options.useCache - Whether to use cache (default: false)
- * @param {number} options.cacheTtl - Cache TTL in milliseconds (default: 5 minutes)
- * @returns {Promise} - Axios response
+ * @param {Object} config - Request config
+ * @param {string} config.method - HTTP method (GET, POST, PUT, DELETE)
+ * @param {string} config.url - API endpoint
+ * @param {Object} [config.data] - Request body (for POST/PUT)
+ * @param {Object} [config.params] - Query parameters (for GET)
+ * @param {Object} [options] - Additional options
+ * @param {number} [options.retries=2] - Number of retry attempts
+ * @param {boolean} [options.useCache=false] - Whether to use cache
+ * @param {number} [options.cacheTtl] - Cache TTL in milliseconds
+ * @returns {Promise<Object>} - Response data
  */
-const request = async (config, { 
+async function request(config, { 
   retries = 2, 
   useCache = false, 
   cacheTtl = cacheConfig.defaultTtl 
-} = {}) => {
-  const cacheKey = config.url + JSON.stringify(config.params || {});
-  const now = Date.now();
-  
-  // Check cache if enabled
-  if (useCache && cache.has(cacheKey)) {
-    const { data, timestamp } = cache.get(cacheKey);
-    if (now - timestamp < cacheTtl) {
-      console.debug(`Cache hit for ${cacheKey}`);
-      return { data, fromCache: true };
+} = {}) {
+  const { method = 'GET', url, data, params = {} } = config;
+  const cacheKey = JSON.stringify({ method, url, params, data });
+  const requestId = uuidv4();
+
+  // Return cached response if available and valid
+  if (useCache && cacheConfig.enabled) {
+    const cached = cache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < cacheTtl)) {
+      return { ...cached.response, cached: true };
     }
-    // Remove expired cache entry
-    cache.delete(cacheKey);
   }
-  
-  // Make the request with retry logic
+
   let lastError;
+  
   for (let i = 0; i <= retries; i++) {
     try {
-      const response = await apiClient({
-        ...config,
-        // Add cache control headers
-        headers: {
-          ...config.headers,
-          'Cache-Control': useCache ? `max-age=${Math.floor(cacheTtl / 1000)}` : 'no-cache',
-        },
-      });
+      let response;
       
-      // Cache the response if successful and caching is enabled
-      if (useCache && response.data) {
-        // Enforce max cache size
-        if (cache.size >= cacheConfig.maxSize) {
-          const oldestKey = cache.keys().next().value;
-          cache.delete(oldestKey);
-        }
-        
+      // Handle different HTTP methods
+      switch (method.toLowerCase()) {
+        case 'get':
+          response = await supabase.rpc(url, params);
+          break;
+          
+        case 'post':
+        case 'put':
+        case 'delete':
+          response = await supabase.rpc(url, { data: { ...data, ...params } });
+          break;
+          
+        default:
+          throw new Error(`Unsupported HTTP method: ${method}`);
+      }
+      
+      // Check for errors
+      const { data: result, error } = response;
+      
+      if (error) {
+        throw error;
+      }
+
+      // Cache the successful response
+      if (useCache && cacheConfig.enabled) {
         cache.set(cacheKey, {
-          data: response.data,
-          timestamp: now,
+          response: { data: result },
+          timestamp: Date.now(),
         });
       }
       
-      return response;
+      return { data: result };
+      
     } catch (error) {
       lastError = error;
       
-      // Don't retry for these status codes
-      const nonRetryableStatuses = [400, 401, 403, 404, 422];
-      if (error.response && nonRetryableStatuses.includes(error.response.status)) {
+      // Don't retry for 4xx errors (except 408, 429, 500-599)
+      if (error.status && error.status >= 400 && error.status < 500 && 
+          error.status !== 408 && error.status !== 429) {
         break;
       }
       
-      // Exponential backoff: 1s, 2s, 4s, etc.
+      // Add delay before retry (exponential backoff)
       if (i < retries) {
-        const delay = Math.pow(2, i) * 1000;
+        const delay = Math.min(1000 * Math.pow(2, i), 30000); // Max 30s delay
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
   
   throw lastError;
-};
+}
 
-// Helper methods for common HTTP methods
+/**
+ * Make a GET request
+ * @param {string} url - API endpoint
+ * @param {Object} [params] - Query parameters
+ * @param {Object} [options] - Additional options
+ * @returns {Promise<Object>} - Response data
+ */
 const get = (url, params = {}, options = {}) => 
-  request({ method: 'get', url, params }, options);
+  request({ method: 'GET', url, params }, options);
 
-const post = (url, data = {}, options = {}) => 
-  request({ method: 'post', url, data }, options);
+/**
+ * Make a POST request
+ * @param {string} url - API endpoint
+ * @param {Object} [data] - Request body
+ * @param {Object} [options] - Additional options
+ * @returns {Promise<Object>} - Response data
+ */
+const post = (url, data = {}, options = {}) =>
+  request({ method: 'POST', url, data }, options);
 
-const put = (url, data = {}, options = {}) => 
-  request({ method: 'put', url, data }, options);
+/**
+ * Make a PUT request
+ * @param {string} url - API endpoint
+ * @param {Object} [data] - Request body
+ * @param {Object} [options] - Additional options
+ * @returns {Promise<Object>} - Response data
+ */
+const put = (url, data = {}, options = {}) =>
+  request({ method: 'PUT', url, data }, options);
 
-const del = (url, options = {}) => 
-  request({ method: 'delete', url }, options);
+/**
+ * Make a DELETE request
+ * @param {string} url - API endpoint
+ * @param {Object} [options] - Additional options
+ * @returns {Promise<Object>} - Response data
+ */
+const del = (url, options = {}) =>
+  request({ method: 'DELETE', url }, options);
 
 /**
  * Wrapper for API calls with retry logic
@@ -189,22 +146,32 @@ const del = (url, options = {}) =>
  * @param {number} [options.delay=1000] - Base delay between retries in ms
  * @returns {Promise} - Promise that resolves with the function result or rejects after all retries
  */
-const withRetry = async (fn, { retries = 2, delay = 1000 } = {}) => {
-  try {
-    return await fn();
-  } catch (error) {
-    if (retries <= 0) {
-      throw error;
+async function withRetry(fn, { retries = 2, delay = 1000 } = {}) {
+  let lastError;
+  
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry for 4xx errors (except 408, 429, 500-599)
+      if (error.status && error.status >= 400 && error.status < 500 && 
+          error.status !== 408 && error.status !== 429) {
+        break;
+      }
+      
+      if (i < retries) {
+        // Exponential backoff with jitter
+        const backoff = delay * Math.pow(2, i);
+        const jitter = Math.random() * 1000;
+        await new Promise(resolve => setTimeout(resolve, backoff + jitter));
+      }
     }
-    
-    // Use exponential backoff
-    const waitTime = delay * (2 ** (2 - retries));
-    console.warn(`Retrying after error (${error.message}). ${retries} attempts left.`);
-    
-    await new Promise(resolve => setTimeout(resolve, waitTime));
-    return withRetry(fn, { retries: retries - 1, delay });
   }
-};
+  
+  throw lastError;
+}
 
 /**
  * Handle API errors consistently
@@ -212,33 +179,42 @@ const withRetry = async (fn, { retries = 2, delay = 1000 } = {}) => {
  * @param {Object} context - Additional context for error handling
  * @returns {Object} - Normalized error object
  */
-const handleApiError = (error, context = {}) => {
+function handleApiError(error, context = {}) {
   console.error('API Error:', {
     message: error.message,
-    status: error.response?.status,
-    url: error.config?.url,
-    ...context
+    code: error.code,
+    status: error.status,
+    ...context,
   });
   
   // Return a normalized error object
   return {
-    success: false,
-    error: {
-      message: error.response?.data?.message || error.message,
-      status: error.response?.status,
-      code: error.code,
-      ...context
-    }
+    message: error.message || 'An unknown error occurred',
+    code: error.code || 'UNKNOWN_ERROR',
+    status: error.status,
+    originalError: error,
+    ...context,
   };
+}
+
+// Export all the HTTP methods and utilities
+export {
+  get,
+  post,
+  put,
+  del as delete,
+  withRetry,
+  handleApiError,
+  request
 };
 
-export { 
-  get, 
-  post, 
-  put, 
-  del, 
-  withRetry, 
-  handleApiError 
+// For backward compatibility
+export default {
+  get,
+  post,
+  put,
+  delete: del,
+  withRetry,
+  handleApiError,
+  request
 };
-
-export default apiClient;

@@ -1,5 +1,5 @@
 import responseTime from 'response-time';
-import { logger } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 import { generateRequestId } from '../ai-services/utils.js';
 
 /**

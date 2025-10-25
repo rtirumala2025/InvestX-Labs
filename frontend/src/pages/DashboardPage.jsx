@@ -9,8 +9,19 @@ import { logVerificationComplete } from '../utils/verificationLogger';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import MarketTicker from '../components/market/MarketTicker';
+import { MarketProvider } from '../contexts/MarketContext';
 
+// Main DashboardPage component wrapped with MarketProvider
 export default function DashboardPage() {
+  return (
+    <MarketProvider>
+      <DashboardPageContent />
+    </MarketProvider>
+  );
+}
+
+function DashboardPageContent() {
   const { currentUser } = useAuth();
   const userProfile = currentUser?.profile;
   const { portfolio, holdings, loading, error } = usePortfolio();
@@ -292,23 +303,41 @@ export default function DashboardPage() {
             </motion.div>
           ))}
         </motion.div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content Area */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Portfolio Performance Chart */}
-            <motion.div variants={fadeIn} initial="hidden" animate="visible">
-              <GlassCard variant="hero" padding="large" shadow="xl">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-semibold text-white">Portfolio Performance</h2>
-                  <div className="flex space-x-2">
-                    <button className="px-3 py-1 text-sm bg-white/10 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-all">1D</button>
-                    <button className="px-3 py-1 text-sm bg-blue-500/30 rounded-lg text-white">1W</button>
-                    <button className="px-3 py-1 text-sm bg-white/10 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-all">1M</button>
-                    <button className="px-3 py-1 text-sm bg-white/10 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-all">1Y</button>
+        
+        {/* Market Ticker */}
+        <motion.div 
+          variants={fadeIn}
+          initial="hidden"
+          animate="visible"
+          className="mb-6"
+        >
+          <MarketTicker />
+        </motion.div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column */}
+          <div className="lg:col-span-2 space-y-6">
+              {/* Portfolio Performance Chart */}
+              <motion.div variants={fadeIn} initial="hidden" animate="visible">
+                <GlassCard variant="hero" padding="large" shadow="xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                    <h2 className="text-2xl font-semibold text-white">Portfolio Performance</h2>
+                    <div className="flex flex-wrap gap-2">
+                      {['1D', '1W', '1M', '1Y', 'ALL'].map((period) => (
+                        <button 
+                          key={period}
+                          className={`px-3 py-1 text-sm rounded-lg transition-all ${
+                            period === '1W' 
+                              ? 'bg-blue-500/30 text-white' 
+                              : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                          }`}
+                        >
+                          {period}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div className="h-64 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl border border-white/10 flex items-center justify-center backdrop-blur-sm">
+                  <div className="h-64 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl border border-white/10 flex items-center justify-center backdrop-blur-sm">
                   <div className="text-center">
                     <div className="text-4xl mb-2">📈</div>
                     <p className="text-white/70">Interactive chart will be displayed here</p>

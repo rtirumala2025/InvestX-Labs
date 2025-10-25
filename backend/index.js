@@ -7,7 +7,8 @@ import compression from 'compression';
 import { requestTracker, errorLogger, metricsMiddleware } from './middleware/requestTracker.js';
 import aiRoutes from './routes/aiRoute.js';
 import mcpRoutes from './routes/mcpRoute.js';
-import { logger } from './utils/logger.js';
+import marketRoutes from './routes/market.js';
+import logger from './utils/logger.js';
 
 dotenv.config();
 
@@ -17,10 +18,40 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Security middleware
 app.use(helmet());
-app.use(cors({
-  origin: isProduction ? process.env.ALLOWED_ORIGINS?.split(',') || [] : '*',
-  credentials: true
-}));
+
+// CORS configuration
+const whitelist = [
+  'http://localhost:3000',
+  'http://localhost:3002',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3002',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000'
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (whitelist.indexOf(origin) !== -1 || !isProduction) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-Id'],
+  credentials: true,
+  optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
+  preflightContinue: false
+};
+
+// Enable CORS with these options
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions)); // Include before other routes
 
 // Request parsing
 app.use(express.json({ limit: '10kb' }));
@@ -50,9 +81,10 @@ app.use('/api', limiter);
 app.use(requestTracker());
 app.use(metricsMiddleware);
 
-// API Routes
-app.use('/api', aiRoutes);
-app.use('/api', mcpRoutes);
+// API Routes - Mount each service under its own path
+app.use('/api/ai', aiRoutes);
+app.use('/api/mcp', mcpRoutes);
+app.use('/api/market', marketRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -65,8 +97,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 404 handler
-app.use((req, res) => {
+// Catch-all for undefined routes
+app.all('*', (req, res) => {
+  logger.warn(`Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     status: 'error',
     message: 'Resource not found',

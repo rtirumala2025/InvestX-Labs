@@ -6,6 +6,7 @@ const { getFirestore } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const cors = require('cors');
 const { handleChatMessage } = require('./chat/chatService');
+const { getStockQuote, getMarketNews } = require('../market/marketService');
 
 // Configure CORS
 const corsHandler = cors({
@@ -40,6 +41,62 @@ const updateStockPrices = require('./market/stockPrices');
 // User Management
 const createUserProfile = require('./users/userManagement');
 const updateUserProgress = require('./users/progressTracking');
+
+// Market Data Endpoints
+exports.marketData = onRequest(async (req, res) => {
+  // Enable CORS
+  res.set('Access-Control-Allow-Origin', '*');
+  
+  if (req.method === 'OPTIONS') {
+    // Send response to OPTIONS requests
+    res.set('Access-Control-Allow-Methods', 'GET');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(204).send('');
+    return;
+  }
+
+  try {
+    const { symbol } = req.query;
+    
+    if (!symbol) {
+      res.status(400).json({ error: 'Symbol parameter is required' });
+      return;
+    }
+
+    const quote = await getStockQuote(symbol);
+    res.status(200).json(quote);
+  } catch (error) {
+    console.error('Error in market data endpoint:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch market data',
+      details: error.message 
+    });
+  }
+});
+
+exports.marketNews = onRequest(async (req, res) => {
+  // Enable CORS
+  res.set('Access-Control-Allow-Origin', '*');
+  
+  if (req.method === 'OPTIONS') {
+    // Send response to OPTIONS requests
+    res.set('Access-Control-Allow-Methods', 'GET');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(204).send('');
+    return;
+  }
+
+  try {
+    const news = await getMarketNews();
+    res.status(200).json(news);
+  } catch (error) {
+    console.error('Error in market news endpoint:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch market news',
+      details: error.message 
+    });
+  }
+});
 
 // Export Cloud Functions
 exports.generatePersonalizedSuggestions = onCall(async (request) => {

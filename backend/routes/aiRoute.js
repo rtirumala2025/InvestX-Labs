@@ -8,6 +8,15 @@ dotenv.config();
 
 const router = express.Router();
 
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'ai-service',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Mock data for recommendations
 const mockRecommendations = [
   {

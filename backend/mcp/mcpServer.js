@@ -1,4 +1,4 @@
-import { MCPServer } from '@modelcontextprotocol/sdk';
+import { MCPServer as MCPCore } from '@modelcontextprotocol/sdk';
 import { logger } from '../utils/logger.js';
 import { OpenRouterAdapter } from './adapters/openrouterAdapter.js';
 import { AlphaVantageAdapter } from './adapters/alphaVantageAdapter.js';
@@ -7,7 +7,7 @@ import { ContextManager } from './contextManager.js';
 
 class MCPServer {
   constructor() {
-    this.server = new MCPServer({
+    this.server = new MCPCore({
       name: 'InvestX Labs MCP Server',
       version: '1.0.0',
       description: 'MCP server for InvestX Labs AI investment education platform',

@@ -1,8 +1,8 @@
-import apiClient from './apiClient';
-import { getSession } from './auth';
+import { supabase } from '../../lib/supabaseClient';
 import { logError, logInfo } from '../../utils/logger';
 
-const { get, post, put, del, patch, handleApiError, withRetry } = apiClient;
+// Base URL for API calls (not needed for Supabase RPC)
+const API_BASE_URL = '';
 
 // Cache configuration
 const CACHE_TTL = {
@@ -58,80 +58,128 @@ const invalidateCache = (pattern) => {
   }
 };
 
-// API Base URL - should be set in environment variables
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-
 // Maximum retry attempts for API calls
 const MAX_RETRIES = 3;
+
+/**
+ * Handle API errors consistently
+ * @param {Error} error - The error object
+ * @param {string} context - Context of the error
+ * @throws {Error} Enhanced error with context
+ */
+const handleApiError = (error, context = 'MCP Service') => {
+  const errorMessage = error.message || 'Unknown error';
+  const errorDetails = error.details || error.toString();
+  const fullMessage = `[${context}] ${errorMessage}: ${errorDetails}`;
+  
+  logError(fullMessage, { error, context });
+  throw new Error(fullMessage);
+};
+
+/**
+ * Get the current user session
+ * @returns {Promise<Object>} The current session
+ */
+const getSession = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    return session;
+  } catch (error) {
+    handleApiError(error, 'Failed to get session');
+  }
+};
+
+// Default options for Supabase RPC calls
+const DEFAULT_RPC_OPTIONS = {
+  head: false,
+  count: null,
+  retry: true,
+  retryCount: MAX_RETRIES,
+  retryDelay: 1000,
+};
 
 // Base delay between retries (ms)
 const RETRY_DELAY = 1000;
 
 /**
  * Get MCP context for a user
- * @param {string} userId - User ID
+ * @param {string} userId - User ID (defaults to 'anonymous' if not provided)
  * @param {Object} [options] - Options
  * @param {boolean} [options.useCache=true] - Whether to use cache
  * @param {number} [options.cacheTtl=CACHE_TTL.MEDIUM] - Cache TTL in ms
- * @param {number} [options.retries=2] - Number of retry attempts
+ * @param {number} [options.retries=MAX_RETRIES] - Number of retry attempts
  * @returns {Promise<Object>} MCP context data
  */
-export const getMCPContext = async (userId, options = {}) => {
-  const { 
-    useCache = true, 
+const getMCPContext = async (userId = 'anonymous', options = {}) => {
+  const {
+    useCache = true,
     cacheTtl = CACHE_TTL.MEDIUM,
-    retries = 2
+    retries = MAX_RETRIES
   } = options;
-  
+
   const cacheKey = `mcp:context:${userId}`;
   
   // Return cached data if available and cache is enabled
   if (useCache) {
     const cached = getCachedData(cacheKey);
     if (cached) {
-      logInfo('Returning cached MCP context');
-      return cached;
+      logInfo('Returning cached MCP context', { userId });
+      return { ...cached, _cached: true };
     }
   }
-  
+
   try {
-    logInfo(`Fetching MCP context for user ${userId}`);
+    logInfo('Fetching MCP context', { userId });
     
-    const response = await withRetry(
-      () => get(
-        `${API_BASE_URL}/mcp/context/${userId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${getSession()?.accessToken || ''}`,
-            'X-Request-ID': `mcp-ctx-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          }
-        }
-      ),
-      { retries, delay: 1000 }
-    );
-    
-    const data = response?.data || {};
-    
-    // Cache the response if successful
+    // Use Supabase RPC to get user context
+    const { data, error } = await supabase
+      .rpc('get_user_context', { user_id: userId })
+      .single();
+
+    if (error) throw error;
+
+    const context = {
+      ...data,
+      userId,
+      _cached: false,
+      _timestamp: new Date().toISOString()
+    };
+
+    // Cache the successful response
     if (useCache) {
-      setCachedData(cacheKey, data, cacheTtl);
+      setCachedData(cacheKey, context, cacheTtl);
     }
-    
-    logInfo('Successfully fetched MCP context');
-    return data;
+
+    return context;
   } catch (error) {
-    logError('Error fetching MCP context:', error);
+    logError('Error fetching MCP context', { error, userId });
+    
+    // Return a default context if the request fails
+    const defaultContext = {
+      userId,
+      preferences: {
+        theme: 'light',
+        notifications: true,
+        defaultView: 'dashboard'
+      },
+      lastActive: new Date().toISOString(),
+      features: {},
+      _cached: false,
+      _error: error.message,
+      _fallback: true
+    };
+
+    // Cache the fallback to prevent repeated failed requests
+    if (useCache) {
+      setCachedData(cacheKey, defaultContext, CACHE_TTL.SHORT);
+    }
     
     // In development, return mock data if the API call fails
     if (process.env.NODE_ENV !== 'production') {
       console.warn('Using mock MCP context due to error');
       return {
-        userId,
-        riskProfile: 'moderate',
-        investmentGoals: ['growth', 'income'],
-        riskTolerance: 5,
-        timeHorizon: 5,
-        preferredAssetClasses: ['stocks', 'etfs'],
+        ...defaultContext,
         lastUpdated: new Date().toISOString(),
         _mock: true
       };
@@ -148,75 +196,82 @@ export const getMCPContext = async (userId, options = {}) => {
  * @param {number} options.retries - Number of retry attempts (default: MAX_RETRIES)
  * @returns {Promise<Object>} Updated MCP context
  */
-export const updateMCPContext = async (contextUpdate, options = {}) => {
+const updateMCPContext = async (contextUpdate, options = {}) => {
   const { retries = MAX_RETRIES } = options;
-  const session = getSession();
   
-  if (!session) {
-    const error = new Error('User not authenticated');
-    logError('Authentication required for updating MCP context', error);
-    throw error;
-  }
-  
-  const attempt = async (attemptNumber = 1) => {
+  let attempts = 0;
+  let lastError;
+
+  while (attempts < retries) {
     try {
-      logInfo('Updating MCP context', { attempt: attemptNumber });
+      attempts++;
       
-      const response = await patch(
-        `${API_BASE_URL}/mcp/context`,
-        {
-          ...contextUpdate,
-          // Include additional metadata
-          metadata: {
-            ...(contextUpdate.metadata || {}),
-            updatedAt: new Date().toISOString(),
-            updatedBy: session.user.id,
-            userAgent: navigator?.userAgent,
-            ipAddress: '0.0.0.0' // This would be set by the server in production
-          }
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${session.accessToken}`,
-            'Content-Type': 'application/json',
-            'X-Request-ID': `mcp-update-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          }
+      const session = await getSession();
+      const userId = session?.user?.id || 'anonymous';
+
+      // Prepare the context update with metadata
+      const updateWithMetadata = {
+        ...contextUpdate,
+        _metadata: {
+          ...(contextUpdate._metadata || {}),
+          updatedAt: new Date().toISOString(),
+          updatedBy: userId,
+          userAgent: typeof window !== 'undefined' ? window.navigator?.userAgent : 'server',
+          attempt: attempts
         }
-      );
+      };
+
+      // Call the Supabase RPC function
+      const { data, error } = await supabase
+        .rpc('update_user_context', { 
+          user_id: userId,
+          context_updates: updateWithMetadata
+        })
+        .single();
+
+      if (error) throw error;
+
+      // Invalidate any cached context
+      invalidateCache(`mcp-context-${userId}`);
       
-      logInfo('Successfully updated MCP context');
-      return response.data || {};
+      logInfo('Successfully updated MCP context', { userId });
+      return data || updateWithMetadata;
       
     } catch (error) {
-      logError('Error updating MCP context:', error);
+      lastError = error;
+      logError(`Attempt ${attempts} failed for updateMCPContext`, { 
+        error, 
+        attempt: attempts,
+        totalRetries: retries
+      });
       
-      // If we have retries left, wait and try again
-      if (attemptNumber < retries) {
-        const delay = RETRY_DELAY * Math.pow(2, attemptNumber - 1);
-        logInfo(`Retrying in ${delay}ms...`);
+      // Exponential backoff
+      if (attempts < retries) {
+        const delay = 1000 * Math.pow(2, attempts);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return attempt(attemptNumber + 1);
       }
-      
-      // If we're out of retries, handle the error
-      handleApiError(error, 'Failed to update MCP context');
-      
-      // In development, log the error but don't fail the UI
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('Failed to update MCP context, but continuing in development mode');
-        return {
-          ...contextUpdate,
-          lastUpdated: new Date().toISOString(),
-          _localUpdate: true
-        };
-      }
-      
-      // In production, rethrow the error to be handled by the caller
-      throw error;
     }
-  };
+  }
+
+  // If we get here, all retries failed
+  const errorMessage = lastError?.message || 'Failed to update MCP context';
+  logError('All retries failed for updateMCPContext', { 
+    error: lastError,
+    attempts 
+  });
+
+  // In development, return the local update with a flag
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn('Using local MCP context update due to error');
+    return {
+      ...contextUpdate,
+      lastUpdated: new Date().toISOString(),
+      _localUpdate: true,
+      _error: errorMessage
+    };
+  }
   
-  return attempt();
+  throw lastError || new Error(errorMessage);
 };
 
 /**
@@ -230,85 +285,84 @@ export const updateMCPContext = async (contextUpdate, options = {}) => {
  * @param {number} [fetchOptions.retries=MAX_RETRIES] - Number of retry attempts
  * @returns {Promise<Array>} List of MCP recommendations
  */
-export const getMCPRecommendations = async (options = {}, fetchOptions = {}) => {
+const getMCPRecommendations = async (options = {}, fetchOptions = {}) => {
   const { type, contextId, limit = 10 } = options;
   const { useCache = true, retries = MAX_RETRIES } = fetchOptions;
-  const session = getSession();
   
-  const attempt = async (attemptNumber = 1) => {
+  const cacheKey = `mcp-recommendations-${type || 'all'}-${contextId || 'global'}-${limit}`;
+  
+  // Try to get from cache first
+  if (useCache) {
+    const cached = getCachedData(cacheKey);
+    if (cached) return cached;
+  }
+  
+  let attempts = 0;
+  let lastError;
+
+  while (attempts < retries) {
     try {
-      logInfo('Fetching MCP recommendations', { 
-        attempt: attemptNumber,
-        type,
-        contextId
+      attempts++;
+      
+      const session = await getSession();
+      const userId = session?.user?.id || 'anonymous';
+      
+      // Call the Supabase RPC function
+      const { data, error } = await supabase
+        .rpc('get_recommendations', {
+          user_id: userId,
+          recommendation_type: type || null,
+          context_id: contextId || null,
+          max_results: limit
+        });
+
+      if (error) throw error;
+
+      // Cache the successful response
+      if (useCache) {
+        setCachedData(cacheKey, data, CACHE_TTL.MEDIUM);
+      }
+      
+      return data || [];
+    } catch (error) {
+      lastError = error;
+      logError(`Attempt ${attempts} failed for getMCPRecommendations`, { 
+        error, 
+        options,
+        contextId,
+        attempt: attempts,
+        totalRetries: retries
       });
       
-      const response = await get(
-        `${API_BASE_URL}/mcp/recommendations`,
-        {
-          type,
-          contextId,
-          limit,
-          // Include additional context
-          timestamp: new Date().toISOString(),
-          sessionId: session?.sessionId,
-          userId: session?.user?.id,
-          userAgent: navigator?.userAgent
-        },
-        {
-          useCache,
-          cacheTtl: type === 'personalized' ? CACHE_TTL.SHORT : CACHE_TTL.MEDIUM,
-          headers: {
-            'Authorization': `Bearer ${session?.accessToken || ''}`,
-            'X-Request-ID': `mcp-recs-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          }
-        }
-      );
-      
-      logInfo(`Successfully fetched ${response.data?.length || 0} MCP recommendations`);
-      return response.data || [];
-      
-    } catch (error) {
-      logError('Error getting MCP recommendations:', error);
-      
-      // If we have retries left, wait and try again
-      if (attemptNumber < retries) {
-        const delay = RETRY_DELAY * Math.pow(2, attemptNumber - 1);
-        logInfo(`Retrying in ${delay}ms...`);
+      if (attempts < retries) {
+        const delay = 1000 * Math.pow(2, attempts);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return attempt(attemptNumber + 1);
       }
-      
-      // If we're out of retries, handle the error
-      handleApiError(error, 'Failed to fetch MCP recommendations');
-      
-      // In development, return mock data if the API call fails
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('Using mock MCP recommendations due to error');
-        return [
-          {
-            id: 'rec-1',
-            type: type || 'general',
-            title: 'Diversify your portfolio',
-            description: 'Consider adding more assets from different sectors to reduce risk.',
-            priority: 'high',
-            confidence: 0.85,
-            actions: [
-              { id: 'act-1', label: 'View portfolio', type: 'navigate', target: '/portfolio' },
-              { id: 'act-2', label: 'Dismiss', type: 'dismiss' }
-            ],
-            timestamp: new Date().toISOString(),
-            _mock: true
-          }
-        ];
-      }
-      
-      // In production, rethrow the error to be handled by the caller
-      throw error;
     }
-  };
+  }
+
+  // Return mock data in development if all retries fail
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn('Using mock MCP recommendations due to error');
+    return [
+      { 
+        id: 'rec1', 
+        type: type || 'default', 
+        score: 0.9, 
+        content: 'Sample recommendation 1',
+        _mock: true
+      },
+      { 
+        id: 'rec2', 
+        type: type || 'default', 
+        score: 0.85, 
+        content: 'Sample recommendation 2',
+        _mock: true
+      },
+    ].slice(0, limit);
+  }
   
-  return attempt();
+  throw lastError || new Error('Failed to get MCP recommendations');
 };
 
 /**
@@ -331,44 +385,64 @@ export const getMCPRecommendations = async (options = {}, fetchOptions = {}) => 
  * @param {Object} [feedback.metadata] - Additional metadata
  * @returns {Promise<Object>} Submission response
  */
-export const submitFeedback = async (feedback) => {
+const submitFeedback = async (feedback) => {
   const { userId, contentId, rating, comment = '', metadata = {} } = feedback;
-  const session = getSession();
   
   try {
-    logInfo(`Submitting feedback for content ${contentId}`);
+    const session = await getSession();
+    const currentUserId = session?.user?.id || userId || 'anonymous';
     
-    const response = await post(
-      '/api/mcp/feedback',
-      {
-        userId: session?.user?.id || userId,
-        contentId,
-        rating,
-        comment,
-        metadata: {
-          ...metadata,
-          timestamp: new Date().toISOString(),
-          url: typeof window !== 'undefined' ? window.location.href : '',
-          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
-        },
-        sessionId: session?.sessionId
-      },
-      {
-        useCache: false,
-        headers: {
-          'Authorization': `Bearer ${session?.accessToken || ''}`,
-          'Content-Type': 'application/json'
-        }
+    logInfo(`Submitting feedback for content ${contentId}`, { userId: currentUserId });
+    
+    // Prepare feedback data
+    const feedbackData = {
+      user_id: currentUserId,
+      content_id: contentId,
+      rating,
+      comment,
+      metadata: {
+        ...metadata,
+        timestamp: new Date().toISOString(),
+        url: typeof window !== 'undefined' ? window.location.href : '',
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        session_id: session?.id
       }
-    );
+    };
     
-    return response?.data || { success: true };
+    // Call the Supabase RPC function
+    const { data, error } = await supabase
+      .rpc('submit_feedback', feedbackData)
+      .single();
+      
+    if (error) throw error;
+    
+    // Invalidate any cached recommendations that might be affected
+    invalidateCache('mcp-recommendations-');
+    
+    return { 
+      success: true, 
+      data: data || { id: `local-${Date.now()}` },
+      _cached: false
+    };
+    
   } catch (error) {
     // Log the error but don't throw - we don't want to break the UI for tracking
     logError('Error submitting MCP feedback:', error);
+    
+    // In development, return a success response with a mock ID
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Using mock feedback submission due to error:', error.message);
+      return { 
+        success: true, 
+        data: { id: `mock-${Date.now()}` },
+        _mock: true
+      };
+    }
+    
     return { 
       success: false, 
-      error: error.message || 'Failed to submit feedback' 
+      error: error.message || 'Failed to submit feedback',
+      _error: true
     };
   }
 };
@@ -381,48 +455,130 @@ export const submitFeedback = async (feedback) => {
  * @param {Object} [interaction.metadata] - Additional metadata
  * @returns {Promise<Object>} Tracking response
  */
-export const trackMCPInteraction = async (interaction) => {
+const trackMCPInteraction = async (interaction) => {
   const { type, contentId, metadata = {} } = interaction;
-  const session = getSession();
   
   try {
-    logInfo(`Tracking MCP interaction: ${type} for content ${contentId}`);
+    const session = await getSession();
+    const userId = session?.user?.id || 'anonymous';
     
-    const response = await post(
-      '/api/mcp/interactions',
-      {
-        type,
-        contentId,
-        metadata: {
-          ...metadata,
-          timestamp: new Date().toISOString(),
-          url: typeof window !== 'undefined' ? window.location.href : '',
-          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
-        },
-        userId: session?.user?.id,
-        sessionId: session?.sessionId
-      },
-      {
-        useCache: false,
-        headers: {
-          'Authorization': `Bearer ${session?.accessToken || ''}`,
-          'Content-Type': 'application/json'
-        }
+    logInfo(`Tracking MCP interaction: ${type} for content ${contentId}`, { userId });
+    
+    // Prepare interaction data
+    const interactionData = {
+      user_id: userId,
+      interaction_type: type,
+      content_id: contentId,
+      metadata: {
+        ...metadata,
+        timestamp: new Date().toISOString(),
+        url: typeof window !== 'undefined' ? window.location.href : '',
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        session_id: session?.id,
+        screen_width: typeof window !== 'undefined' ? window.innerWidth : 0,
+        screen_height: typeof window !== 'undefined' ? window.innerHeight : 0
       }
-    );
+    };
     
-    return response?.data || { success: true };
+    // Call the Supabase RPC function
+    const { error } = await supabase
+      .rpc('track_interaction', interactionData);
+      
+    if (error) throw error;
+    
+    return { 
+      success: true,
+      _cached: false
+    };
+    
   } catch (error) {
+    // Don't fail the interaction if tracking fails
     logError('Error tracking MCP interaction:', error);
-    return { success: false, error: error.message };
+    
+    // In development, return a success response
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Using mock interaction tracking due to error:', error.message);
+      return { 
+        success: true,
+        _mock: true
+      };
+    }
+    
+    return { 
+      success: false, 
+      error: error.message || 'Failed to track interaction',
+      _error: true
+    };
   }
 };
 
 // Export all functions
+/**
+ * Test connection to the MCP service
+ * @returns {Promise<Object>} Service status
+ */
+const testConnection = async () => {
+  try {
+    // Test Supabase connection by fetching the current session
+    const { data: session, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) throw sessionError;
+    
+    // Test RPC function
+    const { data, error: rpcError } = await supabase
+      .rpc('get_ai_health')
+      .single();
+      
+    if (rpcError) throw rpcError;
+    
+    return { 
+      success: true, 
+      data: {
+        ...data,
+        supabase_connected: !!session.session
+      } 
+    };
+  } catch (error) {
+    logError('MCP Service connection test failed', error);
+    
+    // In development, return a mock success response
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Using mock MCP connection test due to error:', error.message);
+      return { 
+        success: true, 
+        data: { 
+          status: 'ok', 
+          version: '1.0.0',
+          supabase_connected: true,
+          _mock: true
+        } 
+      };
+    }
+    
+    return { 
+      success: false, 
+      error: error.message || 'Failed to connect to MCP service',
+      _error: true
+    };
+  }
+};
+
+// Export all functions as named exports
+export {
+  getMCPContext,
+  updateMCPContext,
+  getMCPRecommendations,
+  submitFeedback as submitMCPFeedback,
+  trackMCPInteraction,
+  testConnection
+};
+
+// For backward compatibility, also provide a default export with the same functions
 export default {
   getMCPContext,
   updateMCPContext,
   getMCPRecommendations,
   submitFeedback,
-  trackMCPInteraction
+  trackMCPInteraction,
+  testConnection
 };
