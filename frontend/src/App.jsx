@@ -8,7 +8,7 @@ import theme from './theme';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import DisclaimerBanner from './components/common/DisclaimerBanner';
 import NetworkStatus from './components/common/NetworkStatus';
-import ProtectedRoute from './components/auth/ProtectedRoute';
+// import ProtectedRoute from './components/auth/ProtectedRoute'; // Commented out for demo - no auth required
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
 import DevTools from './components/dev/DevTools';
@@ -61,54 +61,15 @@ function App() {
                       <Route path="/signup" element={<SignupPage />} />
                       <Route path="/privacy" element={<PrivacyPage />} />
                       
-                      {/* Protected Routes */}
-                      <Route path="/onboarding" element={
-                        <ProtectedRoute>
-                          <OnboardingPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/diagnostic" element={
-                        <ProtectedRoute>
-                          <DiagnosticPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/dashboard" element={
-                        <ProtectedRoute>
-                          <DashboardPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/suggestions" element={
-                        <ProtectedRoute>
-                          <SuggestionsPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/portfolio" element={
-                        <ProtectedRoute>
-                          <PortfolioPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/education" element={
-                        <ProtectedRoute>
-                          <EducationPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/profile" element={
-                        <ProtectedRoute>
-                          <ProfilePage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/chat" element={
-                        <ProtectedRoute>
-                          <ChatPage />
-                        </ProtectedRoute>
-                      } />
+                      {/* Previously Protected Routes - Now Open for Demo */}
+                      <Route path="/onboarding" element={<OnboardingPage />} />
+                      <Route path="/diagnostic" element={<DiagnosticPage />} />
+                      <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/suggestions" element={<SuggestionsPage />} />
+                      <Route path="/portfolio" element={<PortfolioPage />} />
+                      <Route path="/education" element={<EducationPage />} />
+                      <Route path="/profile" element={<ProfilePage />} />
+                      <Route path="/chat" element={<ChatPage />} />
                       
                       {/* Development routes */}
                       {process.env.NODE_ENV === 'development' && (

@@ -12,11 +12,21 @@ import { supabase } from '../services/supabase/config';
 
 const AuthContext = createContext({
   currentUser: null,
+  user: null,
+  userProfile: null,
   loading: true,
+  error: null,
   signIn: async () => ({}),
+  signUp: async () => ({}),
   signInWithGoogle: async () => ({}),
   signOut: async () => {},
-  updateProfile: async () => ({})
+  updateProfile: async () => ({}),
+  // Aliases
+  login: async () => ({}),
+  logout: async () => {},
+  signup: async () => ({}),
+  loginWithGoogle: async () => ({}),
+  updateUserProfile: async () => ({})
 });
 
 export function useAuth() {
@@ -161,7 +171,7 @@ export function AuthProvider({ children }) {
   };
 
   // Google Sign In function
-  const signInWithGoogle = async () => {
+  const handleSignInWithGoogle = async () => {
     try {
       setLoading(true);
       setIsPopupOpen(true);
@@ -171,7 +181,7 @@ export function AuthProvider({ children }) {
         sessionStorage.setItem('preAuthUrl', window.location.pathname);
       }
       
-      // This will redirect to Google OAuth page
+      // Call the imported signInWithGoogle service function (not self)
       const { error } = await signInWithGoogle();
       
       if (error) throw error;
@@ -240,11 +250,19 @@ export function AuthProvider({ children }) {
     currentUser,
     loading,
     signIn,
-    signInWithGoogle,
+    signUp,
+    signInWithGoogle: handleSignInWithGoogle,
     signOut,
     updateProfile,
+    // Aliases for compatibility with different naming conventions
     login: signIn,
     logout: signOut,
+    signup: signUp,
+    loginWithGoogle: handleSignInWithGoogle,
+    updateUserProfile: updateProfile,
+    user: currentUser,
+    userProfile: currentUser?.profile,
+    error: null,
     isPopupOpen
   };
 
