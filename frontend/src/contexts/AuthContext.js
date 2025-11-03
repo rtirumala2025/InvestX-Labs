@@ -37,6 +37,9 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  
+  // Session timeout configuration (30 minutes of inactivity)
+  const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
 
   // Handle authentication state changes
   useEffect(() => {
@@ -245,6 +248,67 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
   };
+
+  /**
+   * Session Timeout Management
+   * 
+   * Automatically logs out user after 30 minutes of inactivity.
+   * Inactivity is detected by monitoring mouse movements and keyboard presses.
+   * Timer is reset on each user interaction.
+   */
+  useEffect(() => {
+    // Only set up timeout if user is logged in
+    if (!currentUser) return;
+
+    let inactivityTimer;
+
+    /**
+     * Reset the inactivity timer
+     * Called on every user interaction (mousemove, keypress, click)
+     */
+    const resetInactivityTimer = () => {
+      // Clear existing timer
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+
+      // Set new timer
+      inactivityTimer = setTimeout(async () => {
+        try {
+          await signOut();
+          // Show notification to user
+          if (window.confirm('Your session has expired due to inactivity. Please log in again.')) {
+            window.location.href = '/login';
+          }
+        } catch (error) {
+          console.error('Session timeout error:', error);
+        }
+      }, SESSION_TIMEOUT);
+    };
+
+    // Activity event listeners
+    const events = ['mousemove', 'keypress', 'click', 'scroll', 'touchstart'];
+    
+    // Add event listeners for user activity
+    events.forEach(event => {
+      window.addEventListener(event, resetInactivityTimer);
+    });
+
+    // Initialize the timer
+    resetInactivityTimer();
+
+    // Cleanup function
+    return () => {
+      // Remove all event listeners
+      events.forEach(event => {
+        window.removeEventListener(event, resetInactivityTimer);
+      });
+      // Clear the timeout
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+    };
+  }, [currentUser, SESSION_TIMEOUT]);
 
   const value = {
     currentUser,

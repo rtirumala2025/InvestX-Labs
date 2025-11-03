@@ -11,7 +11,17 @@ export const signInUser = async (email, password) => {
   return data;
 };
 
-// Sign up with email and password
+/**
+ * Sign up a new user with email and password
+ * 
+ * Creates a new user account and sends an email verification link.
+ * The user's metadata (full_name, username) is stored in the auth.users table.
+ * 
+ * @param {string} email - User's email address
+ * @param {string} password - User's password (min 6 characters)
+ * @param {Object} userData - Additional user data (fullName, username)
+ * @returns {Promise<Object>} User data and session information
+ */
 export const signUpUser = async (email, password, userData) => {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -21,6 +31,8 @@ export const signUpUser = async (email, password, userData) => {
         full_name: userData.fullName,
         username: userData.username,
       },
+      // Redirect user to email verification page after clicking email link
+      emailRedirectTo: `${window.location.origin}/verify-email`,
     },
   });
 
@@ -69,6 +81,59 @@ export const updateUserProfile = async (updates) => {
   return data;
 };
 
+/**
+ * Send a password reset email to the user
+ * 
+ * Triggers Supabase to send a password reset link to the user's email.
+ * The link will redirect to the reset-password page in the app.
+ * 
+ * @param {string} email - User's email address
+ * @returns {Promise<void>}
+ */
+export const sendPasswordResetEmail = async (email) => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+  
+  if (error) throw error;
+};
+
+/**
+ * Update the user's password
+ * 
+ * Used after user clicks the password reset link from their email.
+ * Requires the user to be in an authenticated session from the reset link.
+ * 
+ * @param {string} newPassword - New password (min 6 characters)
+ * @returns {Promise<Object>} Updated user data
+ */
+export const updatePassword = async (newPassword) => {
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+  
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Resend email verification link
+ * 
+ * Allows users to request a new verification email if they didn't receive
+ * the original or if it expired.
+ * 
+ * @param {string} email - User's email address
+ * @returns {Promise<void>}
+ */
+export const resendVerificationEmail = async (email) => {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: email,
+  });
+  
+  if (error) throw error;
+};
+
 export default {
   signInUser,
   signUpUser,
@@ -77,4 +142,7 @@ export default {
   onAuthStateChange,
   signInWithGoogle,
   updateUserProfile,
+  sendPasswordResetEmail,
+  updatePassword,
+  resendVerificationEmail,
 };

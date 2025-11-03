@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../supabase/config';
 import { getSession } from './auth';
 import { logError, logInfo } from '../../utils/logger';
 

@@ -1,11 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
+/**
+ * Header Component
+ * 
+ * Main navigation header with responsive design.
+ * Displays different buttons based on authentication state:
+ * - Logged out: Shows Login and Sign Up buttons
+ * - Logged in: Shows user welcome message and Logout button
+ * 
+ * Features:
+ * - Sticky header with scroll-based styling
+ * - Responsive mobile menu
+ * - Logout functionality with redirect
+ */
 const Header = () => {
-  const { currentUser: user, logout } = useAuth();
+  const { currentUser: user, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -14,6 +28,19 @@ const Header = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  /**
+   * Handle user logout
+   * Signs out the user and redirects to home page
+   */
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
 
   return (
     <>
@@ -80,11 +107,12 @@ const Header = () => {
               {user ? (
                 <>
                   <span className="hidden lg:block bg-white/85 hover:bg-white/95 text-neutral-700 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 border border-white/25 hover:border-white/35 backdrop-blur-xl shadow-apple hover:shadow-apple-lg">
-                    Welcome, {user.displayName || user.email}
+                    Welcome, {user?.profile?.full_name || user?.email || 'User'}
                   </span>
                   <button
-                    onClick={logout}
+                    onClick={handleLogout}
                     className="bg-white/85 hover:bg-white/95 text-neutral-700 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 border border-white/25 hover:border-white/35 backdrop-blur-xl shadow-apple hover:shadow-apple-lg focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:ring-offset-2"
+                    title="Sign out of your account"
                   >
                     Logout
                   </button>

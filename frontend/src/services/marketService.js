@@ -10,7 +10,7 @@
  * - Error recovery
  */
 
-import { supabase } from '../lib/supabaseClient.js';
+import { supabase } from './supabase/config';
 
 // Logging utilities
 const isDevelopment = process.env.NODE_ENV === 'development' || 

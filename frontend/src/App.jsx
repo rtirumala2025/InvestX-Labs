@@ -18,6 +18,9 @@ import ConnectionTester from './components/ConnectionTester';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 import OnboardingPage from './pages/OnboardingPage';
 import DiagnosticPage from './pages/DiagnosticPage';
 import DashboardPage from './pages/DashboardPage';
@@ -59,6 +62,9 @@ function App() {
                       <Route path="/" element={<HomePage />} />
                       <Route path="/login" element={<LoginPage />} />
                       <Route path="/signup" element={<SignupPage />} />
+                      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                      <Route path="/reset-password" element={<ResetPasswordPage />} />
+                      <Route path="/verify-email" element={<VerifyEmailPage />} />
                       <Route path="/privacy" element={<PrivacyPage />} />
                       
                       {/* Previously Protected Routes - Now Open for Demo */}

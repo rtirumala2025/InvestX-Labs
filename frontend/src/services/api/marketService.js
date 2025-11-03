@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../supabase/config';
 import { logError, logInfo } from '../../utils/logger';
 
 // Cache configuration

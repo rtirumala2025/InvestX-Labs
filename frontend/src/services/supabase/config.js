@@ -1,18 +1,33 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Hardcoded Supabase configuration (temporary for testing)
-const SUPABASE_URL = 'https://oysuothaldgentevxzod.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95c3VvdGhhbGRnZW50ZXZ4em9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5ODk2ODcsImV4cCI6MjA3NjU2NTY4N30.s-28PFHVIVYPpvDELiBNDFBmKhi2F-9dw803mr2NnKU';
+/**
+ * Supabase Client Configuration
+ * 
+ * Retrieves Supabase credentials from environment variables for security.
+ * Environment variables must be prefixed with REACT_APP_ for Create React App.
+ * 
+ * Required environment variables:
+ * - REACT_APP_SUPABASE_URL: Your Supabase project URL
+ * - REACT_APP_SUPABASE_ANON_KEY: Your Supabase anonymous/public key
+ */
 
-console.log('Using hardcoded Supabase configuration');
+// Load Supabase credentials from environment variables
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
+const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
+// Validate that required environment variables are present
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   const errorMsg = 'Missing required Supabase environment variables. Please check your .env file.';
   console.error(errorMsg);
-  console.error('REACT_APP_SUPABASE_URL:', SUPABASE_URL);
-  console.error('REACT_APP_SUPABASE_ANON_KEY:', SUPABASE_KEY ? '*** (key exists but hidden)' : 'Not set');
-  throw new Error(errorMsg);
+  console.error('REACT_APP_SUPABASE_URL:', SUPABASE_URL || 'Not set');
+  console.error('REACT_APP_SUPABASE_ANON_KEY:', SUPABASE_KEY ? '*** (exists but hidden for security)' : 'Not set');
+  
+  if (process.env.NODE_ENV === 'development') {
+    throw new Error(errorMsg);
+  }
 }
+
+console.log('✅ Supabase client initialized with environment variables');
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
