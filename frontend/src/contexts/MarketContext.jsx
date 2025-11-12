@@ -39,7 +39,7 @@ export const MarketProvider = ({ children }) => {
       setLastUpdated(new Date().toISOString());
       return data;
     } catch (err) {
-      console.error('Error fetching market data:', err);
+      console.debug?.('MarketContext fetch error', err);
       setError(err.message || 'Failed to fetch market data');
       showBoundary(err);
       throw err;

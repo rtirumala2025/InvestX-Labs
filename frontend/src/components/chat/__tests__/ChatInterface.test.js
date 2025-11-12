@@ -1,20 +1,13 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ChatInterface from '../ChatInterface';
 import { useAuth } from '../../../hooks/useAuth';
-import { useChat } from '../../../hooks/useChat';
+import { useChat } from '../../../contexts/ChatContext';
 
 // Mock the hooks
 jest.mock('../../../hooks/useAuth');
-jest.mock('../../../hooks/useChat');
-
-// Mock the services
-jest.mock('../../../services/chat', () => ({
-  sendChatMessage: jest.fn(),
-  startConversation: jest.fn(),
-  getChatHistory: jest.fn(),
-}));
+jest.mock('../../../contexts/ChatContext');
 
 const mockUser = {
   uid: 'test-user-123',
@@ -30,11 +23,13 @@ const mockUser = {
 const mockChatHook = {
   messages: [],
   loading: false,
+  sending: false,
   error: null,
   sendMessage: jest.fn(),
   clearConversation: jest.fn(),
   startNewConversation: jest.fn(),
   retryLastMessage: jest.fn(),
+  isOnline: true,
 };
 
 const renderWithRouter = (component) => {
@@ -51,8 +46,12 @@ describe('ChatInterface', () => {
       user: mockUser,
       logout: jest.fn(),
     });
-    
-    useChat.mockReturnValue(mockChatHook);
+
+    mockChatHook.sendMessage = jest.fn();
+    mockChatHook.clearConversation = jest.fn();
+    mockChatHook.startNewConversation = jest.fn();
+    mockChatHook.retryLastMessage = jest.fn();
+    useChat.mockReturnValue({ ...mockChatHook });
   });
 
   afterEach(() => {
@@ -104,7 +103,7 @@ describe('ChatInterface', () => {
     fireEvent.change(input, { target: { value: 'Hello Finley!' } });
     fireEvent.click(sendButton);
     
-    expect(mockChatHook.sendMessage).toHaveBeenCalledWith('Hello Finley!');
+    expect(mockChatHook.sendMessage).toHaveBeenCalledWith('Hello Finley!', 'user');
   });
 
   it('handles Enter key to send messages', async () => {
@@ -115,7 +114,7 @@ describe('ChatInterface', () => {
     fireEvent.change(input, { target: { value: 'Test message' } });
     fireEvent.keyPress(input, { key: 'Enter', code: 'Enter' });
     
-    expect(mockChatHook.sendMessage).toHaveBeenCalledWith('Test message');
+    expect(mockChatHook.sendMessage).toHaveBeenCalledWith('Test message', 'user');
   });
 
   it('shows loading state when sending message', () => {
@@ -156,7 +155,7 @@ describe('ChatInterface', () => {
     const starterButton = screen.getByText("What's the difference between stocks and bonds?");
     fireEvent.click(starterButton);
     
-    expect(mockChatHook.sendMessage).toHaveBeenCalledWith("What's the difference between stocks and bonds?");
+    expect(mockChatHook.sendMessage).toHaveBeenCalledWith("What's the difference between stocks and bonds?", 'user');
   });
 
   it('displays character count in input', () => {

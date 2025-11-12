@@ -1,125 +1,196 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
+import Modal from '../components/ui/Modal';
 import SuggestionsList from '../components/ai-suggestions/SuggestionsList';
+import LoadingSpinner from '../components/common/LoadingSpinner';
+import { useAISuggestions } from '../hooks/useAISuggestions';
+import { getMarketInsights } from '../services/api/aiService';
 
-export default function SuggestionsPage() {
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [aiInsightExpanded, setAiInsightExpanded] = useState(false);
+const fadeIn = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
+};
 
-  const fadeIn = {
-    hidden: { opacity: 0, y: 16 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
-  };
+const staggerChildren = {
+  visible: {
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
 
-  const staggerChildren = {
-    visible: {
-      transition: {
-        staggerChildren: 0.1
+const SuggestionsPage = () => {
+  const {
+    suggestions,
+    loading,
+    error,
+    refresh,
+    dismissSuggestion,
+    viewSuggestion,
+    getExplanation,
+    recordFeedback,
+    updateConfidence,
+    recordInteraction,
+  } = useAISuggestions();
+
+  const [selectedSuggestion, setSelectedSuggestion] = useState(null);
+  const [explanation, setExplanation] = useState(null);
+  const [isExplanationLoading, setIsExplanationLoading] = useState(false);
+
+  const [marketInsights, setMarketInsights] = useState([]);
+  const [marketInsightsLoading, setMarketInsightsLoading] = useState(false);
+  const [marketInsightsError, setMarketInsightsError] = useState(null);
+
+  const averageConfidence = useMemo(() => {
+    if (!suggestions.length) return null;
+    const total = suggestions.reduce(
+      (sum, suggestion) => sum + (Number(suggestion.confidence) || 0),
+      0
+    );
+    return Math.round(total / suggestions.length);
+  }, [suggestions]);
+
+  const confidenceLabel = useMemo(() => {
+    if (averageConfidence === null) return 'Waiting for data';
+    if (averageConfidence >= 80) return 'High Confidence';
+    if (averageConfidence >= 60) return 'Moderate Confidence';
+    return 'Developing Confidence';
+  }, [averageConfidence]);
+
+  const confidenceWidth = averageConfidence !== null
+    ? `${Math.min(Math.max(averageConfidence, 0), 100)}%`
+    : '0%';
+
+  const selectedMarketStats = useMemo(() => {
+    if (!selectedSuggestion?.marketContext) return null;
+    const { currentPrice, changePercent, previousClose, marketSignal } = selectedSuggestion.marketContext;
+    const formatValue = (value, digits = 2) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric.toFixed(digits) : '—';
+    };
+
+    return {
+      currentPrice: formatValue(currentPrice),
+      changePercent: formatValue(changePercent),
+      previousClose: formatValue(previousClose),
+      marketSignal: Number.isFinite(Number(marketSignal)) ? Math.round(Number(marketSignal)) : null,
+      changeIsPositive: Number(changePercent) >= 0
+    };
+  }, [selectedSuggestion?.marketContext]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadInsights = async () => {
+      setMarketInsightsLoading(true);
+      setMarketInsightsError(null);
+      try {
+        const data = await getMarketInsights({}, { useCache: true });
+        if (!isMounted) return;
+
+        const normalize = (payload) => {
+          if (!payload) return [];
+          if (Array.isArray(payload)) return payload;
+          if (Array.isArray(payload?.insights)) return payload.insights;
+          return Object.entries(payload).map(([key, value]) => ({
+            title: key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+            description:
+              typeof value === 'string'
+                ? value
+                : JSON.stringify(value, null, 2),
+            impact: 'Medium',
+            icon: '📈',
+          }));
+        };
+
+        const normalized = normalize(data)
+          .map((insight) => ({
+            title: insight.title || 'AI Insight',
+            description:
+              insight.description ||
+              insight.summary ||
+              'Additional context unavailable.',
+            impact:
+              insight.impact ||
+              (insight.score
+                ? insight.score > 0.6
+                  ? 'High'
+                  : insight.score > 0.3
+                  ? 'Medium'
+                  : 'Low'
+                : 'Medium'),
+            icon: insight.icon || '🤖',
+          }))
+          .slice(0, 6);
+
+        setMarketInsights(normalized);
+      } catch (err) {
+        if (!isMounted) return;
+        setMarketInsightsError(err.message || 'Unable to load AI market insights.');
+      } finally {
+        if (isMounted) {
+          setMarketInsightsLoading(false);
+        }
       }
+    };
+
+    loadInsights();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleOpenSuggestion = async (suggestionId) => {
+    const suggestion = suggestions.find((item) => item.id === suggestionId);
+    if (!suggestion) return;
+
+    setSelectedSuggestion(suggestion);
+    setExplanation(null);
+    setIsExplanationLoading(true);
+
+    try {
+      await viewSuggestion(suggestionId);
+      await recordInteraction(suggestionId, 'open_details');
+      const result = await getExplanation(suggestionId);
+      setExplanation(result || 'AI explanation not available yet.');
+    } catch (err) {
+      setExplanation(err.message || 'Unable to load AI explanation.');
+    } finally {
+      setIsExplanationLoading(false);
     }
   };
 
-  // Mock AI suggestions data
-  const aiSuggestions = [
-    {
-      id: 1,
-      type: 'buy',
-      symbol: 'VTI',
-      company: 'Vanguard Total Stock Market ETF',
-      confidence: 92,
-      reason: 'Diversification Opportunity',
-      description: 'Your portfolio is heavily weighted in individual tech stocks. Adding VTI would provide broad market exposure and reduce concentration risk.',
-      expectedReturn: '+12-15%',
-      riskLevel: 'Low',
-      timeframe: '1-3 years',
-      allocation: '15-20%',
-      category: 'diversification',
-      aiReasoning: 'Based on your current 65% tech allocation, diversifying with broad market exposure could reduce volatility by 23% while maintaining growth potential.',
-      pros: ['Instant diversification', 'Low expense ratio (0.03%)', 'Dividend income'],
-      cons: ['Lower growth than individual stocks', 'Market correlation'],
-      logo: '📊'
-    },
-    {
-      id: 2,
-      type: 'rebalance',
-      symbol: 'GOOGL',
-      company: 'Alphabet Inc.',
-      confidence: 87,
-      reason: 'Rebalancing Alert',
-      description: 'GOOGL is currently underperforming. Consider reducing position size and reallocating to stronger performers.',
-      expectedReturn: 'Risk Reduction',
-      riskLevel: 'Medium',
-      timeframe: 'Immediate',
-      allocation: 'Reduce by 5%',
-      category: 'rebalancing',
-      aiReasoning: 'GOOGL has underperformed the market by 8% this quarter. Technical indicators suggest continued weakness in the near term.',
-      pros: ['Lock in gains from other positions', 'Reduce concentration risk', 'Free up capital'],
-      cons: ['Potential tax implications', 'May miss recovery'],
-      logo: '🔍'
-    },
-    {
-      id: 3,
-      type: 'buy',
-      symbol: 'SCHD',
-      company: 'Schwab US Dividend Equity ETF',
-      confidence: 89,
-      reason: 'Income Generation',
-      description: 'Add dividend-focused ETF to generate passive income and reduce portfolio volatility.',
-      expectedReturn: '+8-10% + 3.5% yield',
-      riskLevel: 'Low',
-      timeframe: '2-5 years',
-      allocation: '10-15%',
-      category: 'income',
-      aiReasoning: 'Your portfolio lacks income-generating assets. SCHD provides quality dividend stocks with 10-year average yield of 3.2%.',
-      pros: ['Steady dividend income', 'Quality companies', 'Lower volatility'],
-      cons: ['Lower growth potential', 'Interest rate sensitivity'],
-      logo: '💰'
-    },
-    {
-      id: 4,
-      type: 'buy',
-      symbol: 'QQQ',
-      company: 'Invesco QQQ Trust',
-      confidence: 85,
-      reason: 'Growth Opportunity',
-      description: 'Capitalize on AI and technology trends with exposure to NASDAQ-100 companies.',
-      expectedReturn: '+15-20%',
-      riskLevel: 'Medium-High',
-      timeframe: '1-2 years',
-      allocation: '8-12%',
-      category: 'growth',
-      aiReasoning: 'AI revolution is accelerating. QQQ provides exposure to major AI beneficiaries like NVDA, MSFT, and GOOGL with less concentration risk.',
-      pros: ['AI/Tech exposure', 'Liquid and tradeable', 'Strong historical performance'],
-      cons: ['High volatility', 'Tech concentration', 'Higher expense ratio'],
-      logo: '🚀'
+  const handleDismiss = async (suggestionId) => {
+    await dismissSuggestion(suggestionId);
+    if (selectedSuggestion?.id === suggestionId) {
+      setSelectedSuggestion(null);
+      setExplanation(null);
     }
-  ];
+  };
 
-  const categories = [
-    { id: 'all', name: 'All Suggestions', count: aiSuggestions.length, icon: '🎯' },
-    { id: 'diversification', name: 'Diversification', count: 1, icon: '📊' },
-    { id: 'rebalancing', name: 'Rebalancing', count: 1, icon: '⚖️' },
-    { id: 'income', name: 'Income', count: 1, icon: '💰' },
-    { id: 'growth', name: 'Growth', count: 1, icon: '🚀' }
-  ];
+  const handleCloseModal = () => {
+    setSelectedSuggestion(null);
+    setExplanation(null);
+  };
 
-  const filteredSuggestions = selectedCategory === 'all' 
-    ? aiSuggestions 
-    : aiSuggestions.filter(s => s.category === selectedCategory);
+  const handleFeedback = async (rating) => {
+    if (!selectedSuggestion) return;
+    await recordFeedback(selectedSuggestion.id, rating);
+  };
 
-  const marketInsights = [
-    { title: 'Fed Rate Decision Impact', description: 'Interest rate changes may affect growth stocks', impact: 'Medium', icon: '🏛️' },
-    { title: 'AI Sector Momentum', description: 'Artificial intelligence stocks showing strong momentum', impact: 'High', icon: '🤖' },
-    { title: 'Dividend Season', description: 'Q4 dividend announcements approaching', impact: 'Low', icon: '💸' },
-    { title: 'Earnings Season', description: 'Tech earnings could drive market volatility', impact: 'High', icon: '📈' }
-  ];
+  const handleConfidenceChange = async (suggestionId, nextConfidence, interactionType) => {
+    if (!suggestionId || nextConfidence === undefined) return;
+    const result = await updateConfidence(suggestionId, nextConfidence);
+    if (result?.success && interactionType) {
+      await recordInteraction(suggestionId, interactionType, { nextConfidence });
+    }
+  };
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
-      {/* Enhanced Background Orbs */}
       <motion.div
         className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-purple-500/30 to-blue-500/20 rounded-full blur-3xl"
         animate={{ y: [0, 20, 0], x: [0, 10, 0] }}
@@ -136,264 +207,169 @@ export default function SuggestionsPage() {
         transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut', delay: 5 }}
       />
 
-      <main className="relative z-10 max-w-[1400px] mx-auto px-6 py-8">
-        {/* Header */}
-        <motion.div 
-          variants={fadeIn} 
-          initial="hidden" 
-          animate="visible" 
-          className="mb-8"
+      <main className="relative z-10 w-full max-w-[1920px] mx-auto px-3 lg:px-4 xl:px-6 py-4 lg:py-6">
+        <motion.div
+          variants={fadeIn}
+          initial="hidden"
+          animate="visible"
+          className="mb-4 lg:mb-6"
         >
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-300 via-blue-300 to-orange-300 mb-2">
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-300 via-blue-300 to-orange-300 mb-2">
                 AI Investment Advisor 🤖
               </h1>
-              <p className="text-gray-300 text-lg">Personalized recommendations powered by advanced market analysis</p>
+              <p className="text-gray-300 text-base lg:text-lg">
+                Personalized recommendations powered by your Supabase portfolio data
+              </p>
             </div>
             <div className="mt-4 md:mt-0 flex space-x-3">
-              <GlassButton variant="glass" size="default">
-                📊 Generate Report
+              <GlassButton variant="glass" size="default" as={Link} to="/portfolio">
+                💼 Review Portfolio
               </GlassButton>
-              <GlassButton variant="primary" size="default">
-                🔄 Refresh Analysis
+              <GlassButton variant="primary" size="default" onClick={refresh} disabled={loading}>
+                {loading ? 'Refreshing…' : '🔄 Refresh Analysis'}
               </GlassButton>
             </div>
           </div>
         </motion.div>
 
-        {/* AI Confidence Score */}
-        <motion.div variants={fadeIn} initial="hidden" animate="visible" className="mb-8">
-          <GlassCard variant="accent" padding="large" glow={true}>
-            <div className="flex items-center justify-between">
+        <motion.div variants={fadeIn} initial="hidden" animate="visible" className="mb-4 lg:mb-6">
+          <GlassCard variant="accent" padding="large" glow>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
               <div>
                 <h3 className="text-xl font-semibold text-white mb-2">AI Confidence Score</h3>
-                <p className="text-white/80">Based on your portfolio analysis and market conditions</p>
+                <p className="text-white/80">
+                  Confidence calculated from live portfolio metrics and recent market trends.
+                </p>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-green-400 mb-1">89%</div>
-                <div className="text-sm text-green-300">High Confidence</div>
+                <div className="text-4xl font-bold text-green-400 mb-1">
+                  {averageConfidence !== null ? `${averageConfidence}%` : '—'}
+                </div>
+                <div className="text-sm text-green-300">{confidenceLabel}</div>
               </div>
             </div>
-            <div className="mt-4 w-full bg-white/20 rounded-full h-3">
-              <div className="bg-gradient-to-r from-green-400 to-emerald-500 h-3 rounded-full transition-all duration-1000" style={{ width: '89%' }}></div>
+            <div className="mt-4 w-full bg-white/20 rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-green-400 to-emerald-500 h-3 rounded-full transition-all duration-700"
+                style={{ width: confidenceWidth }}
+              />
             </div>
           </GlassCard>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-3 space-y-8">
-            {/* Category Filter */}
-            <motion.div variants={fadeIn} initial="hidden" animate="visible">
-              <GlassCard variant="default" padding="large">
-                <h3 className="text-xl font-semibold text-white mb-4">Suggestion Categories</h3>
-                <div className="flex flex-wrap gap-3">
-                  {categories.map((category) => (
-                    <button
-                      key={category.id}
-                      onClick={() => setSelectedCategory(category.id)}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
-                        selectedCategory === category.id
-                          ? 'bg-blue-500/30 text-white border border-blue-400/30'
-                          : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
-                      }`}
-                    >
-                      <span>{category.icon}</span>
-                      <span className="text-sm font-medium">{category.name}</span>
-                      <span className="px-2 py-1 bg-white/20 text-xs rounded-full">{category.count}</span>
-                    </button>
-                  ))}
-                </div>
-              </GlassCard>
-            </motion.div>
-
-            {/* AI Suggestions */}
-            <motion.div variants={staggerChildren} initial="hidden" animate="visible" className="space-y-6">
-              {filteredSuggestions.map((suggestion, index) => (
-                <motion.div key={suggestion.id} variants={fadeIn}>
-                  <GlassCard variant="hero" padding="large" shadow="xl" interactive={true}>
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-xl flex items-center justify-center text-3xl border border-white/10">
-                          {suggestion.logo}
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="text-xl font-semibold text-white">{suggestion.symbol}</h3>
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              suggestion.type === 'buy' ? 'bg-green-500/20 text-green-300' :
-                              suggestion.type === 'sell' ? 'bg-red-500/20 text-red-300' :
-                              'bg-blue-500/20 text-blue-300'
-                            }`}>
-                              {suggestion.type.toUpperCase()}
-                            </span>
-                            <div className="flex items-center space-x-1">
-                              <span className="text-sm text-white/70">Confidence:</span>
-                              <span className="text-sm font-medium text-green-400">{suggestion.confidence}%</span>
-                            </div>
-                          </div>
-                          <p className="text-white/80 text-sm">{suggestion.company}</p>
-                          <p className="text-purple-300 text-sm font-medium">{suggestion.reason}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-green-400 mb-1">{suggestion.expectedReturn}</div>
-                        <div className="text-sm text-white/70">{suggestion.timeframe}</div>
-                      </div>
-                    </div>
-
-                    <p className="text-white/90 mb-4">{suggestion.description}</p>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                      <div className="text-center p-3 bg-white/5 rounded-lg">
-                        <div className="text-sm text-white/70 mb-1">Risk Level</div>
-                        <div className="text-white font-medium">{suggestion.riskLevel}</div>
-                      </div>
-                      <div className="text-center p-3 bg-white/5 rounded-lg">
-                        <div className="text-sm text-white/70 mb-1">Allocation</div>
-                        <div className="text-white font-medium">{suggestion.allocation}</div>
-                      </div>
-                      <div className="text-center p-3 bg-white/5 rounded-lg">
-                        <div className="text-sm text-white/70 mb-1">Timeframe</div>
-                        <div className="text-white font-medium">{suggestion.timeframe}</div>
-                      </div>
-                      <div className="text-center p-3 bg-white/5 rounded-lg">
-                        <div className="text-sm text-white/70 mb-1">Confidence</div>
-                        <div className="text-green-400 font-medium">{suggestion.confidence}%</div>
-                      </div>
-                    </div>
-
-                    <div className="bg-blue-500/10 rounded-lg p-4 mb-4">
-                      <h4 className="text-white font-medium mb-2">🤖 AI Analysis</h4>
-                      <p className="text-blue-200 text-sm">{suggestion.aiReasoning}</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <h5 className="text-green-400 font-medium mb-2">✅ Pros</h5>
-                        <ul className="space-y-1">
-                          {suggestion.pros.map((pro, i) => (
-                            <li key={i} className="text-sm text-white/80">• {pro}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <h5 className="text-red-400 font-medium mb-2">⚠️ Considerations</h5>
-                        <ul className="space-y-1">
-                          {suggestion.cons.map((con, i) => (
-                            <li key={i} className="text-sm text-white/80">• {con}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-3">
-                      <GlassButton variant="primary" size="default" className="flex-1">
-                        {suggestion.type === 'buy' ? '🛒 Add to Watchlist' : '⚖️ Rebalance Now'}
-                      </GlassButton>
-                      <GlassButton variant="glass" size="default">
-                        📊 View Details
-                      </GlassButton>
-                      <GlassButton variant="ghost" size="default">
-                        ❌ Dismiss
-                      </GlassButton>
-                    </div>
-                  </GlassCard>
-                </motion.div>
-              ))}
-            </motion.div>
+            <SuggestionsList
+              suggestions={suggestions}
+              loading={loading}
+              error={error}
+              onDismiss={handleDismiss}
+              onRefresh={refresh}
+              onViewDetails={handleOpenSuggestion}
+              onAdjustConfidence={handleConfidenceChange}
+              onRecordInteraction={recordInteraction}
+            />
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-8">
-            {/* Market Insights */}
             <motion.div variants={fadeIn} initial="hidden" animate="visible">
-              <GlassCard variant="floating" padding="large" interactive={true}>
+              <GlassCard variant="floating" padding="large" interactive>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-white">Market Insights</h3>
-                  <span className="px-2 py-1 bg-green-500/30 text-green-300 text-xs rounded-full">Live</span>
+                  <h3 className="text-xl font-semibold text-white">AI Market Insights</h3>
+                  <span className="px-2 py-1 bg-green-500/30 text-green-300 text-xs rounded-full">
+                    {marketInsightsLoading ? 'Loading' : 'Live'}
+                  </span>
                 </div>
-                <div className="space-y-3">
-                  {marketInsights.map((insight, index) => (
-                    <div key={index} className="p-3 bg-white/5 rounded-lg border border-white/10">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-lg">{insight.icon}</span>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          insight.impact === 'High' ? 'bg-red-500/20 text-red-300' :
-                          insight.impact === 'Medium' ? 'bg-yellow-500/20 text-yellow-300' :
-                          'bg-green-500/20 text-green-300'
-                        }`}>
-                          {insight.impact}
-                        </span>
+                {marketInsightsLoading && (
+                  <div className="flex justify-center py-6">
+                    <LoadingSpinner size="small" />
+                  </div>
+                )}
+                {!marketInsightsLoading && marketInsightsError && (
+                  <div className="text-sm text-red-300">
+                    {marketInsightsError}
+                  </div>
+                )}
+                {!marketInsightsLoading && !marketInsightsError && (
+                  <div className="space-y-3">
+                    {marketInsights.map((insight, index) => (
+                      <div key={index} className="p-3 bg-white/5 rounded-lg border border-white/10">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-lg">{insight.icon}</span>
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full ${
+                              insight.impact === 'High'
+                                ? 'bg-red-500/20 text-red-300'
+                                : insight.impact === 'Low'
+                                ? 'bg-green-500/20 text-green-300'
+                                : 'bg-yellow-500/20 text-yellow-300'
+                            }`}
+                          >
+                            {insight.impact}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-medium text-white mb-1">{insight.title}</h4>
+                        <p className="text-xs text-white/70 whitespace-pre-line">
+                          {insight.description}
+                        </p>
                       </div>
-                      <h4 className="text-sm font-medium text-white mb-1">{insight.title}</h4>
-                      <p className="text-xs text-white/70">{insight.description}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                    {!marketInsights.length && (
+                      <p className="text-sm text-white/70">
+                        Insights will appear once the AI completes an initial portfolio scan.
+                      </p>
+                    )}
+                  </div>
+                )}
               </GlassCard>
             </motion.div>
 
-            {/* AI Learning */}
             <motion.div variants={fadeIn} initial="hidden" animate="visible">
-              <GlassCard variant="accent" padding="large" glow={true}>
-                <h3 className="text-xl font-semibold text-white mb-4">AI Learning Progress</h3>
+              <GlassCard variant="accent" padding="large" glow>
+                <h3 className="text-xl font-semibold text-white mb-4">Grow With AI</h3>
                 <div className="space-y-4">
                   <div>
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-white/90">Portfolio Analysis</span>
-                      <span className="text-white">95%</span>
+                      <span className="text-white/90">Portfolio Coverage</span>
+                      <span className="text-white">
+                        {suggestions.length ? `${Math.min(100, suggestions.length * 20)}%` : '—'}
+                      </span>
                     </div>
                     <div className="w-full bg-white/20 rounded-full h-2">
-                      <div className="bg-gradient-to-r from-purple-400 to-blue-500 h-2 rounded-full" style={{ width: '95%' }}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-white/90">Market Sentiment</span>
-                      <span className="text-white">87%</span>
-                    </div>
-                    <div className="w-full bg-white/20 rounded-full h-2">
-                      <div className="bg-gradient-to-r from-green-400 to-emerald-500 h-2 rounded-full" style={{ width: '87%' }}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-white/90">Risk Assessment</span>
-                      <span className="text-white">92%</span>
-                    </div>
-                    <div className="w-full bg-white/20 rounded-full h-2">
-                      <div className="bg-gradient-to-r from-orange-400 to-red-500 h-2 rounded-full" style={{ width: '92%' }}></div>
+                      <div
+                        className="bg-gradient-to-r from-blue-400 to-purple-500 h-2 rounded-full"
+                        style={{ width: suggestions.length ? `${Math.min(100, suggestions.length * 20)}%` : '0%' }}
+                      />
                     </div>
                   </div>
                 </div>
                 <GlassButton as={Link} to="/education" variant="glass" className="w-full mt-4">
-                  📚 Learn More About AI
+                  📚 Explore Learning Paths
                 </GlassButton>
               </GlassCard>
             </motion.div>
 
-            {/* Quick Actions */}
             <motion.div variants={fadeIn} initial="hidden" animate="visible">
               <GlassCard variant="default" padding="large">
                 <h3 className="text-xl font-semibold text-white mb-6">Quick Actions</h3>
                 <div className="space-y-3">
-                  <GlassButton variant="glass" className="w-full justify-start">
-                    <span className="mr-3">🎯</span>
-                    Set Investment Goals
+                  <GlassButton variant="glass" className="w-full justify-start" as={Link} to="/diagnostic">
+                    <span className="mr-3">🧠</span>
+                    Refresh Diagnostic Profile
                   </GlassButton>
-                  <GlassButton variant="glass" className="w-full justify-start">
-                    <span className="mr-3">📊</span>
-                    Risk Assessment
+                  <GlassButton variant="glass" className="w-full justify-start" as={Link} to="/simulation">
+                    <span className="mr-3">🎮</span>
+                    Practice In Simulation
                   </GlassButton>
-                  <GlassButton variant="glass" className="w-full justify-start">
-                    <span className="mr-3">🔔</span>
-                    Set AI Alerts
-                  </GlassButton>
-                  <GlassButton as={Link} to="/portfolio" variant="glass" className="w-full justify-start">
+                  <GlassButton variant="glass" className="w-full justify-start" as={Link} to="/portfolio">
                     <span className="mr-3">💼</span>
-                    View Portfolio
+                    Adjust Portfolio
+                  </GlassButton>
+                  <GlassButton variant="glass" className="w-full justify-start" as={Link} to="/chat">
+                    <span className="mr-3">💬</span>
+                    Ask InvestX Assistant
                   </GlassButton>
                 </div>
               </GlassCard>
@@ -401,6 +377,190 @@ export default function SuggestionsPage() {
           </div>
         </div>
       </main>
+
+      <Modal
+        isOpen={Boolean(selectedSuggestion)}
+        onClose={handleCloseModal}
+        size="large"
+        title={selectedSuggestion ? `${selectedSuggestion.symbol || selectedSuggestion.title} • AI Insight` : ''}
+      >
+        {selectedSuggestion && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="text-sm text-white/60 uppercase tracking-wide">Recommendation Type</p>
+                <p className="text-lg font-semibold capitalize">{selectedSuggestion.type}</p>
+              </div>
+              <div>
+                <p className="text-sm text-white/60 uppercase tracking-wide">Confidence</p>
+                <p className="text-lg font-semibold text-green-300">
+                  {Number(selectedSuggestion.confidence) || 0}%
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-white/60 uppercase tracking-wide">Timeframe</p>
+                <p className="text-lg font-semibold">
+                  {selectedSuggestion.timeframe || selectedSuggestion.horizon || 'Medium Term'}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-semibold text-white/80 mb-2">AI Explanation</h4>
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 min-h-[120px]">
+                {isExplanationLoading ? (
+                  <div className="flex justify-center py-6">
+                    <LoadingSpinner size="small" />
+                  </div>
+                ) : (
+                  <>
+                    {explanation && typeof explanation === 'object' ? (
+                      <div className="space-y-3 text-sm text-white/80">
+                        {explanation.headline && (
+                          <p className="text-base font-semibold text-white">
+                            {explanation.headline}
+                          </p>
+                        )}
+                        {explanation.profileAlignment && (
+                          <p>
+                            <span className="font-medium text-white/90">Profile match:</span>{' '}
+                            {explanation.profileAlignment}
+                          </p>
+                        )}
+                        {explanation.knowledgeBaseSummary && (
+                          <p>
+                            <span className="font-medium text-white/90">Strategy insight:</span>{' '}
+                            {explanation.knowledgeBaseSummary}
+                          </p>
+                        )}
+                        {explanation.learningOpportunity && (
+                          <p>
+                            <span className="font-medium text-white/90">Learning focus:</span>{' '}
+                            {explanation.learningOpportunity}
+                          </p>
+                        )}
+                        {explanation.marketContext && (
+                          <p>
+                            <span className="font-medium text-white/90">Market context:</span>{' '}
+                            {explanation.marketContext}
+                          </p>
+                        )}
+                        {explanation.newsInsight && (
+                          <div className="bg-white/5 border border-white/10 rounded-lg p-3 text-sm">
+                            <p className="font-medium text-white">
+                              Latest news • {explanation.newsSentimentLabel || 'neutral'}
+                            </p>
+                            <p className="text-white/70 mt-1">
+                              {explanation.newsInsight}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm leading-relaxed whitespace-pre-line text-white/80">
+                        {explanation || 'AI explanation not available yet.'}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {selectedMarketStats && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-white/80 mb-2">Live Market Context</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm text-white/80">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">Current Price</p>
+                    <p className="text-base font-semibold text-white">${selectedMarketStats.currentPrice}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">Change</p>
+                    <p className={`text-base font-semibold ${selectedMarketStats.changeIsPositive ? 'text-emerald-300' : 'text-rose-300'}`}>
+                      {selectedMarketStats.changeIsPositive ? '+' : ''}
+                      {selectedMarketStats.changePercent}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">Previous Close</p>
+                    <p className="text-base font-semibold text-white">${selectedMarketStats.previousClose}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">Signal Score</p>
+                    <p className="text-base font-semibold text-white">
+                      {selectedMarketStats.marketSignal ?? '—'} / 100
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <h4 className="text-sm font-semibold text-white/80 mb-2">AI Suggested Actions</h4>
+              <ul className="list-disc list-inside text-sm text-white/70 space-y-1">
+                {(selectedSuggestion.pros || []).map((pro, index) => (
+                  <li key={`pro-${index}`}>✅ {pro}</li>
+                ))}
+                {(selectedSuggestion.cons || []).map((con, index) => (
+                  <li key={`con-${index}`}>⚠️ {con}</li>
+                ))}
+                {!selectedSuggestion.pros?.length && !selectedSuggestion.cons?.length && (
+                  <li>AI is still compiling trade-offs for this recommendation.</li>
+                )}
+              </ul>
+            </div>
+
+            {Array.isArray(selectedSuggestion.news?.items) && selectedSuggestion.news.items.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-white/80 mb-2">Recent Headlines</h4>
+                <div className="space-y-3">
+                  {selectedSuggestion.news.items.slice(0, 3).map((item, idx) => (
+                    <a
+                      key={`${item.url}-${idx}`}
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block bg-white/5 border border-white/10 rounded-lg p-3 hover:border-white/20 transition-colors"
+                    >
+                      <p className="text-sm font-semibold text-white mb-1">{item.headline}</p>
+                      <p className="text-xs text-white/60">
+                        {item.source || 'News'} • {item.publishedAt ? new Date(item.publishedAt).toLocaleString() : 'recent'}
+                      </p>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-between gap-3">
+              <div className="flex gap-2">
+                <GlassButton
+                  variant="ghost"
+                  onClick={() => handleFeedback('helpful')}
+                >
+                  👍 Helpful
+                </GlassButton>
+                <GlassButton
+                  variant="ghost"
+                  onClick={() => handleFeedback('not_helpful')}
+                >
+                  👎 Not Helpful
+                </GlassButton>
+              </div>
+              <div className="flex gap-2">
+                <GlassButton variant="glass" onClick={() => handleDismiss(selectedSuggestion.id)}>
+                  ❌ Dismiss
+                </GlassButton>
+                <GlassButton variant="primary" onClick={handleCloseModal}>
+                  Done
+                </GlassButton>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
-}
+};
+
+export default SuggestionsPage;

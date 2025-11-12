@@ -1,6 +1,5 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useFirestore } from '../hooks/useFirestore';
 
 const UserContext = createContext();
 
@@ -13,26 +12,18 @@ export const useUser = () => {
 };
 
 export const UserProvider = ({ children }) => {
-  const { user, loading: authLoading } = useAuth();
-  const { documents: userData, loading: userDataLoading } = useFirestore('users', user?.uid);
+  const { currentUser, loading: authLoading } = useAuth();
 
-  const userProfile = userData?.[0] || null;
-  const loading = authLoading || userDataLoading;
-
-  const updateUserProfile = async (updates) => {
-    // This would be implemented with the actual update function
-    console.log('Updating user profile:', updates);
-  };
-
-  const isOnboardingComplete = userProfile?.onboardingCompleted || false;
-
-  const value = {
-    user,
-    userProfile,
-    loading,
-    updateUserProfile,
-    isOnboardingComplete
-  };
+  const value = useMemo(() => {
+    const profile = currentUser?.profile || null;
+    return {
+      user: currentUser || null,
+      userProfile: profile,
+      loading: authLoading,
+      updateUserProfile: async () => {},
+      isOnboardingComplete: Boolean(profile?.onboarding_completed || profile?.profile_completed)
+    };
+  }, [currentUser, authLoading]);
 
   return (
     <UserContext.Provider value={value}>

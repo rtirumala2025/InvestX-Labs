@@ -4,6 +4,7 @@ import PortfolioChart from './PortfolioChart';
 import HoldingsList from './HoldingsList';
 import PerformanceMetrics from './PerformanceMetrics';
 import AddHolding from './AddHolding';
+import UploadCSV from './UploadCSV';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { useAlphaVantageData } from '../../hooks/useAlphaVantageData';
 import { calculatePerformanceMetrics } from '../../services/portfolio/portfolioCalculations';
@@ -13,7 +14,13 @@ import GlassButton from '../ui/GlassButton';
 import Modal from '../ui/Modal';
 
 const PortfolioTracker = () => {
-  const { portfolio, holdings, loading: portfolioLoading, error: portfolioError } = usePortfolio();
+  const {
+    portfolio,
+    holdings,
+    transactions,
+    loading: portfolioLoading,
+    error: portfolioError,
+  } = usePortfolio();
   const { 
     portfolioMetrics: liveMetrics, 
     marketData, 
@@ -24,7 +31,8 @@ const PortfolioTracker = () => {
     isDataStale 
   } = useAlphaVantageData(holdings || []);
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [selectedTimeframe, setSelectedTimeframe] = useState('1W');
+  const [selectedTimeframe, setSelectedTimeframe] = useState('1M');
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'upload'
 
   const fadeIn = {
     hidden: { opacity: 0, y: 16 },
@@ -124,7 +132,7 @@ const PortfolioTracker = () => {
   const timeframes = ['1D', '1W', '1M', '3M', '1Y', 'ALL'];
 
   const loading = portfolioLoading || marketLoading;
-  const error = portfolioError || marketError;
+  const errorState = portfolioError || marketError;
 
   if (portfolioLoading) {
     return (
@@ -153,21 +161,21 @@ const PortfolioTracker = () => {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto px-6 py-8">
+    <div className="w-full max-w-[1920px] mx-auto px-3 lg:px-4 xl:px-6 py-4 lg:py-6">
       {/* Header */}
       <motion.div 
         variants={fadeIn} 
         initial="hidden" 
         animate="visible" 
-        className="mb-8"
+        className="mb-4 lg:mb-6"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 mb-2">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 mb-2">
               Portfolio Tracker 📈
             </h1>
             <div className="flex items-center space-x-4">
-              <p className="text-gray-300 text-lg">Monitor your investments and track performance in real-time</p>
+              <p className="text-gray-300 text-base lg:text-lg">Monitor your investments and track performance in real-time</p>
               {marketLoading && (
                 <div className="flex items-center space-x-2 text-blue-400 text-sm">
                   <LoadingSpinner size="small" />
@@ -238,9 +246,9 @@ const PortfolioTracker = () => {
         ))}
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
         {/* Main Content Area */}
-        <div className="lg:col-span-3 space-y-8">
+        <div className="lg:col-span-3 space-y-4 lg:space-y-6">
           {/* Portfolio Performance Chart */}
           <motion.div variants={fadeIn} initial="hidden" animate="visible">
             <GlassCard variant="hero" padding="large" shadow="xl">
@@ -262,9 +270,15 @@ const PortfolioTracker = () => {
                   ))}
                 </div>
               </div>
-              <div className="h-80 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl border border-white/10 backdrop-blur-sm">
-                <PortfolioChart portfolio={portfolio} />
-              </div>
+                  <PortfolioChart
+                    portfolio={portfolio}
+                    holdings={holdings}
+                    transactions={transactions}
+                    marketData={marketData?.quotes || marketData || {}}
+                    timeframe={selectedTimeframe}
+                    loading={loading}
+                    error={errorState}
+                  />
             </GlassCard>
           </motion.div>
 
@@ -280,11 +294,41 @@ const PortfolioTracker = () => {
             </GlassCard>
           </motion.div>
 
-          {/* Holdings List */}
+          {/* Holdings List / CSV Upload Section */}
           <motion.div variants={fadeIn} initial="hidden" animate="visible">
             <GlassCard variant="default" padding="large" shadow="large">
+              {/* Tab Navigation */}
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-semibold text-white">Your Holdings</h2>
+                <h2 className="text-2xl font-semibold text-white">Portfolio Management</h2>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setActiveTab('overview')}
+                    className={`px-4 py-2 text-sm rounded-lg transition-all ${
+                      activeTab === 'overview'
+                        ? 'bg-blue-500/30 text-white border border-blue-400/30'
+                        : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                    }`}
+                  >
+                    Holdings
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('upload')}
+                    className={`px-4 py-2 text-sm rounded-lg transition-all ${
+                      activeTab === 'upload'
+                        ? 'bg-blue-500/30 text-white border border-blue-400/30'
+                        : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                    }`}
+                  >
+                    📄 Upload CSV
+                  </button>
+                </div>
+              </div>
+
+              {/* Tab Content */}
+              {activeTab === 'overview' ? (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-white/90">Your Holdings</h3>
                 <div className="flex space-x-2">
                   <button className="px-3 py-1 text-sm bg-white/10 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-all">
                     Value
@@ -302,6 +346,22 @@ const PortfolioTracker = () => {
                 liveMetrics={liveMetrics}
                 marketData={marketData}
               />
+                </div>
+              ) : (
+                <div>
+                  <h3 className="text-lg font-semibold text-white/90 mb-4">Upload Spending Data</h3>
+                  <p className="text-white/60 text-sm mb-6">
+                    Upload your CSV or Excel file to analyze spending patterns and get personalized investment recommendations.
+                  </p>
+                  <UploadCSV 
+                    onUploadComplete={(data) => {
+                      console.log('CSV upload completed:', data);
+                      // Optionally refresh portfolio or show success message
+                      setActiveTab('overview');
+                    }}
+                  />
+                </div>
+              )}
             </GlassCard>
           </motion.div>
         </div>

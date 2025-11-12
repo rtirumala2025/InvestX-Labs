@@ -1,6 +1,6 @@
 import responseTime from 'response-time';
 import logger from '../utils/logger.js';
-import { generateRequestId } from '../ai-services/utils.js';
+import { generateRequestId } from '../ai-system/index.js';
 
 /**
  * Middleware to track request metrics and add request context to logs

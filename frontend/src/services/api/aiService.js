@@ -1,6 +1,8 @@
+import axios from 'axios';
 import { supabase } from '../supabase/config';
 import { getSession } from './auth';
 import { logError, logInfo } from '../../utils/logger';
+import { API_CONFIG } from '../../utils/constants';
 
 // Cache configuration
 const CACHE_TTL = {
@@ -11,6 +13,34 @@ const CACHE_TTL = {
 
 // Cache storage
 const cache = new Map();
+
+const deriveApiBaseUrl = () => {
+  const explicit = process.env.REACT_APP_API_BASE_URL;
+  if (explicit) {
+    return explicit.replace(/\/$/, '');
+  }
+
+  const configured = API_CONFIG?.BASE_URL;
+  if (configured && configured !== 'https://api.investxlabs.com') {
+    return configured.replace(/\/$/, '');
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:5001/api';
+  }
+
+  return '/api';
+};
+
+const API_BASE_URL = deriveApiBaseUrl();
+
+const apiClient = axios.create({
+  baseURL: `${API_BASE_URL}/ai`,
+  timeout: API_CONFIG?.TIMEOUT || 10000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
 
 /**
  * Get cached data if available and not expired
@@ -64,14 +94,18 @@ const RETRY_DELAY = 1000;
 const getAIRecommendations = async (userProfile, options = {}) => {
   const {
     useCache = true,
-    cacheTtl = CACHE_TTL.MEDIUM,
-    retries = MAX_RETRIES
+    cacheTtl = CACHE_TTL.MEDIUM
   } = options;
-  
-  const userId = userProfile?.userId || 'anonymous';
+
+  const userId =
+    userProfile?.userId ||
+    userProfile?.id ||
+    userProfile?.user_id ||
+    getSession()?.user?.id ||
+    'anonymous';
+
   const cacheKey = `ai:recommendations:${userId}`;
-  
-  // Return cached data if available and cache is enabled
+
   if (useCache) {
     const cached = getCachedData(cacheKey);
     if (cached) {
@@ -79,72 +113,78 @@ const getAIRecommendations = async (userProfile, options = {}) => {
       return { ...cached, _cached: true };
     }
   }
-  
+
   try {
-    logInfo(`Fetching AI recommendations for user: ${userId}`);
-    
-    // Call the Supabase RPC function
-    const { data, error } = await supabase
-      .rpc('get_ai_recommendations', { 
-        user_id: userId,
-        user_profile: userProfile 
-      });
-    
-    if (error) throw error;
-    
-    // Cache the successful response
-    if (useCache && data) {
-      setCachedData(cacheKey, data, cacheTtl);
+    logInfo(`Fetching AI recommendations via API for user: ${userId}`);
+
+    const response = await apiClient.post('/suggestions', {
+      userId,
+      profile: userProfile,
+      options: {
+        count: options.count || options.limit || 4
+      }
+    });
+
+    const payload = response.data?.data || {};
+    const suggestions = payload.suggestions || [];
+
+    const result = {
+      suggestions,
+      metadata: {
+        count: payload.count ?? suggestions.length,
+        timestamp: response.data?.timestamp,
+        message: response.data?.message || response.data?.status
+      }
+    };
+
+    if (useCache) {
+      setCachedData(cacheKey, result, cacheTtl);
     }
-    
-    return data;
+
+    return result;
   } catch (error) {
     logError('Error fetching AI recommendations:', error);
-    
-    // Return cached data if available, even if it's stale
+
     const cached = getCachedData(cacheKey);
     if (cached) {
       logInfo('Returning stale cached AI recommendations');
       return { ...cached, _stale: true };
     }
-    
-    // Return mock data in development if API fails
+
     if (process.env.NODE_ENV !== 'production') {
       logInfo('Using mock AI recommendations in development');
-      return {
-        recommendations: [
-          {
-            id: 'rec1',
-            symbol: 'AAPL',
-            action: 'BUY',
-            confidence: 0.85,
-            reasoning: 'Strong fundamentals and growth potential',
-            risk: 'MEDIUM',
-            timeHorizon: 'LONG_TERM'
-          },
-          {
-            id: 'rec2',
-            symbol: 'MSFT',
-            action: 'HOLD',
-            confidence: 0.72,
-            reasoning: 'Stable performance with consistent growth',
-            risk: 'LOW',
-            timeHorizon: 'MEDIUM_TERM'
-          },
-          {
-            id: 'rec3',
-            symbol: 'GOOGL',
-            action: 'BUY',
-            confidence: 0.78,
-            reasoning: 'Undervalued relative to peers',
-            risk: 'MEDIUM',
-            timeHorizon: 'LONG_TERM'
+      const mockSuggestions = [
+        {
+          id: 'rec1',
+          strategyId: 'mock_growth',
+          symbol: 'AAPL',
+          type: 'buy',
+          title: 'Apple Momentum',
+          confidence: 78,
+          explanation: {
+            headline: 'Sample explanation',
+            profileAlignment: 'Matches your growth interests.',
+            learningOpportunity: 'Teaches momentum tracking.'
           }
-        ],
-        _mock: true
+        },
+        {
+          id: 'rec2',
+          strategyId: 'mock_income',
+          symbol: 'VIG',
+          type: 'buy',
+          title: 'Dividend Steady',
+          confidence: 65
+        }
+      ];
+      return {
+        suggestions: mockSuggestions,
+        metadata: {
+          count: mockSuggestions.length,
+          _mock: true
+        }
       };
     }
-    
+
     throw error;
   }
 };
@@ -392,29 +432,69 @@ const submitFeedback = async (recommendationId, feedback, options = {}) => {
  */
 const trackRecommendationInteraction = async (recommendationId, interactionType, metadata = {}) => {
   try {
-    const session = getSession();
-    
-    // Don't fail the app if tracking fails
-    const { data, error } = await supabase.rpc('track_recommendation_interaction', {
-      p_recommendation_id: recommendationId,
-      p_interaction_type: interactionType,
-      p_metadata: {
-        ...metadata,
-        user_agent: typeof window !== 'undefined' ? window.navigator?.userAgent : 'server',
-        timestamp: new Date().toISOString(),
-        user_id: session?.user?.id || 'anonymous',
-        session_id: session?.sessionId || 'no-session'
-      }
+    if (metadata?.logId) {
+      await apiClient.post(`/suggestions/${metadata.logId}/interactions`, {
+        userId: metadata.userId || getSession()?.user?.id,
+        interactionType,
+        payload: {
+          recommendationId,
+          ...metadata
+        }
+      });
+      logInfo(`Tracked ${interactionType} interaction for recommendation ${recommendationId}`);
+      return { success: true };
+    }
+
+    logInfo('Interaction logged without backend persistence (missing logId)', {
+      recommendationId,
+      interactionType
     });
-    
-    if (error) throw error;
-    
-    logInfo(`Tracked ${interactionType} interaction for recommendation ${recommendationId}`);
-    return data;
+    return { success: false, reason: 'logId missing' };
   } catch (error) {
     // Log the error but don't throw - we don't want to break the UI for tracking
     logError('Error tracking recommendation interaction:', error);
     return { success: false, error: error.message };
+  }
+};
+
+const updateSuggestionConfidenceScore = async ({ logId, confidence, userId }) => {
+  try {
+    const payload = {
+      confidence,
+      userId: userId || getSession()?.user?.id
+    };
+
+    const response = await apiClient.patch(`/suggestions/${logId}/confidence`, payload);
+    return response.data?.data?.log;
+  } catch (error) {
+    logError('Error updating suggestion confidence:', error);
+    throw error;
+  }
+};
+
+const logSuggestionInteraction = async ({ logId, interactionType, userId, payload = {} }) => {
+  try {
+    const response = await apiClient.post(`/suggestions/${logId}/interactions`, {
+      userId: userId || getSession()?.user?.id,
+      interactionType,
+      payload
+    });
+    return response.data?.data?.log;
+  } catch (error) {
+    logError('Error logging suggestion interaction:', error);
+    throw error;
+  }
+};
+
+const fetchSuggestionLogs = async ({ userId, limit = 25 }) => {
+  try {
+    const response = await apiClient.get(`/suggestions/logs/${userId}`, {
+      params: { limit }
+    });
+    return response.data?.data?.logs || [];
+  } catch (error) {
+    logError('Error fetching suggestion logs:', error);
+    throw error;
   }
 };
 
@@ -474,5 +554,8 @@ export {
   getMarketInsights,
   submitFeedback,
   trackRecommendationInteraction,
+  updateSuggestionConfidenceScore,
+  logSuggestionInteraction,
+  fetchSuggestionLogs,
   testConnection
 };

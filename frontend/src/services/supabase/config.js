@@ -11,28 +11,70 @@ import { createClient } from '@supabase/supabase-js';
  * - REACT_APP_SUPABASE_ANON_KEY: Your Supabase anonymous/public key
  */
 
-// Load Supabase credentials from environment variables
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
 const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-// Validate that required environment variables are present
+const createSupabaseStub = () => {
+  const error = new Error('Supabase client is not configured. Running in offline/read-only mode.');
+  error.code = 'SUPABASE_OFFLINE';
+
+  const reject = async () => {
+    throw error;
+  };
+
+  const queryBuilder = () => ({
+    select: reject,
+    insert: reject,
+    update: reject,
+    delete: reject,
+    upsert: reject,
+    eq: () => queryBuilder(),
+    single: reject,
+    maybeSingle: async () => ({ data: null, error }),
+    limit: () => queryBuilder(),
+    order: () => queryBuilder()
+  });
+
+  return {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error }),
+      getUser: async () => ({ data: { user: null }, error }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signInWithPassword: reject,
+      signUp: reject,
+      signOut: reject,
+      updateUser: reject,
+      resetPasswordForEmail: reject,
+      resend: reject,
+      signInWithOAuth: reject
+    },
+    from: queryBuilder,
+    rpc: reject,
+    channel: () => ({
+      on: () => ({
+        subscribe: () => ({
+          unsubscribe: () => {}
+        })
+      })
+    }),
+    removeChannel: () => {}
+  };
+};
+
+let supabaseClient;
+
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  const errorMsg = 'Missing required Supabase environment variables. Please check your .env file.';
-  console.error(errorMsg);
-  console.error('REACT_APP_SUPABASE_URL:', SUPABASE_URL || 'Not set');
-  console.error('REACT_APP_SUPABASE_ANON_KEY:', SUPABASE_KEY ? '*** (exists but hidden for security)' : 'Not set');
-  
-  if (process.env.NODE_ENV === 'development') {
-    throw new Error(errorMsg);
-  }
+  console.warn('Supabase environment variables missing; using offline stub.');
+  supabaseClient = createSupabaseStub();
+} else {
+  console.log('✅ Supabase client initialized with environment variables');
+  supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    }
+  });
 }
 
-console.log('✅ Supabase client initialized with environment variables');
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
-  }
-});
+export const supabase = supabaseClient;

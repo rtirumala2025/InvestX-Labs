@@ -1,14 +1,32 @@
 import { supabase } from './config';
 
+const createSupabaseError = (message, code = 'SUPABASE_UNAVAILABLE') => {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+};
+
+const ensureAuthClient = () => {
+  if (!supabase?.auth) {
+    throw createSupabaseError('Supabase auth client is unavailable.');
+  }
+};
+
 // Sign in with email and password
 export const signInUser = async (email, password) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  try {
+    ensureAuthClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  if (error) throw error;
-  return data;
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.warn('Supabase signInUser failed:', error);
+    throw error;
+  }
 };
 
 /**
@@ -23,62 +41,90 @@ export const signInUser = async (email, password) => {
  * @returns {Promise<Object>} User data and session information
  */
 export const signUpUser = async (email, password, userData) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: userData.fullName,
-        username: userData.username,
+  try {
+    ensureAuthClient();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: userData.fullName,
+          username: userData.username,
+        },
+        emailRedirectTo: `${window.location.origin}/verify-email`,
       },
-      // Redirect user to email verification page after clicking email link
-      emailRedirectTo: `${window.location.origin}/verify-email`,
-    },
-  });
+    });
 
-  if (error) throw error;
-  return data;
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.warn('Supabase signUpUser failed:', error);
+    throw error;
+  }
 };
 
 // Sign out
 export const signOutUser = async () => {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  try {
+    ensureAuthClient();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+  } catch (error) {
+    console.warn('Supabase signOutUser failed:', error);
+    throw error;
+  }
 };
 
 // Get current user
 export const getCurrentUser = async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  try {
+    ensureAuthClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    return user;
+  } catch (error) {
+    console.warn('Supabase getCurrentUser failed:', error);
+    throw error;
+  }
 };
 
 // Listen for auth state changes
 export const onAuthStateChange = (callback) => {
+  if (!supabase?.auth?.onAuthStateChange) {
+    console.warn('Supabase onAuthStateChange unavailable; returning noop unsubscriber.');
+    return () => {};
+  }
+
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     callback(session?.user || null);
   });
-  
+
   return () => subscription?.unsubscribe();
 };
 
 // Sign in with Google
 export const signInWithGoogle = async () => {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-  });
-  
-  if (error) throw error;
-  return data;
-};
-
-// Update user profile
-export const updateUserProfile = async (updates) => {
-  const { data, error } = await supabase.auth.updateUser({
-    data: updates,
-  });
-  
-  if (error) throw error;
-  return data;
+  try {
+    ensureAuthClient();
+    console.log('🔐 [Auth] Initiating Google OAuth sign in');
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+    
+    if (error) {
+      console.error('🔐 [Auth] ❌ Google OAuth error:', error.message);
+      throw error;
+    }
+    
+    console.log('🔐 [Auth] ✅ Google OAuth initiated, redirecting...');
+    return data;
+  } catch (error) {
+    console.warn('Supabase signInWithGoogle failed:', error);
+    throw error;
+  }
 };
 
 /**
@@ -91,11 +137,17 @@ export const updateUserProfile = async (updates) => {
  * @returns {Promise<void>}
  */
 export const sendPasswordResetEmail = async (email) => {
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/reset-password`,
-  });
-  
-  if (error) throw error;
+  try {
+    ensureAuthClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    
+    if (error) throw error;
+  } catch (error) {
+    console.warn('Supabase sendPasswordResetEmail failed:', error);
+    throw error;
+  }
 };
 
 /**
@@ -108,12 +160,18 @@ export const sendPasswordResetEmail = async (email) => {
  * @returns {Promise<Object>} Updated user data
  */
 export const updatePassword = async (newPassword) => {
-  const { data, error } = await supabase.auth.updateUser({
-    password: newPassword,
-  });
-  
-  if (error) throw error;
-  return data;
+  try {
+    ensureAuthClient();
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.warn('Supabase updatePassword failed:', error);
+    throw error;
+  }
 };
 
 /**
@@ -126,12 +184,18 @@ export const updatePassword = async (newPassword) => {
  * @returns {Promise<void>}
  */
 export const resendVerificationEmail = async (email) => {
-  const { error } = await supabase.auth.resend({
-    type: 'signup',
-    email: email,
-  });
-  
-  if (error) throw error;
+  try {
+    ensureAuthClient();
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+    });
+    
+    if (error) throw error;
+  } catch (error) {
+    console.warn('Supabase resendVerificationEmail failed:', error);
+    throw error;
+  }
 };
 
 export default {
@@ -141,7 +205,6 @@ export default {
   getCurrentUser,
   onAuthStateChange,
   signInWithGoogle,
-  updateUserProfile,
   sendPasswordResetEmail,
   updatePassword,
   resendVerificationEmail,

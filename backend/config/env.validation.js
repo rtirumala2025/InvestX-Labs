@@ -27,9 +27,9 @@ const REQUIRED_ENV_VARS = {
     description: 'Supabase anonymous key',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   },
-  SUPABASE_SERVICE_KEY: {
+  SUPABASE_SERVICE_ROLE_KEY: {
     required: false,
-    description: 'Supabase service role key (for admin operations)',
+    description: 'Supabase service role key (for admin operations). Legacy alias SUPABASE_SERVICE_KEY is also supported.',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   },
   
@@ -85,7 +85,8 @@ export function validateEnv() {
   console.log('\n🔍 Validating environment variables...\n');
   
   Object.entries(REQUIRED_ENV_VARS).forEach(([key, config]) => {
-    const value = process.env[key];
+    const value = process.env[key] ||
+      (key === 'SUPABASE_SERVICE_ROLE_KEY' ? process.env.SUPABASE_SERVICE_KEY : undefined);
     
     if (!value) {
       if (config.required) {
@@ -183,7 +184,7 @@ export const config = {
   supabase: {
     url: process.env.SUPABASE_URL,
     anonKey: process.env.SUPABASE_ANON_KEY,
-    serviceKey: process.env.SUPABASE_SERVICE_KEY,
+    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY,
   },
   alphaVantage: {
     apiKey: process.env.ALPHA_VANTAGE_API_KEY,

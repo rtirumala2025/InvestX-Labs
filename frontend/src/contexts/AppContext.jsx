@@ -1,780 +1,223 @@
-import React, { createContext, useContext, useReducer, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import PropTypes from 'prop-types';
-import { useErrorBoundary } from 'react-error-boundary';
+import { AuthProvider } from './AuthContext';
+import { LeaderboardProvider } from './LeaderboardContext';
+import { AchievementsProvider } from './AchievementsContext';
+import { EducationProvider } from './EducationContext';
+import { PortfolioProvider } from './PortfolioContext';
+import { ChatProvider } from './ChatContext';
+import { SimulationProvider } from './SimulationContext';
+import { ClubsProvider } from './ClubsContext';
 
-// Import services
-import { getSession } from '../services/api/auth';
-import { getMarketData, getMarketNews } from '../services/api/marketService';
-import { getAIRecommendations } from '../services/api/aiService';
-import { getMCPContext, getMCPRecommendations } from '../services/api/mcpService';
+const AppContext = createContext(null);
 
-// Utils
-import { logError, logInfo } from '../utils/logger';
-
-// Default user preferences
-const DEFAULT_PREFERENCES = {
-  riskTolerance: 'moderate', // low, moderate, high
-  investmentGoal: 'growth', // income, growth, balanced
-  timeHorizon: 5, // years
-  theme: 'light', // light, dark, system
-  notifications: {
-    email: true,
-    push: true,
-    priceAlerts: true,
-    marketUpdates: true
-  },
-  watchlist: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META']
-};
-
-// Initial state
-const initialState = {
-  // User and authentication
-  user: null,
-  session: null,
-  isAuthenticated: false,
-  
-  // User preferences and settings
-  preferences: DEFAULT_PREFERENCES,
-  
-  // Data loading states
-  loading: {
-    marketData: false,
-    aiRecommendations: false,
-    mcpContext: false
-  },
-  errors: {
-    marketData: null,
-    aiRecommendations: null,
-    mcpContext: null
-  },
-  lastUpdated: null,
-  
-  // Market data
-  marketData: {
-    summary: {},
-    watchlist: [],
-    news: [],
-    trends: {}
-  },
-  
-  // AI Recommendations
-  aiRecommendations: {
-    stocks: [],
-    insights: [],
-    lastUpdated: null
-  },
-  
-  // MCP (Market Context Personalization)
-  mcpContext: {
-    riskProfile: 'moderate',
-    investmentGoals: [],
-    learningModules: [],
-    recommendations: [],
-    lastUpdated: null
-  },
-  
-  // UI state
-  ui: {
-    darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
-    sidebarOpen: true,
-    activeTab: 'dashboard',
-    notifications: [],
-    unreadNotifications: 0
-  },
-  
-  // API and loading states
-  status: {
-    isInitialized: false,
-    isLoading: false,
-    isRefreshing: false,
-    lastError: null
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppContextProvider');
   }
+  return context;
 };
 
-// Action types
-const actionTypes = {
-  // Authentication
-  LOGIN: 'LOGIN',
-  LOGOUT: 'LOGOUT',
-  SET_SESSION: 'SET_SESSION',
-  
-  // User data
-  SET_USER: 'SET_USER',
-  UPDATE_PREFERENCES: 'UPDATE_PREFERENCES',
-  
-  // Data loading states
-  SET_LOADING: 'SET_LOADING',
-  SET_ERROR: 'SET_ERROR',
-  CLEAR_ERROR: 'CLEAR_ERROR',
-  
-  // Market data
-  SET_MARKET_DATA: 'SET_MARKET_DATA',
-  UPDATE_WATCHLIST: 'UPDATE_WATCHLIST',
-  
-  // AI Recommendations
-  SET_AI_RECOMMENDATIONS: 'SET_AI_RECOMMENDATIONS',
-  
-  // MCP Context
-  SET_MCP_CONTEXT: 'SET_MCP_CONTEXT',
-  
-  // UI state
-  SET_UI_STATE: 'SET_UI_STATE',
-  ADD_NOTIFICATION: 'ADD_NOTIFICATION',
-  REMOVE_NOTIFICATION: 'REMOVE_NOTIFICATION',
-  CLEAR_NOTIFICATIONS: 'CLEAR_NOTIFICATIONS',
-  TOGGLE_SIDEBAR: 'TOGGLE_SIDEBAR',
-  SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
-  TOGGLE_THEME: 'TOGGLE_THEME',
-  
-  // Data refresh
-  REFRESH_DATA: 'REFRESH_DATA'
-};
+const MAX_TOAST_HISTORY = 25;
 
-// Helper functions for the reducer
-const updateArrayItem = (array, item, key = 'id') => {
-  const index = array.findIndex(i => i[key] === item[key]);
-  if (index === -1) return [...array, item];
-  return [...array.slice(0, index), item, ...array.slice(index + 1)];
-};
+const isBrowser = typeof window !== 'undefined';
 
-const removeArrayItem = (array, itemId, key = 'id') => {
-  return array.filter(item => item[key] !== itemId);
-};
-
-// Reducer function
-const appReducer = (state, action) => {
-  switch (action.type) {
-    // User actions
-    case actionTypes.SET_USER:
-      return {
-        ...state,
-        user: action.payload,
-        isAuthenticated: !!action.payload
-      };
-      
-    case actionTypes.SET_SESSION:
-      return {
-        ...state,
-        session: action.payload,
-        isAuthenticated: !!action.payload,
-        user: action.payload?.user || state.user
-      };
-      
-    case actionTypes.SET_PREFERENCES:
-      return {
-        ...state,
-        preferences: {
-          ...state.preferences,
-          ...action.payload
-        }
-      };
-    
-    // Data loading states
-    case actionTypes.SET_LOADING: {
-      return {
-        ...state,
-        loading: {
-          ...state.loading,
-          [action.payload.key]: action.payload.value
-        }
-      };
-    }
-    
-    case actionTypes.SET_ERROR: {
-      return {
-        ...state,
-        errors: {
-          ...state.errors,
-          [action.payload.key]: action.payload.error
-        },
-        loading: {
-          ...state.loading,
-          [action.payload.key]: false
-        }
-      };
-    }
-    
-    case actionTypes.CLEAR_ERROR: {
-      return {
-        ...state,
-        errors: {
-          ...state.errors,
-          [action.payload]: null
-        }
-      };
-    }
-    
-    // Market data
-    case actionTypes.SET_MARKET_DATA: {
-      return {
-        ...state,
-        marketData: {
-          ...state.marketData,
-          ...action.payload,
-          lastUpdated: new Date().toISOString()
-        },
-        lastUpdated: new Date().toISOString(),
-        loading: {
-          ...state.loading,
-          marketData: false
-        },
-        errors: {
-          ...state.errors,
-          marketData: null
-        }
-      };
-    }
-    
-    case actionTypes.UPDATE_WATCHLIST: {
-      return {
-        ...state,
-        marketData: {
-          ...state.marketData,
-          watchlist: action.payload
-        }
-      };
-    }
-    
-    // AI Recommendations
-    case actionTypes.SET_AI_RECOMMENDATIONS: {
-      return {
-        ...state,
-        aiRecommendations: {
-          ...state.aiRecommendations,
-          ...action.payload,
-          lastUpdated: new Date().toISOString()
-        },
-        lastUpdated: new Date().toISOString(),
-        loading: {
-          ...state.loading,
-          aiRecommendations: false
-        },
-        errors: {
-          ...state.errors,
-          aiRecommendations: null
-        }
-      };
-    }
-    
-    // MCP Context
-    case actionTypes.SET_MCP_CONTEXT: {
-      return {
-        ...state,
-        mcpContext: {
-          ...state.mcpContext,
-          ...action.payload,
-          lastUpdated: new Date().toISOString()
-        },
-        lastUpdated: new Date().toISOString(),
-        loading: {
-          ...state.loading,
-          mcpContext: false
-        },
-        errors: {
-          ...state.errors,
-          mcpContext: null
-        }
-      };
-    }
-    
-    // UI state
-    case actionTypes.SET_UI_STATE:
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          ...action.payload
-        }
-      };
-      
-    case actionTypes.ADD_NOTIFICATION:
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          notifications: [
-            ...state.ui.notifications,
-            {
-              id: Date.now(),
-              ...action.payload
-            }
-          ]
-        }
-      };
-      
-    case actionTypes.REMOVE_NOTIFICATION:
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          notifications: state.ui.notifications.filter(
-            notification => notification.id !== action.payload
-          )
-        }
-      };
-      
-    case actionTypes.CLEAR_NOTIFICATIONS:
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          notifications: []
-        }
-      };
-      
-    case actionTypes.TOGGLE_SIDEBAR:
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          sidebarOpen: !state.ui.sidebarOpen
-        }
-      };
-      
-    case actionTypes.SET_ACTIVE_TAB:
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          activeTab: action.payload
-        }
-      };
-      
-    case actionTypes.TOGGLE_THEME: {
-      const newTheme = state.ui.darkMode ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', newTheme);
-      return {
-        ...state,
-        ui: {
-          ...state.ui,
-          darkMode: !state.ui.darkMode
-        }
-      };
-    }
-    
-    // Data refresh
-    case actionTypes.REFRESH_DATA: {
-      return {
-        ...state,
-        lastUpdated: new Date().toISOString()
-      };
-    }
-    
-    default:
-      return state;
+const generateId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
   }
+  return `toast-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
-// Create context with default value
-const AppContext = createContext({
-  ...initialState,
-  actions: {},
-  ai: {},
-  mcp: {},
-  market: {}
-});
+export const AppContextProvider = ({ children }) => {
+  const [isOnline, setIsOnline] = useState(() => (isBrowser ? navigator.onLine : true));
+  const [theme, setTheme] = useState(() => {
+    if (!isBrowser) return 'dark';
+    return localStorage.getItem('investx-theme') || 'dark';
+  });
+  const [globalError, setGlobalError] = useState(null);
+  const [toastQueue, setToastQueue] = useState([]);
+  const [registeredContexts, setRegisteredContexts] = useState({});
 
-// Provider component
-export const AppProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(appReducer, initialState);
-  const { showBoundary } = useErrorBoundary();
-  const refreshInterval = useRef(null);
-  
-  // Initialize session on mount
-  useEffect(() => {
-    const initializeSession = async () => {
-      try {
-        const session = await getSession();
-        if (session) {
-          dispatch({ type: actionTypes.SET_SESSION, payload: session });
-        }
-      } catch (error) {
-        logError('Error initializing session:', error);
+  const isInitialOnlineCheck = useRef(true);
+
+  const queueToast = useCallback((message, type = 'info', options = {}) => {
+    if (!message) return;
+
+    const id = options.id ?? generateId();
+    const duration = options.duration ?? 4000;
+
+    setToastQueue((prev) => {
+      const filtered = prev.filter((toast) => toast.id !== id);
+      const next = [
+        ...filtered,
+        { id, message, type, createdAt: Date.now(), duration },
+      ];
+      if (next.length > MAX_TOAST_HISTORY) {
+        next.shift();
       }
-    };
-    
-    initializeSession();
+      return next;
+    });
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToastQueue((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
+  const clearToasts = useCallback(() => {
+    setToastQueue([]);
+  }, []);
+
+  const handleGlobalError = useCallback(
+    (error, options = {}) => {
+      if (!error) return;
+
+      const normalized =
+        typeof error === 'string'
+          ? { message: error }
+          : {
+              message: error.message || 'Unexpected error occurred',
+              stack: error.stack,
+              ...options,
+            };
+
+      console.debug?.('AppContext captured global error', normalized);
+      setGlobalError(normalized);
+      queueToast(normalized.message, 'error');
+    },
+    [queueToast]
+  );
+
+  const clearGlobalError = useCallback(() => setGlobalError(null), []);
+
+  const registerContext = useCallback((name, api) => {
+    if (!name) return () => {};
+
+    setRegisteredContexts((prev) => ({
+      ...prev,
+      [name]: api,
+    }));
+
+    return () =>
+      setRegisteredContexts((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
   }, []);
   
-  // Set up data refresh interval (5 minutes)
   useEffect(() => {
-    const setupRefreshInterval = () => {
-      if (refreshInterval.current) {
-        clearInterval(refreshInterval.current);
+    if (!isBrowser) return undefined;
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (!isInitialOnlineCheck.current) {
+        queueToast('Back online. Your data is syncing again.', 'success', { id: 'network-status' });
       }
-      
-      refreshInterval.current = setInterval(() => {
-        refreshAllData();
-      }, 5 * 60 * 1000); // 5 minutes
-      
-      return () => {
-        if (refreshInterval.current) {
-          clearInterval(refreshInterval.current);
-        }
-      };
+      isInitialOnlineCheck.current = false;
     };
-    
-    if (state.isAuthenticated) {
-      setupRefreshInterval();
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      queueToast('You are offline. Some actions will be unavailable.', 'error', { id: 'network-status' });
+      isInitialOnlineCheck.current = false;
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Prime the state
+    if (!navigator.onLine) {
+      handleOffline();
+    } else {
+      handleOnline();
     }
     
     return () => {
-      if (refreshInterval.current) {
-        clearInterval(refreshInterval.current);
-      }
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
-  }, [state.isAuthenticated]);
-  
-  // Set loading state
-  const setLoading = (key, value) => {
-    dispatch({ 
-      type: actionTypes.SET_LOADING, 
-      payload: { key, value } 
-    });
-  };
-  
-  // Set error state
-  const setError = (key, error) => {
-    dispatch({ 
-      type: actionTypes.SET_ERROR, 
-      payload: { key, error: error?.message || 'An unknown error occurred' } 
-    });
-    
-    // Show error notification
-    dispatch({
-      type: actionTypes.ADD_NOTIFICATION,
-      payload: {
-        type: 'error',
-        title: 'Error',
-        message: error?.message || 'An error occurred while fetching data',
-        autoDismiss: 5000
-      }
-    });
-  };
-  
-  // Clear error state
-  const clearError = (key) => {
-    dispatch({ 
-      type: actionTypes.CLEAR_ERROR, 
-      payload: key 
-    });
-  };
-  
-  // Fetch market data
-  const fetchMarketData = useCallback(async () => {
-    if (!state.isAuthenticated) return;
-    
-    try {
-      setLoading('marketData', true);
-      clearError('marketData');
-      
-      // Fetch watchlist data
-      const watchlistData = await Promise.all(
-        state.preferences.watchlist.map(symbol =>
-          getMarketData(symbol).catch(() => null)
-        )
-      );
-      
-      // Filter out failed requests
-      const validWatchlist = watchlistData.filter(Boolean);
-      
-      // Fetch market news
-      const news = await getMarketNews({ limit: 5 });
-      
-      dispatch({
-        type: actionTypes.SET_MARKET_DATA,
-        payload: {
-          watchlist: validWatchlist,
-          news,
-          lastUpdated: new Date().toISOString()
-        }
-      });
-      
-    } catch (error) {
-      setError('marketData', error);
-    }
-  }, [state.isAuthenticated, state.preferences.watchlist]);
-  
-  // Fetch AI recommendations
-  const fetchAIRecommendations = useCallback(async () => {
-    if (!state.isAuthenticated) return;
-    
-    try {
-      setLoading('aiRecommendations', true);
-      clearError('aiRecommendations');
-      
-      const recommendations = await getAIRecommendations({
-        riskTolerance: state.preferences.riskTolerance,
-        investmentGoal: state.preferences.investmentGoal,
-        timeHorizon: state.preferences.timeHorizon
-      });
-      
-      dispatch({
-        type: actionTypes.SET_AI_RECOMMENDATIONS,
-        payload: {
-          stocks: recommendations.stocks || [],
-          insights: recommendations.insights || []
-        }
-      });
-      
-    } catch (error) {
-      setError('aiRecommendations', error);
-    }
-  }, [state.isAuthenticated, state.preferences]);
-  
-  // Fetch MCP context
-  const fetchMCPContext = useCallback(async () => {
-    if (!state.isAuthenticated || !state.user?.id) return;
-    
-    try {
-      setLoading('mcpContext', true);
-      clearError('mcpContext');
-      
-      const [context, recommendations] = await Promise.all([
-        getMCPContext(state.user.id),
-        getMCPRecommendations({ limit: 5 })
-      ]);
-      
-      dispatch({
-        type: actionTypes.SET_MCP_CONTEXT,
-        payload: {
-          ...context,
-          recommendations: recommendations || []
-        }
-      });
-      
-    } catch (error) {
-      setError('mcpContext', error);
-    }
-  }, [state.isAuthenticated, state.user?.id]);
-  
-  // Refresh all data
-  const refreshAllData = useCallback(async () => {
-    if (!state.isAuthenticated) return;
-    
-    try {
-      logInfo('Refreshing all data...');
-      
-      await Promise.all([
-        fetchMarketData(),
-        fetchAIRecommendations(),
-        fetchMCPContext()
-      ]);
-      
-      dispatch({ type: actionTypes.REFRESH_DATA });
-      
-      // Show success notification
-      dispatch({
-        type: actionTypes.ADD_NOTIFICATION,
-        payload: {
-          type: 'success',
-          title: 'Success',
-          message: 'Data refreshed successfully',
-          autoDismiss: 3000
-        }
-      });
-      
-    } catch (error) {
-      logError('Error refreshing data:', error);
-      
-      dispatch({
-        type: actionTypes.ADD_NOTIFICATION,
-        payload: {
-          type: 'error',
-          title: 'Error',
-          message: 'Failed to refresh data',
-          autoDismiss: 5000
-        }
-      });
-    }
-  }, [state.isAuthenticated, fetchMarketData, fetchAIRecommendations, fetchMCPContext]);
+  }, [queueToast]);
 
   useEffect(() => {
-    if (state.isAuthenticated) {
-      refreshAllData();
-    }
-  }, [state.isAuthenticated, refreshAllData]);
-  
-  // Memoized context value
-  const contextValue = useMemo(() => ({
-    ...state,
-    actions: {
-      // User actions
-      setUser: (user) => dispatch({ type: actionTypes.SET_USER, payload: user }),
-      setSession: (session) => dispatch({ type: actionTypes.SET_SESSION, payload: session }),
-      setPreferences: (preferences) => dispatch({ 
-        type: actionTypes.SET_PREFERENCES, 
-        payload: preferences 
-      }),
-      
-      // Data actions
-      refreshData: refreshAllData,
-      fetchMarketData,
-      fetchAIRecommendations,
-      fetchMCPContext,
-      
-      // UI actions
-      setUiState: (uiState) => dispatch({ 
-        type: actionTypes.SET_UI_STATE, 
-        payload: uiState 
-      }),
-      addNotification: (notification) => dispatch({ 
-        type: actionTypes.ADD_NOTIFICATION, 
-        payload: typeof notification === 'string' 
-          ? { message: notification, type: 'info' } 
-          : notification 
-      }),
-      removeNotification: (id) => dispatch({ 
-        type: actionTypes.REMOVE_NOTIFICATION, 
-        payload: id 
-      }),
-      clearNotifications: () => dispatch({ 
-        type: actionTypes.CLEAR_NOTIFICATIONS 
-      }),
-      toggleSidebar: () => dispatch({ 
-        type: actionTypes.TOGGLE_SIDEBAR 
-      }),
-      setActiveTab: (tab) => dispatch({ 
-        type: actionTypes.SET_ACTIVE_TAB, 
-        payload: tab 
-      }),
-      toggleTheme: () => dispatch({ 
-        type: actionTypes.TOGGLE_THEME 
-      })
-    },
-    
-    // AI Service integration
-    ai: {
-      recommendations: state.aiRecommendations.stocks,
-      insights: state.aiRecommendations.insights,
-      loading: state.loading.aiRecommendations,
-      error: state.errors.aiRecommendations,
-      lastUpdated: state.aiRecommendations.lastUpdated,
-      fetchRecommendations: fetchAIRecommendations
-    },
-    
-    // MCP Service integration
-    mcp: {
-      context: state.mcpContext,
-      recommendations: state.mcpContext.recommendations || [],
-      loading: state.loading.mcpContext,
-      error: state.errors.mcpContext,
-      lastUpdated: state.mcpContext.lastUpdated,
-      fetchContext: fetchMCPContext,
-      updateContext: (updates) => {
-        // This would be implemented to call your MCP update API
-        console.log('Updating MCP context:', updates);
-      },
-      submitFeedback: (feedback) => {
-        // This would be implemented to call your MCP feedback API
-        console.log('Submitting MCP feedback:', feedback);
-        return Promise.resolve({ success: true });
-      }
-    },
-    
-    // Market Service integration
-    market: {
-      data: state.marketData,
-      watchlist: state.marketData.watchlist || [],
-      news: state.marketData.news || [],
-      loading: state.loading.marketData,
-      error: state.errors.marketData,
-      lastUpdated: state.marketData.lastUpdated,
-      fetchData: fetchMarketData,
-      fetchNews: () => getMarketNews({ limit: 10 }),
-      refreshData: fetchMarketData,
-      
-      // Portfolio management
-      updatePortfolio: (updates) => {
-        dispatch({
-          type: actionTypes.UPDATE_PORTFOLIO,
-          payload: updates
-        });
-      },
-      
-      // Watchlist management
-      updateWatchlist: (watchlist) => {
-        dispatch({
-          type: actionTypes.UPDATE_WATCHLIST,
-          payload: watchlist
-        });
-      }
-    },
-    
-    // Preferences management
-    preferences: {
-      ...state.preferences,
-      update: (updates) => {
-        dispatch({
-          type: actionTypes.UPDATE_PREFERENCES,
-          payload: updates
-        });
-      }
-    },
-    
-    // Error handling
-    clearError: (key) => {
-      if (key) {
-        dispatch({ 
-          type: actionTypes.CLEAR_ERROR, 
-          payload: key 
-        });
-      } else {
-        // Clear all errors if no key provided
-        Object.keys(state.errors).forEach(errorKey => {
-          if (state.errors[errorKey]) {
-            dispatch({ 
-              type: actionTypes.CLEAR_ERROR, 
-              payload: errorKey 
-            });
-          }
-        });
-      }
-    }
-  }), [
-    state, 
-    fetchMarketData, 
-    fetchAIRecommendations, 
-    fetchMCPContext, 
-    refreshAllData
-  ]);
+    if (!isBrowser) return;
+    localStorage.setItem('investx-theme', theme);
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  const contextValue = useMemo(() => {
+    const {
+      auth: authContext = null,
+      leaderboard: leaderboardContext = null,
+      achievements: achievementsContext = null,
+      education: educationContext = null,
+      portfolio: portfolioContext = null,
+      clubs: clubsContext = null,
+      analytics: analyticsContext = null,
+      simulation: simulationContext = null,
+      chat: chatContext = null,
+    } = registeredContexts;
+
+    return {
+      isOnline,
+      theme,
+      setTheme,
+      globalError,
+      handleGlobalError,
+      clearGlobalError,
+      queueToast,
+      dismissToast,
+      clearToasts,
+      toastQueue,
+      registerContext,
+      registeredContexts,
+      auth: authContext,
+      leaderboard: leaderboardContext,
+      achievements: achievementsContext,
+      education: educationContext,
+      portfolio: portfolioContext,
+      clubs: clubsContext,
+      analytics: analyticsContext,
+      simulation: simulationContext,
+      chat: chatContext,
+    };
+  }, [clearGlobalError, clearToasts, dismissToast, globalError, isOnline, queueToast, registerContext, registeredContexts, theme, toastQueue]);
   
   return (
     <AppContext.Provider value={contextValue}>
-      {children}
+      <AuthProvider>
+        <LeaderboardProvider>
+          <AchievementsProvider>
+            <EducationProvider>
+              <PortfolioProvider>
+                <ClubsProvider>
+                  <ChatProvider>
+                    <SimulationProvider>{children}</SimulationProvider>
+                  </ChatProvider>
+                </ClubsProvider>
+              </PortfolioProvider>
+            </EducationProvider>
+          </AchievementsProvider>
+        </LeaderboardProvider>
+      </AuthProvider>
     </AppContext.Provider>
   );
 };
 
-AppProvider.propTypes = {
-  children: PropTypes.node.isRequired
+AppContextProvider.propTypes = {
+  children: PropTypes.node.isRequired,
 };
 
-// Custom hook to use the app context
-export const useAppContext = () => {
-  const context = useContext(AppContext);
-  
-  if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider');
-  }
-  
-  // Add debug logging in development
-  if (process.env.NODE_ENV === 'development') {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useEffect(() => {
-      console.log('AppContext updated:', {
-        user: context.user,
-        loading: context.status.isLoading,
-        error: context.status.lastError
-      });
-    }, [context.user, context.status.isLoading, context.status.lastError]);
-  }
-  
-  return context;
-};
+export const useAppContext = useApp;
 
-// Export action types and other utilities
-export { actionTypes, DEFAULT_PREFERENCES };
-
-// Export the main context and provider
 export default AppContext;
+

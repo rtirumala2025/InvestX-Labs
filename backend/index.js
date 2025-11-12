@@ -8,6 +8,8 @@ import { requestTracker, errorLogger, metricsMiddleware } from './middleware/req
 import aiRoutes from './routes/aiRoute.js';
 import mcpRoutes from './routes/mcpRoute.js';
 import marketRoutes from './routes/market.js';
+import educationRoutes from './routes/education.js';
+import clubsRoutes from './routes/clubs.js';
 import logger from './utils/logger.js';
 
 dotenv.config();
@@ -85,6 +87,8 @@ app.use(metricsMiddleware);
 app.use('/api/ai', aiRoutes);
 app.use('/api/mcp', mcpRoutes);
 app.use('/api/market', marketRoutes);
+app.use('/api/education', educationRoutes);
+app.use('/api/clubs', clubsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

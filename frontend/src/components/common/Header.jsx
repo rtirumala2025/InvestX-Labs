@@ -51,67 +51,91 @@ const Header = () => {
           : 'bg-white/5 backdrop-blur-xl backdrop-saturate-125 border-b border-white/10 shadow-xl shadow-black/5'
         }
       `}>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex justify-between items-center h-16">
+        <div className="w-full mx-auto px-6 lg:px-8 xl:px-12">
+          <div className="flex justify-between items-center h-20">
             {/* Logo - Always visible */}
-            <div className="flex items-center">
-              <Link to="/" className="flex-shrink-0 group">
-                <h1 className="text-2xl font-semibold text-white tracking-tight bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 bg-clip-text text-transparent group-hover:from-blue-200 group-hover:via-purple-200 group-hover:to-orange-200 transition-all duration-300">
+            <div className="flex items-center flex-shrink-0">
+              <Link to="/" className="group">
+                <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 bg-clip-text text-transparent group-hover:from-blue-200 group-hover:via-purple-200 group-hover:to-orange-200 transition-all duration-300">
                   InvestX Labs
                 </h1>
               </Link>
             </div>
           
-            {/* Desktop Navigation - Always visible */}
-            <nav className="hidden md:flex items-center space-x-2">
+            {/* Desktop Navigation - Spread across full width */}
+            <nav className="hidden lg:flex items-center justify-center flex-1 gap-6 xl:gap-8 2xl:gap-12 px-8">
               <Link 
                 to="/dashboard" 
-                className="text-white/80 hover:text-white px-4 py-2 text-sm font-medium transition-all duration-300 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-2 focus:ring-offset-transparent"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 Dashboard
               </Link>
               <Link 
                 to="/portfolio" 
-                className="text-white/80 hover:text-white px-4 py-2 text-sm font-medium transition-all duration-300 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-2 focus:ring-offset-transparent"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 Portfolio
               </Link>
               <Link 
                 to="/suggestions" 
-                className="text-white/80 hover:text-white px-4 py-2 text-sm font-medium transition-all duration-300 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-2 focus:ring-offset-transparent"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 AI Suggestions
               </Link>
               <Link 
                 to="/education" 
-                className="text-white/80 hover:text-white px-4 py-2 text-sm font-medium transition-all duration-300 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-2 focus:ring-offset-transparent"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 Education
               </Link>
               <Link 
+                to="/clubs" 
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
+                🏛️ Clubs
+              </Link>
+              <Link 
                 to="/chat" 
-                className="text-white/80 hover:text-white px-4 py-2 text-sm font-medium transition-all duration-300 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-2 focus:ring-offset-transparent"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 💬 Chat
               </Link>
               <Link 
+                to="/simulation" 
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
+                🎮 Simulation
+              </Link>
+              <Link 
+                to="/leaderboard" 
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
+                🏆 Leaderboard
+              </Link>
+              <Link 
+                to="/achievements" 
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
+                🏅 Achievements
+              </Link>
+              <Link 
                 to="/privacy" 
-                className="text-white/80 hover:text-white px-4 py-2 text-sm font-medium transition-all duration-300 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-2 focus:ring-offset-transparent"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 Privacy
               </Link>
             </nav>
 
             {/* Right side - Always visible */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 lg:space-x-6 flex-shrink-0">
               {user ? (
                 <>
-                  <span className="hidden lg:block bg-white/85 hover:bg-white/95 text-neutral-700 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 border border-white/25 hover:border-white/35 backdrop-blur-xl shadow-apple hover:shadow-apple-lg">
+                  <span className="hidden xl:block bg-white/85 hover:bg-white/95 text-neutral-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border border-white/25 hover:border-white/35 backdrop-blur-xl">
                     Welcome, {user?.profile?.full_name || user?.email || 'User'}
                   </span>
                   <button
                     onClick={handleLogout}
-                    className="bg-white/85 hover:bg-white/95 text-neutral-700 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 border border-white/25 hover:border-white/35 backdrop-blur-xl shadow-apple hover:shadow-apple-lg focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:ring-offset-2"
+                    className="bg-white/85 hover:bg-white/95 text-neutral-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border border-white/25 hover:border-white/35 backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-accent-500/20"
                     title="Sign out of your account"
                   >
                     Logout
@@ -121,13 +145,13 @@ const Header = () => {
                 <>
                   <Link 
                     to="/login" 
-                    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 shadow-apple hover:shadow-apple-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-2 active:scale-[0.98]"
+                    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:scale-[0.98]"
                   >
                     Login
                   </Link>
                   <Link
                     to="/signup"
-                    className="bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 shadow-apple hover:shadow-apple-lg focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:ring-offset-2 active:scale-[0.98]"
+                    className="bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-accent-500/20 active:scale-[0.98]"
                   >
                     Sign Up
                   </Link>
@@ -137,7 +161,7 @@ const Header = () => {
               {/* Mobile menu button - Always visible on mobile */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg text-neutral-700 hover:bg-white/20 transition-colors duration-200"
+                className="lg:hidden p-2 rounded-lg text-white hover:bg-white/20 transition-colors duration-200"
                 aria-label="Toggle mobile menu"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,46 +177,74 @@ const Header = () => {
           
           {/* Mobile Navigation - Always visible when open */}
           {isMobileMenuOpen && (
-            <div className="md:hidden border-t border-white/20 py-4">
-              <nav className="flex flex-col space-y-2">
+            <div className="lg:hidden border-t border-white/20 py-4">
+              <nav className="flex flex-col space-y-3">
                 <Link 
                   to="/dashboard" 
-                  className="text-neutral-700 hover:text-accent-600 px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                  className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Dashboard
                 </Link>
                 <Link 
                   to="/portfolio" 
-                  className="text-neutral-700 hover:text-accent-600 px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                  className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Portfolio
                 </Link>
                 <Link 
                   to="/suggestions" 
-                  className="text-neutral-700 hover:text-accent-600 px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                  className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   AI Suggestions
                 </Link>
                 <Link 
                   to="/education" 
-                  className="text-neutral-700 hover:text-accent-600 px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                  className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Education
                 </Link>
                 <Link 
+                  to="/clubs" 
+                  className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Clubs
+                </Link>
+                <Link 
                   to="/chat" 
-                  className="text-neutral-700 hover:text-accent-600 px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                  className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   💬 Chat
                 </Link>
                 <Link 
+                  to="/simulation" 
+                  className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  🎮 Simulation
+                </Link>
+                <Link 
+                  to="/leaderboard" 
+                  className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  🏆 Leaderboard
+                </Link>
+              <Link 
+                to="/achievements" 
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                🏅 Achievements
+              </Link>
+                <Link 
                   to="/privacy" 
-                  className="text-neutral-700 hover:text-accent-600 px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                  className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Privacy

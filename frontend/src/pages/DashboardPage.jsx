@@ -11,6 +11,8 @@ import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import MarketTicker from '../components/market/MarketTicker';
 import { MarketProvider } from '../contexts/MarketContext';
+import PortfolioChart from '../components/portfolio/PortfolioChart';
+import { useApp } from '../contexts/AppContext';
 
 // Main DashboardPage component wrapped with MarketProvider
 export default function DashboardPage() {
@@ -24,13 +26,26 @@ export default function DashboardPage() {
 function DashboardPageContent() {
   const { currentUser } = useAuth();
   const userProfile = currentUser?.profile;
-  const { portfolio, holdings, loading, error } = usePortfolio();
+  const { portfolio, holdings, transactions, loading, error } = usePortfolio();
   const { 
     portfolioMetrics: liveMetrics, 
     marketData, 
     loading: marketLoading, 
     error: marketError 
   } = useAlphaVantageData(holdings || []);
+
+  const [selectedChartTimeframe, setSelectedChartTimeframe] = React.useState('1M');
+
+  // Log dashboard data on load
+  React.useEffect(() => {
+    console.log('🏠 [DashboardPage] Dashboard loaded');
+    console.log('🏠 [DashboardPage] Current user:', currentUser?.id || 'Not logged in');
+    console.log('🏠 [DashboardPage] User profile:', userProfile ? 'Loaded' : 'Not loaded');
+    console.log('🏠 [DashboardPage] Portfolio:', portfolio ? `Found (${portfolio.id})` : 'Not found');
+    console.log('🏠 [DashboardPage] Holdings count:', holdings?.length || 0);
+    console.log('🏠 [DashboardPage] Loading state:', loading);
+    console.log('🏠 [DashboardPage] Error:', error || 'None');
+  }, [currentUser, userProfile, portfolio, holdings, loading, error]);
   
   const fadeIn = {
     hidden: { opacity: 0, y: 16 },
@@ -91,6 +106,20 @@ function DashboardPageContent() {
 
   const learningProgress = userProfile?.learningProgress || 0;
   
+  const { queueToast } = useApp();
+
+  React.useEffect(() => {
+    if (error) {
+      queueToast(typeof error === 'string' ? error : error.message, 'error');
+    }
+  }, [error, queueToast]);
+
+  React.useEffect(() => {
+    if (marketError) {
+      queueToast(`Market data unavailable: ${marketError}`, 'error');
+    }
+  }, [marketError, queueToast]);
+
   const quickStats = [
     { 
       label: 'Portfolio Value', 
@@ -135,57 +164,48 @@ function DashboardPageContent() {
 
   // Generate recent activity from actual portfolio data
   const recentActivity = React.useMemo(() => {
-    const activities = [];
-    
-    // Add recent holdings as activities
-    if (holdings && holdings.length > 0) {
-      const recentHoldings = holdings
-        .filter(holding => holding.createdAt || holding.addedAt)
-        .sort((a, b) => new Date(b.createdAt || b.addedAt) - new Date(a.createdAt || a.addedAt))
-        .slice(0, 3);
-      
-      recentHoldings.forEach(holding => {
-        const value = holding.shares * holding.currentPrice;
-        activities.push({
-          type: 'investment',
-          title: `Added ${holding.symbol} to portfolio`,
-          time: formatTimeAgo(holding.createdAt || holding.addedAt),
-          amount: `+$${value.toLocaleString()}`,
-          positive: true
+    if (transactions && transactions.length > 0) {
+      return transactions
+        .sort((a, b) => new Date(b.transaction_date || b.created_at) - new Date(a.transaction_date || a.created_at))
+        .slice(0, 5)
+        .map((transaction) => {
+          const isBuy = transaction.transaction_type === 'buy';
+          const shares = Number(transaction.shares) || 0;
+          const price = Number(transaction.price) || 0;
+          const totalAmount = Math.abs(Number(transaction.total_amount) || shares * price);
+          return {
+            type: 'investment',
+            title: `${isBuy ? 'Bought' : 'Sold'} ${shares.toFixed(2)} ${transaction.symbol}`,
+            time: formatTimeAgo(transaction.transaction_date || transaction.created_at),
+            amount: `${isBuy ? '-' : '+'}$${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            positive: !isBuy,
+          };
         });
-      });
     }
-    
-    // Add learning activities if available
+
     if (userProfile?.completedLessons && userProfile.completedLessons.length > 0) {
-      const recentLessons = userProfile.completedLessons
+      return userProfile.completedLessons
         .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
-        .slice(0, 2);
-      
-      recentLessons.forEach(lesson => {
-        activities.push({
+        .slice(0, 3)
+        .map((lesson) => ({
           type: 'learning',
           title: `Completed "${lesson.title}" lesson`,
           time: formatTimeAgo(lesson.completedAt),
           amount: '+50 XP',
-          positive: true
-        });
-      });
+          positive: true,
+        }));
     }
-    
-    // If no activities, show empty state message
-    if (activities.length === 0) {
-      activities.push({
+
+    return [
+      {
         type: 'welcome',
         title: 'Welcome to InvestX Labs!',
         time: 'Just now',
         amount: 'Get Started',
-        positive: true
-      });
-    }
-    
-    return activities.slice(0, 4); // Limit to 4 items
-  }, [holdings, userProfile]);
+        positive: true,
+      },
+    ];
+  }, [transactions, userProfile]);
 
   // Helper function to format time ago
   const formatTimeAgo = (dateString) => {
@@ -256,20 +276,20 @@ function DashboardPageContent() {
         transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut', delay: 5 }}
       />
 
-      <main className="relative z-10 max-w-[1400px] mx-auto px-6 py-8">
+      <main className="relative z-10 w-full max-w-[1920px] mx-auto px-3 lg:px-4 xl:px-6 py-4 lg:py-6">
         {/* Header */}
         <motion.div 
           variants={fadeIn} 
           initial="hidden" 
           animate="visible" 
-          className="mb-8"
+          className="mb-4 lg:mb-6"
         >
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 mb-2">
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 mb-2">
                 Welcome back, {currentUser?.displayName?.split(' ')[0] || userProfile?.firstName || 'Investor'}! 👋
               </h1>
-              <p className="text-gray-300 text-lg">Here's your investment journey overview</p>
+              <p className="text-gray-300 text-base lg:text-lg">Here's your investment journey overview</p>
             </div>
             <div className="mt-4 md:mt-0">
               <GlassButton as={Link} to="/profile" variant="glass" size="default">
@@ -284,7 +304,7 @@ function DashboardPageContent() {
           variants={staggerChildren}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-4 lg:mb-6"
         >
           {quickStats.map((stat, index) => (
             <motion.div key={index} variants={fadeIn}>
@@ -314,20 +334,21 @@ function DashboardPageContent() {
           <MarketTicker />
         </motion.div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Left Column */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 lg:space-y-6">
               {/* Portfolio Performance Chart */}
               <motion.div variants={fadeIn} initial="hidden" animate="visible">
                 <GlassCard variant="hero" padding="large" shadow="xl">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
                     <h2 className="text-2xl font-semibold text-white">Portfolio Performance</h2>
                     <div className="flex flex-wrap gap-2">
-                      {['1D', '1W', '1M', '1Y', 'ALL'].map((period) => (
+                      {['1D', '1W', '1M', '3M', '1Y', 'ALL'].map((period) => (
                         <button 
                           key={period}
+                          onClick={() => setSelectedChartTimeframe(period)}
                           className={`px-3 py-1 text-sm rounded-lg transition-all ${
-                            period === '1W' 
+                            period === selectedChartTimeframe 
                               ? 'bg-blue-500/30 text-white' 
                               : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
                           }`}
@@ -337,13 +358,15 @@ function DashboardPageContent() {
                       ))}
                     </div>
                   </div>
-                  <div className="h-64 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl border border-white/10 flex items-center justify-center backdrop-blur-sm">
-                  <div className="text-center">
-                    <div className="text-4xl mb-2">📈</div>
-                    <p className="text-white/70">Interactive chart will be displayed here</p>
-                    <p className="text-white/50 text-sm mt-1">Connect your portfolio to see real data</p>
-                  </div>
-                </div>
+                  <PortfolioChart
+                    portfolio={portfolio}
+                    holdings={holdings}
+                    transactions={transactions}
+                    marketData={marketData}
+                    timeframe={selectedChartTimeframe}
+                    loading={loading || marketLoading}
+                    error={error || marketError}
+                  />
               </GlassCard>
             </motion.div>
 

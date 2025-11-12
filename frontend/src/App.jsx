@@ -2,17 +2,16 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { AppProvider } from './contexts/AppContext';
-import { ChatProvider } from './contexts/ChatContext';
+import { AppContextProvider } from './contexts/AppContext';
 import theme from './theme';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import DisclaimerBanner from './components/common/DisclaimerBanner';
 import NetworkStatus from './components/common/NetworkStatus';
-// import ProtectedRoute from './components/auth/ProtectedRoute'; // Commented out for demo - no auth required
+import GlobalErrorBanner from './components/common/GlobalErrorBanner';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
-import DevTools from './components/dev/DevTools';
-import ConnectionTester from './components/ConnectionTester';
+import ToastViewport from './components/common/ToastViewport';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -27,31 +26,25 @@ import DashboardPage from './pages/DashboardPage';
 import SuggestionsPage from './pages/SuggestionsPage';
 import PortfolioPage from './pages/PortfolioPage';
 import EducationPage from './pages/EducationPage';
+import LessonView from './pages/LessonView';
+import ClubsPage from './pages/ClubsPage';
+import ClubDetailPage from './pages/ClubDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import PrivacyPage from './pages/PrivacyPage';
 import ChatPage from './pages/ChatPage';
-
-// Developer Tools - Only in development
-const DevToolsWrapper = () => {
-  if (process.env.NODE_ENV !== 'development') return null;
-  
-  return (
-    <div className="fixed bottom-4 right-4 z-50">
-      <div className="bg-gray-800 bg-opacity-90 p-2 rounded-lg shadow-lg">
-        <DevTools />
-      </div>
-    </div>
-  );
-};
+import SimulationPage from './pages/SimulationPage';
+import LeaderboardPage from './pages/LeaderboardPage';
+import AchievementsPage from './pages/AchievementsPage';
 
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <AppProvider>
-          <ChatProvider>
-              <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+        <AppContextProvider>
+          <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+                <ToastViewport />
+                <GlobalErrorBanner />
                 <NetworkStatus />
                 <DisclaimerBanner />
                 <Header />
@@ -67,20 +60,118 @@ function App() {
                       <Route path="/verify-email" element={<VerifyEmailPage />} />
                       <Route path="/privacy" element={<PrivacyPage />} />
                       
-                      {/* Previously Protected Routes - Now Open for Demo */}
-                      <Route path="/onboarding" element={<OnboardingPage />} />
-                      <Route path="/diagnostic" element={<DiagnosticPage />} />
-                      <Route path="/dashboard" element={<DashboardPage />} />
-                      <Route path="/suggestions" element={<SuggestionsPage />} />
-                      <Route path="/portfolio" element={<PortfolioPage />} />
-                      <Route path="/education" element={<EducationPage />} />
-                      <Route path="/profile" element={<ProfilePage />} />
-                      <Route path="/chat" element={<ChatPage />} />
-                      
-                      {/* Development routes */}
-                      {process.env.NODE_ENV === 'development' && (
-                        <Route path="/dev/connections" element={<ConnectionTester />} />
-                      )}
+                      <Route
+                        path="/onboarding"
+                        element={
+                          <ProtectedRoute>
+                            <OnboardingPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/diagnostic"
+                        element={
+                          <ProtectedRoute>
+                            <DiagnosticPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/dashboard"
+                        element={
+                          <ProtectedRoute>
+                            <DashboardPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/suggestions"
+                        element={
+                          <ProtectedRoute>
+                            <SuggestionsPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/portfolio"
+                        element={
+                          <ProtectedRoute>
+                            <PortfolioPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/education"
+                        element={
+                          <ProtectedRoute>
+                            <EducationPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/education/lessons/:lessonId"
+                        element={
+                          <ProtectedRoute>
+                            <LessonView />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/clubs"
+                        element={
+                          <ProtectedRoute>
+                            <ClubsPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/clubs/:clubId"
+                        element={
+                          <ProtectedRoute>
+                            <ClubDetailPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/profile"
+                        element={
+                          <ProtectedRoute>
+                            <ProfilePage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/chat"
+                        element={
+                          <ProtectedRoute>
+                            <ChatPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/simulation"
+                        element={
+                          <ProtectedRoute>
+                            <SimulationPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/leaderboard"
+                        element={
+                          <ProtectedRoute>
+                            <LeaderboardPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/achievements"
+                        element={
+                          <ProtectedRoute>
+                            <AchievementsPage />
+                          </ProtectedRoute>
+                        }
+                      />
                       
                       {/* Catch all route */}
                       <Route path="*" element={<Navigate to="/" replace />} />
@@ -88,12 +179,9 @@ function App() {
                   </ErrorBoundary>
                 </main>
                 
-                {/* Developer Tools */}
-                <DevToolsWrapper />
                 <Footer />
               </div>
-            </ChatProvider>
-          </AppProvider>
+        </AppContextProvider>
         </ThemeProvider>
       </ErrorBoundary>
   );
