@@ -2,7 +2,7 @@ import React from 'react';
 import FinancialTerm from '../education/FinancialTerm';
 import { calculatePerformanceMetrics } from '../../services/portfolio/portfolioCalculations';
 
-const PerformanceMetrics = ({ portfolio, liveMetrics, marketData }) => {
+const PerformanceMetrics = React.memo(({ portfolio, liveMetrics, marketData }) => {
   console.log('📊 [PerformanceMetrics] Component rendered with props:');
   console.log('📊 [PerformanceMetrics]   Portfolio:', !!portfolio);
   console.log('📊 [PerformanceMetrics]   Live metrics:', !!liveMetrics);
@@ -218,6 +218,6 @@ const PerformanceMetrics = ({ portfolio, liveMetrics, marketData }) => {
       )}
     </div>
   );
-};
+});
 
 export default PerformanceMetrics;

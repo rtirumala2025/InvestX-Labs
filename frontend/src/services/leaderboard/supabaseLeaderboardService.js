@@ -260,22 +260,35 @@ export const getUserRank = async (userId) => {
 
 export const subscribeLeaderboardUpdates = (callback) => {
   if (!supabase?.channel) {
+    console.warn('🏆 [LeaderboardService] Supabase channel unavailable for realtime subscriptions');
     return {
       unsubscribe: () => {}
     };
   }
 
   const channel = supabase
-    .channel('realtime-leaderboard')
+    .channel('realtime-leaderboard', {
+      config: {
+        broadcast: { self: false },
+        presence: { key: 'leaderboard' }
+      }
+    })
     .on(
       'postgres_changes',
       {
         event: '*',
         schema: 'public',
-        table: LEADERBOARD_TABLE
+        table: LEADERBOARD_TABLE,
+        filter: '*' // Listen to all changes
       },
       (payload) => {
         try {
+          console.debug('🏆 [LeaderboardService] Realtime update received', {
+            event: payload.eventType,
+            table: payload.table,
+            new: payload.new ? { user_id: payload.new.user_id, rank: payload.new.rank } : null,
+            old: payload.old ? { user_id: payload.old.user_id, rank: payload.old.rank } : null
+          });
           callback?.(payload);
         } catch (callbackError) {
           console.error('🏆 [LeaderboardService] Callback error:', callbackError);
@@ -283,14 +296,22 @@ export const subscribeLeaderboardUpdates = (callback) => {
       }
     )
     .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR') {
-        console.warn('🏆 [LeaderboardService] Realtime channel error');
+      console.debug('🏆 [LeaderboardService] Realtime subscription status:', status);
+      if (status === 'SUBSCRIBED') {
+        console.log('🏆 [LeaderboardService] Successfully subscribed to leaderboard updates');
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('🏆 [LeaderboardService] Realtime channel error:', status);
       }
     });
 
   return {
     unsubscribe: () => {
-      supabase.removeChannel?.(channel);
+      try {
+        supabase.removeChannel?.(channel);
+        console.debug('🏆 [LeaderboardService] Unsubscribed from leaderboard updates');
+      } catch (error) {
+        console.warn('🏆 [LeaderboardService] Error unsubscribing:', error);
+      }
     }
   };
 };

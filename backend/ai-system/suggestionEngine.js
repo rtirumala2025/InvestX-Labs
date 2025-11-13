@@ -40,11 +40,143 @@ const goalWeights = {
   education: 0.5
 };
 
-export const buildUserEmbedding = (profile = {}) => {
+/**
+ * Fetch comprehensive user context from Supabase
+ * @param {string} userId - User ID
+ * @returns {Promise<Object>} Enhanced user context
+ */
+const fetchUserContext = async (userId) => {
+  if (!adminSupabase || !userId) {
+    return {};
+  }
+
+  try {
+    // Fetch user profile
+    const { data: profile, error: profileError } = await adminSupabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      logger.warn('Error fetching user profile', { userId, error: profileError.message });
+    }
+
+    // Fetch portfolio history
+    const { data: portfolios, error: portfoliosError } = await adminSupabase
+      .from('portfolios')
+      .select('id, name, virtual_balance, metadata, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(5);
+
+    if (portfoliosError) {
+      logger.warn('Error fetching portfolios', { userId, error: portfoliosError.message });
+    }
+
+    // Fetch recent transactions for portfolio history
+    let transactionHistory = [];
+    if (portfolios?.length) {
+      const portfolioIds = portfolios.map(p => p.id);
+      const { data: transactions, error: transactionsError } = await adminSupabase
+        .from('transactions')
+        .select('transaction_type, symbol, shares, price, total_amount, transaction_date')
+        .in('portfolio_id', portfolioIds)
+        .order('transaction_date', { ascending: false })
+        .limit(50);
+
+      if (!transactionsError && transactions) {
+        transactionHistory = transactions;
+      }
+    }
+
+    // Fetch holdings for current portfolio state
+    let currentHoldings = [];
+    if (portfolios?.length) {
+      const primaryPortfolioId = portfolios[0].id;
+      const { data: holdings, error: holdingsError } = await adminSupabase
+        .from('holdings')
+        .select('symbol, shares, purchase_price, current_price, sector, asset_type')
+        .eq('portfolio_id', primaryPortfolioId)
+        .limit(20);
+
+      if (!holdingsError && holdings) {
+        currentHoldings = holdings;
+      }
+    }
+
+    // Fetch learning progress from leaderboard
+    const { data: leaderboardData, error: leaderboardError } = await adminSupabase
+      .from('leaderboard_scores')
+      .select('learning_progress, achievements_count, trades_count')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (leaderboardError && leaderboardError.code !== 'PGRST116') {
+      logger.warn('Error fetching leaderboard data', { userId, error: leaderboardError.message });
+    }
+
+    // Fetch achievements
+    const { data: achievements, error: achievementsError } = await adminSupabase
+      .from('user_achievements')
+      .select('badge_id, badge_name, earned_at')
+      .eq('user_id', userId)
+      .order('earned_at', { ascending: false })
+      .limit(10);
+
+    if (achievementsError) {
+      logger.warn('Error fetching achievements', { userId, error: achievementsError.message });
+    }
+
+    // Calculate portfolio metrics
+    const totalPortfolioValue = portfolios?.reduce((sum, p) => sum + Number(p.virtual_balance || 0), 0) || 0;
+    const totalTrades = transactionHistory.length;
+    const recentTrades = transactionHistory.slice(0, 10);
+    const sectors = [...new Set(currentHoldings.map(h => h.sector).filter(Boolean))];
+    const symbols = [...new Set(currentHoldings.map(h => h.symbol).filter(Boolean))];
+
+    // Calculate portfolio performance trend
+    const recentTransactions = transactionHistory.slice(0, 20);
+    const buyCount = recentTransactions.filter(t => t.transaction_type === 'buy').length;
+    const sellCount = recentTransactions.filter(t => t.transaction_type === 'sell').length;
+    const tradingActivity = totalTrades > 0 ? clamp(totalTrades / 100, 0, 1) : 0;
+
+    return {
+      profile: profile || {},
+      portfolioHistory: {
+        totalPortfolios: portfolios?.length || 0,
+        totalValue: totalPortfolioValue,
+        recentPortfolios: portfolios?.slice(0, 3) || [],
+        currentHoldings: currentHoldings,
+        sectors: sectors,
+        symbols: symbols,
+        totalTrades: totalTrades,
+        recentTrades: recentTrades,
+        tradingActivity: tradingActivity,
+        buySellRatio: totalTrades > 0 ? buyCount / (buyCount + sellCount || 1) : 0.5
+      },
+      learningProgress: {
+        progress: leaderboardData?.learning_progress || 0,
+        achievementsCount: leaderboardData?.achievements_count || achievements?.length || 0,
+        tradesCount: leaderboardData?.trades_count || totalTrades,
+        recentAchievements: achievements?.slice(0, 5) || []
+      },
+      interests: profile?.interests || [],
+      riskTolerance: profile?.risk_tolerance || 'moderate',
+      experienceLevel: profile?.experience_level || 'beginner'
+    };
+  } catch (error) {
+    logger.error('Error fetching user context', { userId, error: error.message });
+    return {};
+  }
+};
+
+export const buildUserEmbedding = (profile = {}, userContext = {}) => {
   const riskTolerance = String(
     profile.risk_tolerance ||
     profile.riskTolerance ||
     profile.risk_profile ||
+    userContext.riskTolerance ||
     'moderate'
   ).toLowerCase();
 
@@ -52,6 +184,7 @@ export const buildUserEmbedding = (profile = {}) => {
     profile.investment_experience ||
     profile.investmentExperience ||
     profile.experience ||
+    userContext.experienceLevel ||
     'beginner'
   ).toLowerCase();
 
@@ -61,10 +194,16 @@ export const buildUserEmbedding = (profile = {}) => {
     ? profile.investmentGoals
     : [];
 
-  const interests = Array.isArray(profile.interests) ? profile.interests : [];
+  const interests = Array.isArray(profile.interests) 
+    ? profile.interests 
+    : Array.isArray(userContext.interests)
+    ? userContext.interests
+    : [];
 
-  const virtualValue = Number(profile.virtual_portfolio_value || profile.portfolio_value || 0);
-  const normalizedValue = virtualValue > 0 ? Math.min(Math.log10(virtualValue + 1) / 6, 1) : 0.1;
+  // Use portfolio value from context if available
+  const portfolioValue = userContext.portfolioHistory?.totalValue || 
+    Number(profile.virtual_portfolio_value || profile.portfolio_value || 0);
+  const normalizedValue = portfolioValue > 0 ? Math.min(Math.log10(portfolioValue + 1) / 6, 1) : 0.1;
 
   const riskScore = riskMap[riskTolerance] ?? 0.5;
   const experienceScore = experienceMap[experience] ?? 0.3;
@@ -92,11 +231,18 @@ export const buildUserEmbedding = (profile = {}) => {
 
   const diversificationNeed = profile.diversification_gap
     ? clamp(Number(profile.diversification_gap) / 100, 0, 1)
+    : userContext.portfolioHistory?.sectors?.length
+    ? clamp(1 - (userContext.portfolioHistory.sectors.length / 10), 0, 1)
     : 0.5;
 
   const cashAvailability = profile.monthly_contribution
     ? clamp(Number(profile.monthly_contribution) / 1000, 0, 1)
     : 0.35;
+
+  // Enhanced embedding with learning progress and trading activity
+  const learningProgress = userContext.learningProgress?.progress || 0;
+  const normalizedLearningProgress = clamp(learningProgress / 100, 0, 1);
+  const tradingActivity = userContext.portfolioHistory?.tradingActivity || 0;
 
   return [
     Number(riskScore.toFixed(2)),
@@ -106,7 +252,9 @@ export const buildUserEmbedding = (profile = {}) => {
     Number(normalizedValue.toFixed(2)),
     Number(techInterest.toFixed(2)),
     Number(sustainabilityInterest.toFixed(2)),
-    Number(cashAvailability.toFixed(2))
+    Number(cashAvailability.toFixed(2)),
+    Number(normalizedLearningProgress.toFixed(2)),
+    Number(tradingActivity.toFixed(2))
   ];
 };
 
@@ -176,14 +324,36 @@ const fetchMarketContext = async (ticker) => {
   }
 };
 
-const buildExplainability = ({ match, profile, marketContext, newsSummary, profileMatchScore }) => {
+const buildExplainability = ({ match, profile, marketContext, newsSummary, profileMatchScore, userContext = {} }) => {
   const metadata = match.metadata || {};
   const riskTolerance = profile.risk_tolerance || profile.riskTolerance || 'moderate';
+  
+  // Build personalized context messages
+  const portfolioContext = userContext.portfolioHistory;
+  const learningContext = userContext.learningProgress;
+  
+  let personalizedNote = '';
+  if (portfolioContext?.sectors?.length) {
+    const sectorMatch = portfolioContext.sectors.some(s => 
+      match.tags?.some(tag => String(tag).toLowerCase().includes(s.toLowerCase()))
+    );
+    if (sectorMatch) {
+      personalizedNote = `This aligns with your existing ${portfolioContext.sectors[0]} holdings. `;
+    }
+  }
+  
+  if (learningContext?.progress > 0) {
+    personalizedNote += `Based on your learning progress (${learningContext.progress}% complete), `;
+  }
+  
+  if (portfolioContext?.totalTrades > 0) {
+    personalizedNote += `you've made ${portfolioContext.totalTrades} trades, showing active engagement. `;
+  }
 
   return {
     headline: `Why "${match.title}" aligns with your profile`,
     profileAlignment: metadata.why_it_matters ||
-      `This strategy lines up with your ${riskTolerance} risk comfort and current learning goals.`,
+      `${personalizedNote}This strategy lines up with your ${riskTolerance} risk comfort and current learning goals.`,
     knowledgeBaseSummary: match.summary,
     marketContext: marketContext
       ? `Recent movement: ${marketContext.changePercent >= 0 ? '▲' : '▼'} ${marketContext.changePercent.toFixed(2)}%. ` +
@@ -193,7 +363,16 @@ const buildExplainability = ({ match, profile, marketContext, newsSummary, profi
       'Use this strategy to practice disciplined rebalancing and reflection on allocation choices.',
     newsInsight: newsSummary.summary,
     newsSentimentLabel: newsSummary.sentimentLabel || 'neutral',
-    profileMatchScore
+    profileMatchScore,
+    portfolioContext: portfolioContext ? {
+      totalValue: portfolioContext.totalValue,
+      sectors: portfolioContext.sectors,
+      tradingActivity: portfolioContext.tradingActivity
+    } : null,
+    learningContext: learningContext ? {
+      progress: learningContext.progress,
+      achievementsCount: learningContext.achievementsCount
+    } : null
   };
 };
 
@@ -224,7 +403,21 @@ export const generateSuggestions = async ({
     throw new Error('User ID is required to generate suggestions');
   }
 
-  const embedding = buildUserEmbedding(profile);
+  // Fetch comprehensive user context
+  const userContext = await fetchUserContext(userId);
+  
+  // Merge profile with fetched context
+  const enhancedProfile = {
+    ...profile,
+    ...userContext.profile,
+    interests: profile.interests || userContext.interests || [],
+    risk_tolerance: profile.risk_tolerance || userContext.riskTolerance || 'moderate',
+    experience_level: profile.experience_level || userContext.experienceLevel || 'beginner',
+    virtual_portfolio_value: userContext.portfolioHistory?.totalValue || profile.virtual_portfolio_value || 0
+  };
+
+  // Build embedding with enhanced context
+  const embedding = buildUserEmbedding(enhancedProfile, userContext);
   let strategies = await fetchKnowledgeStrategies(embedding, requestedCount);
 
   if (!strategies.length) {
@@ -269,12 +462,15 @@ export const generateSuggestions = async ({
     );
 
     const suggestionId = `sugg_${strategy.strategy_id}_${Date.now()}`;
+    
+    // Enhanced explanation with portfolio context
     const explanation = buildExplainability({
       match: strategy,
-      profile,
+      profile: enhancedProfile,
       marketContext,
       newsSummary,
-      profileMatchScore
+      profileMatchScore,
+      userContext
     });
 
     suggestions.push({

@@ -1,7 +1,7 @@
 import React from 'react';
 import { calculateTotalValue } from '../../services/portfolio/portfolioCalculations';
 
-const HoldingsList = ({ portfolio, liveMetrics, marketData }) => {
+const HoldingsList = React.memo(({ portfolio, liveMetrics, marketData }) => {
   console.log('📋 [HoldingsList] Component rendered with props:');
   console.log('📋 [HoldingsList]   Portfolio:', !!portfolio);
   console.log('📋 [HoldingsList]   Live metrics:', !!liveMetrics);
@@ -181,6 +181,6 @@ const HoldingsList = ({ portfolio, liveMetrics, marketData }) => {
       )}
     </div>
   );
-};
+});
 
 export default HoldingsList;

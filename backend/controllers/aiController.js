@@ -244,7 +244,7 @@ const fallbackChatResponse = (message) => ({
 });
 
 export const chat = async (req, res) => {
-  const { message, userProfile } = req.body || {};
+  const { message, userProfile, userId } = req.body || {};
 
   if (!message || typeof message !== 'string') {
     return res.status(400).json(createApiResponse(null, {
@@ -261,6 +261,35 @@ export const chat = async (req, res) => {
   }
 
   try {
+    // Fetch enhanced user context if userId is provided
+    let enhancedContext = '';
+    if (userId) {
+      try {
+        const { fetchUserContext } = await import('../ai-system/suggestionEngine.js');
+        const userContext = await fetchUserContext(userId);
+        
+        if (userContext.portfolioHistory) {
+          const ph = userContext.portfolioHistory;
+          enhancedContext = `\n\n**Portfolio Context:**
+- Total Portfolio Value: $${ph.totalValue?.toLocaleString() || 0}
+- Number of Holdings: ${ph.currentHoldings?.length || 0}
+- Sectors: ${ph.sectors?.join(', ') || 'None yet'}
+- Total Trades: ${ph.totalTrades || 0}
+- Trading Activity Level: ${ph.tradingActivity > 0.5 ? 'Active' : ph.tradingActivity > 0.2 ? 'Moderate' : 'Beginner'}`;
+        }
+        
+        if (userContext.learningProgress) {
+          const lp = userContext.learningProgress;
+          enhancedContext += `\n\n**Learning Progress:**
+- Progress: ${lp.progress || 0}%
+- Achievements Earned: ${lp.achievementsCount || 0}
+- Recent Achievements: ${lp.recentAchievements?.map(a => a.badge_name).join(', ') || 'None yet'}`;
+        }
+      } catch (contextError) {
+        logger.warn('Failed to fetch enhanced context for chat', { userId, error: contextError.message });
+      }
+    }
+
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -282,7 +311,7 @@ export const chat = async (req, res) => {
 - Risk Tolerance: ${userProfile?.risk_tolerance || 'moderate'}
 - Monthly Budget: $${userProfile?.budget || 'Not set'}
 - Portfolio Value: $${userProfile?.portfolio_value || 0}
-- Interests: ${userProfile?.interests?.join(', ') || 'General investing'}
+- Interests: ${userProfile?.interests?.join(', ') || 'General investing'}${enhancedContext}
 
 **Your Role:**
 - Educational guide, NOT a financial advisor
@@ -297,6 +326,7 @@ export const chat = async (req, res) => {
 - Minimal emoji use (1-2 per response max) for emphasis only
 - Structured formatting with headers and bullet points
 - Always provide educational information, never specific financial advice
+- Reference the user's portfolio context when relevant to make explanations more personalized
 
 **Important:**
 - Always mention consulting parents/guardians for users under 18
