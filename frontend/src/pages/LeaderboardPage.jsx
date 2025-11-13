@@ -13,6 +13,7 @@ export default function LeaderboardPage() {
     userRank,
     loading,
     error,
+    offline,
     refreshLeaderboard,
   } = useLeaderboard();
   const { queueToast } = useApp();

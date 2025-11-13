@@ -13,6 +13,7 @@ import {
   getModules,
   getUserProgress,
   updateProgress,
+  loadCachedProgressSnapshot,
 } from '../services/education/supabaseEducationService';
 import { updateUserStats } from '../services/leaderboard/supabaseLeaderboardService';
 import { useAchievements } from './AchievementsContext';

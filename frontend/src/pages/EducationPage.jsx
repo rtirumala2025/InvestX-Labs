@@ -34,6 +34,7 @@ const EducationPage = () => {
     progress,
     loading,
     error,
+    offline,
     refreshEducation,
   } = useEducation();
   const {

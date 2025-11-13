@@ -54,7 +54,9 @@ export const AppContextProvider = ({ children }) => {
     if (!message) return;
 
     const id = options.id ?? generateId();
-    const duration = options.duration ?? 4000;
+    // Error messages get a longer duration (10 seconds) by default
+    const defaultDuration = type === 'error' ? 10000 : 4000;
+    const duration = options.duration ?? defaultDuration;
 
     setToastQueue((prev) => {
       const filtered = prev.filter((toast) => toast.id !== id);
@@ -92,7 +94,7 @@ export const AppContextProvider = ({ children }) => {
 
       console.debug?.('AppContext captured global error', normalized);
       setGlobalError(normalized);
-      queueToast(normalized.message, 'error');
+      queueToast(normalized.message, 'error', { duration: 10000 });
     },
     [queueToast]
   );
