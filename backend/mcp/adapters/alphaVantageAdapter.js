@@ -7,7 +7,7 @@ import { exponentialBackoff } from '../../ai-services/utils.js';
 class AlphaVantageAdapter {
   constructor(config) {
     this.apiKey = config.apiKey;
-    this.baseUrl = 'https://www.alphavantage.co/query';
+    this.baseUrl = process.env.ALPHA_VANTAGE_BASE_URL || 'https://www.alphavantage.co/query';
     this.cache = new Map();
     this.cacheTtl = 5 * 60 * 1000; // 5 minutes cache TTL
   }

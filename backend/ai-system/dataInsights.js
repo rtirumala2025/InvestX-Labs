@@ -9,7 +9,7 @@ class DataInsights {
   constructor(supabaseClient, alphaVantageKey) {
     this.supabase = supabaseClient;
     this.ALPHA_VANTAGE_KEY = alphaVantageKey;
-    this.ALPHA_VANTAGE_URL = 'https://www.alphavantage.co/query';
+    this.ALPHA_VANTAGE_URL = process.env.ALPHA_VANTAGE_BASE_URL || 'https://www.alphavantage.co/query';
   }
 
   async getMarketData(symbol, functionType = 'GLOBAL_QUOTE', options = {}) {

@@ -1,21 +1,34 @@
 import React from 'react';
+import { motion } from 'framer-motion';
+import Tooltip from '../ui/Tooltip';
 
 const WelcomeStep = ({ onNext }) => {
   return (
     <div className="max-w-2xl mx-auto text-center">
-      <div className="mb-8">
-        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="mb-8"
+      >
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+          className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg"
+        >
+          <span className="text-4xl">🚀</span>
+        </motion.div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
           Welcome to InvestX Labs!
         </h1>
         <p className="text-xl text-gray-600 mb-8">
           Your personal investment education and portfolio tracking platform
         </p>
-      </div>
+        <p className="text-sm text-gray-500 mb-8">
+          Let's get you set up in just a few quick steps. This will only take 2-3 minutes!
+        </p>
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-sm border">

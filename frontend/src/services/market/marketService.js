@@ -3,7 +3,7 @@
  * Provides real-time stock market data integration for InvestX Labs
  */
 
-const ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
+const ALPHA_VANTAGE_BASE_URL = process.env.REACT_APP_ALPHA_VANTAGE_BASE_URL || 'https://www.alphavantage.co/query';
 const API_KEY = process.env.REACT_APP_ALPHA_VANTAGE_API_KEY;
 
 // Cache for API responses to avoid excessive calls

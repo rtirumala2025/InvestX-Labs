@@ -142,7 +142,8 @@ async function fetchQuote(symbol: string, supabase: any): Promise<QuoteResponse>
 
   // Fetch from Alpha Vantage
   console.log(`Fetching ${symbol} from Alpha Vantage`)
-  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol.toUpperCase()}&apikey=${ALPHA_VANTAGE_API_KEY}`
+  const ALPHA_VANTAGE_BASE_URL = Deno.env.get('ALPHA_VANTAGE_BASE_URL') || 'https://www.alphavantage.co/query'
+  const url = `${ALPHA_VANTAGE_BASE_URL}?function=GLOBAL_QUOTE&symbol=${symbol.toUpperCase()}&apikey=${ALPHA_VANTAGE_API_KEY}`
 
   const response = await fetch(url)
   const data = await response.json()

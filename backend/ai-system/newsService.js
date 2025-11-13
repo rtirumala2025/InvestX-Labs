@@ -3,8 +3,8 @@ import logger from '../utils/logger.js';
 import { exponentialBackoff } from './utils.js';
 import { aiEngine } from './aiEngine.js';
 
-const ALPHA_VANTAGE_URL = 'https://www.alphavantage.co/query';
-const FINNHUB_URL = 'https://finnhub.io/api/v1/company-news';
+const ALPHA_VANTAGE_URL = process.env.ALPHA_VANTAGE_BASE_URL || 'https://www.alphavantage.co/query';
+const FINNHUB_URL = process.env.FINNHUB_BASE_URL || 'https://finnhub.io/api/v1/company-news';
 
 const {
   ALPHA_VANTAGE_API_KEY,
