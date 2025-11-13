@@ -1,4 +1,5 @@
 import React from 'react';
+import FinancialTerm from '../education/FinancialTerm';
 import { calculatePerformanceMetrics } from '../../services/portfolio/portfolioCalculations';
 
 const PerformanceMetrics = ({ portfolio, liveMetrics, marketData }) => {
@@ -126,7 +127,17 @@ const PerformanceMetrics = ({ portfolio, liveMetrics, marketData }) => {
                   {metric.change}
                 </div>
               </div>
-              <h3 className="text-sm font-medium text-white/70 mb-2">{metric.label}</h3>
+              <h3 className="text-sm font-medium text-white/70 mb-2">
+                {metric.label === 'Diversification' ? (
+                  <FinancialTerm term="diversification">{metric.label}</FinancialTerm>
+                ) : metric.label === 'Total Return' ? (
+                  <FinancialTerm term="return">{metric.label}</FinancialTerm>
+                ) : metric.label === 'Volatility' ? (
+                  <FinancialTerm term="volatility">{metric.label}</FinancialTerm>
+                ) : (
+                  metric.label
+                )}
+              </h3>
               <p className="text-2xl font-bold text-white mb-1">{metric.value}</p>
               <p className="text-xs text-white/60">{metric.description}</p>
             </div>
@@ -147,7 +158,17 @@ const PerformanceMetrics = ({ portfolio, liveMetrics, marketData }) => {
                   {metric.change}
                 </div>
               </div>
-              <h3 className="text-sm font-medium text-white/70 mb-2">{metric.label}</h3>
+              <h3 className="text-sm font-medium text-white/70 mb-2">
+                {metric.label === 'Diversification' ? (
+                  <FinancialTerm term="diversification">{metric.label}</FinancialTerm>
+                ) : metric.label === 'Total Return' ? (
+                  <FinancialTerm term="return">{metric.label}</FinancialTerm>
+                ) : metric.label === 'Volatility' ? (
+                  <FinancialTerm term="volatility">{metric.label}</FinancialTerm>
+                ) : (
+                  metric.label
+                )}
+              </h3>
               <p className="text-2xl font-bold text-white mb-1">{metric.value}</p>
               <p className="text-xs text-white/60">{metric.description}</p>
             </div>

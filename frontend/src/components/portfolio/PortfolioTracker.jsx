@@ -5,6 +5,7 @@ import HoldingsList from './HoldingsList';
 import PerformanceMetrics from './PerformanceMetrics';
 import AddHolding from './AddHolding';
 import UploadCSV from './UploadCSV';
+import FinancialTerm from '../education/FinancialTerm';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { useAlphaVantageData } from '../../hooks/useAlphaVantageData';
 import { calculatePerformanceMetrics } from '../../services/portfolio/portfolioCalculations';
@@ -235,7 +236,15 @@ const PortfolioTracker = () => {
               interactive={true}
               className="text-center group"
             >
-              <h3 className="text-sm font-medium text-white/70 mb-2">{stat.label}</h3>
+              <h3 className="text-sm font-medium text-white/70 mb-2">
+                {stat.label === 'Total Value' ? (
+                  <FinancialTerm term="portfolio">{stat.label}</FinancialTerm>
+                ) : stat.label === 'Holdings' ? (
+                  <FinancialTerm term="holding">{stat.label}</FinancialTerm>
+                ) : (
+                  stat.label
+                )}
+              </h3>
               <p className="text-2xl font-bold text-white mb-1">{stat.value}</p>
               <p className={`text-sm ${stat.positive ? 'text-green-400' : 'text-red-400'}`}>
                 {stat.change}
@@ -371,7 +380,9 @@ const PortfolioTracker = () => {
           {/* Portfolio Allocation */}
           <motion.div variants={fadeIn} initial="hidden" animate="visible">
             <GlassCard variant="accent" padding="large" glow={true}>
-              <h3 className="text-xl font-semibold text-white mb-4">Asset Allocation</h3>
+              <h3 className="text-xl font-semibold text-white mb-4">
+                <FinancialTerm term="asset_allocation">Asset Allocation</FinancialTerm>
+              </h3>
               <div className="space-y-4">
                 {Object.keys(portfolioMetrics.assetTypeAllocation).length > 0 ? (
                   Object.entries(portfolioMetrics.assetTypeAllocation).map(([assetType, percentage], index) => {

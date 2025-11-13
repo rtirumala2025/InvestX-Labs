@@ -4,8 +4,11 @@ import { Link } from 'react-router-dom';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import ProgressBar from '../components/ui/ProgressBar';
+import Celebration from '../components/ui/Celebration';
 import { useEducation } from '../contexts/EducationContext';
 import { useAchievements } from '../contexts/AchievementsContext';
+import { useApp } from '../contexts/AppContext';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 16 },
@@ -46,6 +49,25 @@ const EducationPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [selectedModuleId, setSelectedModuleId] = useState(null);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationData, setCelebrationData] = useState(null);
+  const { queueToast } = useApp();
+  
+  // Track previous achievement count to detect new achievements
+  const prevAchievementsCount = React.useRef(achievementsCount);
+  
+  useEffect(() => {
+    if (achievementsCount > prevAchievementsCount.current && achievementsList?.length > 0) {
+      const latestAchievement = achievementsList[0];
+      setCelebrationData({
+        title: 'Achievement Unlocked! 🎉',
+        message: latestAchievement.details?.description || `You earned: ${latestAchievement.type.replace(/_/g, ' ')}`,
+        icon: '🏆'
+      });
+      setShowCelebration(true);
+      prevAchievementsCount.current = achievementsCount;
+    }
+  }, [achievementsCount, achievementsList]);
 
   const categories = useMemo(() => {
     const set = new Set();
@@ -152,6 +174,20 @@ const EducationPage = () => {
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
+      {celebrationData && (
+        <Celebration
+          show={showCelebration}
+          onComplete={() => {
+            setShowCelebration(false);
+            setCelebrationData(null);
+          }}
+          type="achievement"
+          title={celebrationData.title}
+          message={celebrationData.message}
+          icon={celebrationData.icon}
+          duration={3000}
+        />
+      )}
       <motion.div
         className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-blue-500/30 to-purple-500/20 rounded-full blur-3xl"
         animate={{ y: [0, 20, 0], x: [0, 10, 0] }}
@@ -216,13 +252,15 @@ const EducationPage = () => {
               </div>
             </div>
             <div className="mt-6">
-              <div className="flex justify-between text-sm text-white/80 mb-2">
-                <span>Learning Journey Progress</span>
-                <span>{overallProgress}%</span>
-              </div>
-              <div className="w-full bg-white/20 rounded-full h-3">
-                <div className="bg-gradient-to-r from-blue-400 via-green-400 to-orange-400 h-3 rounded-full transition-all duration-1000" style={{ width: `${overallProgress}%` }} />
-              </div>
+              <ProgressBar
+                progress={overallProgress}
+                label="Learning Journey Progress"
+                showLabel={true}
+                showPercentage={true}
+                height="h-3"
+                color="from-blue-400 via-green-400 to-orange-400"
+                animated={true}
+              />
             </div>
           </GlassCard>
         </motion.div>
@@ -312,18 +350,17 @@ const EducationPage = () => {
                         )}
                       </div>
 
-                      <div className="mb-4">
-                        <div className="flex justify-between text-sm text-white/80 mb-2">
-                          <span>Course Progress</span>
-                          <span>{courseProgress}%</span>
-                        </div>
-                        <div className="w-full bg-white/20 rounded-full h-2">
-                          <div
-                            className="bg-gradient-to-r from-blue-400 to-green-400 h-2 rounded-full transition-all duration-700"
-                            style={{ width: `${courseProgress}%` }}
+                        <div className="mb-4">
+                          <ProgressBar
+                            progress={courseProgress}
+                            label="Course Progress"
+                            showLabel={true}
+                            showPercentage={true}
+                            height="h-2"
+                            color="from-blue-400 to-green-400"
+                            animated={true}
                           />
                         </div>
-                      </div>
 
                       <div className="flex gap-3">
                         <GlassButton
@@ -402,8 +439,16 @@ const EducationPage = () => {
                               <p className="text-white/60 text-sm mt-1">{module.summary}</p>
                             )}
                           </div>
-                          <div className="text-sm text-white/70">
-                            Progress: {moduleProgress}%
+                          <div className="text-sm text-white/70 min-w-[100px]">
+                            <ProgressBar
+                              progress={moduleProgress}
+                              showLabel={false}
+                              showPercentage={true}
+                              height="h-2"
+                              color="from-green-400 to-emerald-500"
+                              animated={true}
+                              className="mt-2"
+                            />
                           </div>
                         </div>
 
