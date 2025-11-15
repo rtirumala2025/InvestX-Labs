@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import SuggestionCard from './SuggestionCard';
-import { useAISuggestions } from '../../hooks/useAISuggestions';
 import LoadingSpinner from '../common/LoadingSpinner';
 
-const SuggestionsList = () => {
-  const { suggestions, loading, dismissSuggestion } = useAISuggestions();
+const SuggestionsList = ({
+  suggestions,
+  loading,
+  error,
+  onDismiss,
+  onRefresh,
+  onViewDetails,
+  onAdjustConfidence,
+  onRecordInteraction,
+}) => {
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('confidence');
 
@@ -23,38 +30,63 @@ const SuggestionsList = () => {
     { value: 'impact', label: 'Expected Impact' }
   ];
 
-  const filteredSuggestions = suggestions?.filter(suggestion => 
-    filter === 'all' || suggestion.type === filter
-  ) || [];
+  const filteredSuggestions = useMemo(() => {
+    if (!Array.isArray(suggestions)) return [];
+    if (filter === 'all') return suggestions;
+    return suggestions.filter((suggestion) => suggestion.type === filter);
+  }, [suggestions, filter]);
 
-  const sortedSuggestions = [...filteredSuggestions].sort((a, b) => {
+  const sortedSuggestions = useMemo(() => {
+    const list = [...filteredSuggestions];
     switch (sortBy) {
       case 'confidence':
-        return b.confidence - a.confidence;
+        return list.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
       case 'date':
-        return new Date(b.createdAt) - new Date(a.createdAt);
+        return list.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
       case 'impact':
-        return b.expectedImpact.localeCompare(a.expectedImpact);
+        return list.sort((a, b) => {
+          const impactA = (a.expectedImpact || a.expectedReturn || '').toString();
+          const impactB = (b.expectedImpact || b.expectedReturn || '').toString();
+          return impactB.localeCompare(impactA);
+        });
       default:
-        return 0;
+        return list;
     }
-  });
+  }, [filteredSuggestions, sortBy]);
 
   const handleViewDetails = (suggestionId) => {
-    // Navigate to suggestion details page
-    console.log('View details for suggestion:', suggestionId);
+    if (typeof onViewDetails === 'function') {
+      onViewDetails(suggestionId);
+    }
   };
 
   const handleDismiss = async (suggestionId) => {
-    try {
-      await dismissSuggestion(suggestionId);
-    } catch (error) {
-      console.error('Error dismissing suggestion:', error);
+    if (typeof onDismiss === 'function') {
+      await onDismiss(suggestionId);
     }
   };
 
   if (loading) {
     return <LoadingSpinner size="large" />;
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto py-10 text-center">
+        <h2 className="text-xl font-semibold text-white mb-2">Unable to load AI suggestions</h2>
+        <p className="text-white/70 mb-6">{error}</p>
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+          >
+            Retry
+          </button>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -117,6 +149,8 @@ const SuggestionsList = () => {
               suggestion={suggestion}
               onViewDetails={handleViewDetails}
               onDismiss={handleDismiss}
+              onAdjustConfidence={onAdjustConfidence}
+              onRecordInteraction={onRecordInteraction}
             />
           ))}
         </div>
@@ -134,17 +168,25 @@ const SuggestionsList = () => {
               : `No ${filter} suggestions available at the moment.`
             }
           </p>
-          <button className="text-blue-600 hover:text-blue-700 font-medium">
-            Refresh Suggestions
-          </button>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Refresh Suggestions
+            </button>
+          )}
         </div>
       )}
 
       {/* Load More Button */}
       {sortedSuggestions.length > 0 && (
         <div className="text-center mt-8">
-          <button className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            Load More Suggestions
+          <button
+            onClick={onRefresh}
+            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            Refresh Suggestions
           </button>
         </div>
       )}

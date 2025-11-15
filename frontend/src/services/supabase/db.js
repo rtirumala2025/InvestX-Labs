@@ -4,14 +4,27 @@ import { supabase } from './config';
  * Get all documents from a table
  * @param {string} table - Table name
  * @param {string} columns - Columns to select (default: '*')
+ * @param {Object} filters - Optional filters { column: value }
  * @returns {Promise<Array>} Array of documents
  */
-export const getDocuments = async (table, columns = '*') => {
-  const { data, error } = await supabase
+export const getDocuments = async (table, columns = '*', filters = {}) => {
+  let query = supabase
     .from(table)
     .select(columns);
   
-  if (error) throw error;
+  // Apply filters
+  Object.entries(filters).forEach(([column, value]) => {
+    query = query.eq(column, value);
+  });
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error(`[db.js] Error fetching documents from ${table}:`, error);
+    throw error;
+  }
+  
+  console.log(`[db.js] ✅ Fetched ${data?.length || 0} documents from ${table}`);
   return data || [];
 };
 
@@ -44,13 +57,20 @@ export const getDocument = async (table, id, columns = '*') => {
  * @returns {Promise<Object>} Created document
  */
 export const addDocument = async (table, data) => {
+  console.log(`[db.js] Adding document to ${table}:`, data);
+  
   const { data: result, error } = await supabase
     .from(table)
     .insert([data])
     .select()
     .single();
     
-  if (error) throw error;
+  if (error) {
+    console.error(`[db.js] Error adding document to ${table}:`, error);
+    throw error;
+  }
+  
+  console.log(`[db.js] ✅ Document added to ${table}:`, result.id);
   return result;
 };
 
@@ -59,17 +79,32 @@ export const addDocument = async (table, data) => {
  * @param {string} table - Table name
  * @param {string} id - Document ID
  * @param {Object} updates - Fields to update
+ * @param {Object} additionalFilters - Additional filters (e.g., { user_id: userId })
  * @returns {Promise<Object>} Updated document
  */
-export const updateDocument = async (table, id, updates) => {
-  const { data, error } = await supabase
+export const updateDocument = async (table, id, updates, additionalFilters = {}) => {
+  console.log(`[db.js] Updating document in ${table}:`, id, updates);
+  
+  let query = supabase
     .from(table)
     .update(updates)
-    .eq('id', id)
+    .eq('id', id);
+  
+  // Apply additional filters (e.g., user_id for security)
+  Object.entries(additionalFilters).forEach(([column, value]) => {
+    query = query.eq(column, value);
+  });
+  
+  const { data, error } = await query
     .select()
     .single();
     
-  if (error) throw error;
+  if (error) {
+    console.error(`[db.js] Error updating document in ${table}:`, error);
+    throw error;
+  }
+  
+  console.log(`[db.js] ✅ Document updated in ${table}:`, id);
   return data;
 };
 

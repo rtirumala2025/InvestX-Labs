@@ -1,8 +1,21 @@
 const axios = require('axios');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getRateLimiter } = require('../utils/alphaVantageRateLimiter');
 
-const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY || 'YOUR_ALPHA_VANTAGE_API_KEY';
-const db = getFirestore();
+const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+const ALPHA_VANTAGE_BASE_URL = process.env.ALPHA_VANTAGE_BASE_URL || 'https://www.alphavantage.co/query';
+
+if (!ALPHA_VANTAGE_API_KEY) {
+  console.warn('[MarketService] ALPHA_VANTAGE_API_KEY not configured. Market data features will be limited.');
+}
+
+// Initialize rate limiter
+const rateLimiter = getRateLimiter({
+  maxCallsPerMinute: 5,
+  maxCallsPerDay: 500,
+  initialDelay: 1000,
+  maxDelay: 60000,
+  maxRetries: 3
+});
 
 // Cache for storing market data
 const cache = new Map();
@@ -22,13 +35,20 @@ async function getStockQuote(symbol) {
     return cached.data;
   }
 
+  if (!ALPHA_VANTAGE_API_KEY) {
+    throw new Error('Alpha Vantage API key not configured');
+  }
+
   try {
-    const response = await axios.get('https://www.alphavantage.co/query', {
-      params: {
-        function: 'GLOBAL_QUOTE',
-        symbol: symbol,
-        apikey: ALPHA_VANTAGE_API_KEY
-      }
+    // Use rate limiter to queue the request
+    const response = await rateLimiter.request(async () => {
+      return await axios.get(ALPHA_VANTAGE_BASE_URL, {
+        params: {
+          function: 'GLOBAL_QUOTE',
+          symbol: symbol,
+          apikey: ALPHA_VANTAGE_API_KEY
+        }
+      });
     });
 
     if (response.data['Global Quote']) {
@@ -74,15 +94,22 @@ async function getMarketNews() {
     return cached.data;
   }
 
+  if (!ALPHA_VANTAGE_API_KEY) {
+    console.warn('[MarketService] Alpha Vantage API key not configured, returning mock news');
+    return getMockNews();
+  }
+
   try {
-    // Using Alpha Vantage News API
-    const response = await axios.get('https://www.alphavantage.co/query', {
-      params: {
-        function: 'NEWS_SENTIMENT',
-        topics: 'technology,finance',
-        apikey: ALPHA_VANTAGE_API_KEY,
-        limit: 10 // Limit to 10 news items
-      }
+    // Use rate limiter to queue the request
+    const response = await rateLimiter.request(async () => {
+      return await axios.get(ALPHA_VANTAGE_BASE_URL, {
+        params: {
+          function: 'NEWS_SENTIMENT',
+          topics: 'technology,finance',
+          apikey: ALPHA_VANTAGE_API_KEY,
+          limit: 10 // Limit to 10 news items
+        }
+      });
     });
 
     if (response.data.feed) {
@@ -116,26 +143,34 @@ async function getMarketNews() {
   } catch (error) {
     console.error('Error fetching market news:', error.message);
     // Return mock data if API fails
-    return [
-      {
-        title: 'Market Update: Tech Stocks Rally',
-        summary: 'Technology stocks showed strong performance today with major gains across the sector.',
-        source: 'Financial Times',
-        timePublished: new Date().toISOString(),
-        url: '#'
-      },
-      {
-        title: 'Federal Reserve Holds Interest Rates Steady',
-        summary: 'The Federal Reserve announced it will keep interest rates unchanged in its latest policy meeting.',
-        source: 'Wall Street Journal',
-        timePublished: new Date().toISOString(),
-        url: '#'
-      }
-    ];
+    return getMockNews();
   }
+}
+
+/**
+ * Get mock news data (fallback)
+ */
+function getMockNews() {
+  return [
+    {
+      title: 'Market Update: Tech Stocks Rally',
+      summary: 'Technology stocks showed strong performance today with major gains across the sector.',
+      source: 'Financial Times',
+      timePublished: new Date().toISOString(),
+      url: '#'
+    },
+    {
+      title: 'Federal Reserve Holds Interest Rates Steady',
+      summary: 'The Federal Reserve announced it will keep interest rates unchanged in its latest policy meeting.',
+      source: 'Wall Street Journal',
+      timePublished: new Date().toISOString(),
+      url: '#'
+    }
+  ];
 }
 
 module.exports = {
   getStockQuote,
-  getMarketNews
+  getMarketNews,
+  getRateLimiterStatus: () => rateLimiter.getStatus()
 };

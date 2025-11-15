@@ -1,93 +1,223 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import LoadingSpinner from '../common/LoadingSpinner';
 
-const PortfolioChart = ({ portfolio }) => {
-  // Mock chart data for demonstration
-  const chartData = [
-    { date: '1W ago', value: 23500 },
-    { date: '6D ago', value: 24100 },
-    { date: '5D ago', value: 23800 },
-    { date: '4D ago', value: 24500 },
-    { date: '3D ago', value: 24200 },
-    { date: '2D ago', value: 24800 },
-    { date: '1D ago', value: 24173 },
-    { date: 'Today', value: 25420 }
-  ];
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
-  return (
-    <div className="relative">
-      {/* Chart Container */}
-      <div className="relative h-80 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-orange-500/5 rounded-xl border border-white/10 backdrop-blur-sm overflow-hidden">
-        {/* Grid Lines */}
-        <div className="absolute inset-0 opacity-20">
-          {/* Horizontal lines */}
-          {[...Array(5)].map((_, i) => (
-            <div 
-              key={`h-${i}`}
-              className="absolute w-full border-t border-white/20"
-              style={{ top: `${(i + 1) * 16.66}%` }}
-            />
-          ))}
-          {/* Vertical lines */}
-          {[...Array(7)].map((_, i) => (
-            <div 
-              key={`v-${i}`}
-              className="absolute h-full border-l border-white/20"
-              style={{ left: `${(i + 1) * 12.5}%` }}
-            />
-          ))}
-        </div>
+const TIMEFRAME_WINDOWS = {
+  '1D': 1,
+  '1W': 7,
+  '1M': 30,
+  '3M': 90,
+  '1Y': 365,
+  ALL: null,
+};
 
-        {/* Mock Chart Line */}
-        <div className="absolute inset-4 flex items-end justify-between">
-          {chartData.map((point, index) => (
-            <div key={index} className="flex flex-col items-center group">
-              {/* Data Point */}
-              <div 
-                className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full mb-2 group-hover:scale-150 transition-transform duration-200 shadow-lg shadow-blue-500/50"
-                style={{ 
-                  marginBottom: `${((point.value - 23000) / 3000) * 200}px` 
-                }}
-              />
-              {/* Tooltip on hover */}
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute -top-12 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-                ${point.value.toLocaleString()}
-              </div>
-            </div>
-          ))}
-        </div>
+const PortfolioChart = ({
+  portfolio,
+  holdings = [],
+  transactions = [],
+  marketData = {},
+  timeframe = '1M',
+  loading = false,
+  error = null,
+}) => {
+  const historicalSeries = useMemo(() => {
+    const metadataHistory = portfolio?.metadata?.historicalData || [];
+    if (metadataHistory.length) {
+      return metadataHistory.map((entry) => ({
+        date: entry.date,
+        value: entry.value,
+      }));
+    }
+    return [];
+  }, [portfolio?.metadata?.historicalData]);
 
-        {/* Gradient Fill */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-blue-500/20 via-purple-500/10 to-transparent rounded-b-xl" />
+  const syntheticSeries = useMemo(() => {
+    if (historicalSeries.length > 1) {
+      return historicalSeries;
+    }
 
-        {/* Center Content */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-6xl mb-4 animate-pulse">📈</div>
-            <p className="text-white/90 font-medium mb-2">Portfolio Growth Visualization</p>
-            <p className="text-white/60 text-sm">Interactive chart coming soon</p>
-            <div className="mt-4 flex items-center justify-center space-x-4 text-sm">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full mr-2"></div>
-                <span className="text-white/70">Portfolio Value</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full mr-2"></div>
-                <span className="text-white/70">Benchmark</span>
-              </div>
-            </div>
-          </div>
-        </div>
+    if (transactions.length === 0) {
+      const totalValue = holdings.reduce((sum, holding) => {
+        const currentPrice = holding.current_price || holding.purchase_price || 0;
+        return sum + currentPrice * holding.shares;
+      }, 0);
 
-        {/* Performance Indicator */}
-        <div className="absolute top-4 right-4 bg-green-500/20 border border-green-400/30 rounded-lg px-3 py-2">
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-green-300 text-sm font-medium">+5.16% Today</span>
-          </div>
+      if (totalValue > 0) {
+        return [{ date: new Date().toISOString(), value: totalValue }];
+      }
+
+      return [];
+    }
+
+    const sorted = [...transactions]
+      .filter((tx) => tx.transaction_date)
+      .sort((a, b) => new Date(a.transaction_date) - new Date(b.transaction_date));
+
+    let cumulativeValue = 0;
+    const points = [];
+
+    sorted.forEach((tx) => {
+      const amount = Number(tx.total_amount) || 0;
+      cumulativeValue += amount;
+      points.push({
+        date: tx.transaction_date,
+        value: Math.max(0, cumulativeValue * -1),
+      });
+    });
+
+    const latestValue = holdings.reduce((sum, holding) => {
+      const quote = marketData?.[holding.symbol];
+      const price = quote?.price || holding.current_price || holding.purchase_price || 0;
+      return sum + price * holding.shares;
+    }, 0);
+
+    if (latestValue > 0) {
+      points.push({ date: new Date().toISOString(), value: latestValue });
+    }
+
+    return points;
+  }, [transactions, holdings, marketData, historicalSeries]);
+
+  const chartPoints = useMemo(() => {
+    const source = historicalSeries.length ? historicalSeries : syntheticSeries;
+
+    if (!source.length) {
+      return [];
+    }
+
+    const windowDays = TIMEFRAME_WINDOWS[timeframe] ?? null;
+    const cutoff = windowDays ? Date.now() - windowDays * 24 * 60 * 60 * 1000 : null;
+
+    const filtered = source.filter((point) => {
+      if (!point?.date) return false;
+      const timestamp = new Date(point.date).getTime();
+      if (Number.isNaN(timestamp)) return false;
+      if (!cutoff) return true;
+      return timestamp >= cutoff;
+    });
+
+    return filtered.map((point) => ({
+      label: new Date(point.date).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+      }),
+      value: Number(point.value) || 0,
+    }));
+  }, [historicalSeries, syntheticSeries, timeframe]);
+
+  const chartData = useMemo(() => {
+    if (!chartPoints.length) {
+      return null;
+    }
+
+    return {
+      labels: chartPoints.map((point) => point.label),
+      datasets: [
+        {
+          label: 'Portfolio Value',
+          data: chartPoints.map((point) => point.value),
+          borderColor: 'rgba(59, 130, 246, 1)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          tension: 0.35,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+      ],
+    };
+  }, [chartPoints]);
+
+  const chartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => `$${(context.parsed.y || 0).toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`,
+          },
+        },
+      },
+      scales: {
+        y: {
+          ticks: {
+            callback: (value) =>
+              `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+            color: 'rgba(255, 255, 255, 0.6)',
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.08)',
+          },
+        },
+        x: {
+          ticks: {
+            color: 'rgba(255, 255, 255, 0.6)',
+          },
+          grid: {
+            display: false,
+          },
+        },
+      },
+    }),
+    []
+  );
+
+  if (loading) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <div className="text-center text-white/80">
+          <LoadingSpinner size="large" />
+          <p className="mt-4">Loading portfolio performance...</p>
         </div>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <p className="text-red-300">⚠️ {error}</p>
+      </div>
+    );
+  }
+
+  if (!chartData || chartData.datasets[0].data.every((value) => value === 0)) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <div className="text-center text-white/70">
+          <div className="text-4xl mb-3">📈</div>
+          <p className="font-semibold mb-1">Add holdings to see performance data</p>
+          <p className="text-sm text-white/50">
+            We\'ll start charting your portfolio as soon as you add your first investment.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-80">
+      <Line data={chartData} options={chartOptions} />
     </div>
   );
 };
 
-export default PortfolioChart;
+export default React.memo(PortfolioChart);

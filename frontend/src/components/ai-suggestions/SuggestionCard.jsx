@@ -1,6 +1,6 @@
 import React from 'react';
 
-const SuggestionCard = ({ suggestion, onViewDetails, onDismiss }) => {
+const SuggestionCard = ({ suggestion, onViewDetails, onDismiss, onAdjustConfidence, onRecordInteraction }) => {
   const getSuggestionTypeColor = (type) => {
     switch (type) {
       case 'buy':
@@ -24,8 +24,24 @@ const SuggestionCard = ({ suggestion, onViewDetails, onDismiss }) => {
     return 'text-red-600';
   };
 
+  const confidenceValue = Number(suggestion.confidence ?? 0);
+  const priceChange = suggestion.marketContext?.changePercent;
+  const priceChangeClass =
+    priceChange >= 0 ? 'text-emerald-400' : priceChange <= -0.01 ? 'text-rose-400' : 'text-white/70';
+
+  const handleConfidenceAdjust = (delta, interactionType) => {
+    if (!onAdjustConfidence) return;
+    const current = Number.isFinite(confidenceValue) ? confidenceValue : 0;
+    const next = Math.max(0, Math.min(100, current + delta));
+    onAdjustConfidence(suggestion.id, next, interactionType);
+  };
+
+  const handleRecordInteraction = (interactionType, payload = {}) => {
+    onRecordInteraction?.(suggestion.id, interactionType, payload);
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow">
+    <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-lg shadow-black/10 hover:border-white/20 transition-all">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center">
           <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
@@ -34,7 +50,9 @@ const SuggestionCard = ({ suggestion, onViewDetails, onDismiss }) => {
             </svg>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">{suggestion.title}</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              {suggestion.title || suggestion.company || suggestion.symbol || 'AI Suggestion'}
+            </h3>
             <p className="text-sm text-gray-500">AI Generated • {new Date(suggestion.createdAt).toLocaleDateString()}</p>
           </div>
         </div>
@@ -43,6 +61,11 @@ const SuggestionCard = ({ suggestion, onViewDetails, onDismiss }) => {
           <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getSuggestionTypeColor(suggestion.type)}`}>
             {suggestion.type.toUpperCase()}
           </span>
+          {Number.isFinite(suggestion.profileMatch) && (
+            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium border border-purple-200">
+              Profile Match {suggestion.profileMatch}%
+            </span>
+          )}
           <button
             onClick={() => onDismiss(suggestion.id)}
             className="text-gray-400 hover:text-gray-600"
@@ -59,30 +82,63 @@ const SuggestionCard = ({ suggestion, onViewDetails, onDismiss }) => {
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
           <p className="text-sm font-medium text-gray-600">Confidence</p>
-          <p className={`text-lg font-semibold ${getConfidenceColor(suggestion.confidence)}`}>
-            {suggestion.confidence}%
+          <p className={`text-lg font-semibold ${getConfidenceColor(confidenceValue)}`}>
+            {Number.isFinite(confidenceValue) ? confidenceValue : '—'}%
           </p>
+          {suggestion.confidenceBreakdown && (
+            <div className="mt-2 space-y-1 text-xs text-gray-600">
+              <p>Profile fit: {Math.round(suggestion.confidenceBreakdown.profileMatch || 0)}%</p>
+              <p>Market signal: {Math.round(suggestion.confidenceBreakdown.marketSignal || 0)}%</p>
+              <p>News: {Math.round(suggestion.confidenceBreakdown.newsScore || 0)}%</p>
+            </div>
+          )}
         </div>
         <div>
           <p className="text-sm font-medium text-gray-600">Expected Impact</p>
-          <p className="text-lg font-semibold text-gray-900">{suggestion.expectedImpact}</p>
+          <p className="text-lg font-semibold text-gray-900">
+            {suggestion.expectedImpact || suggestion.expectedReturn || '—'}
+          </p>
         </div>
       </div>
 
       {suggestion.symbol && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+        <div className="mb-4 p-3 bg-white/5 border border-white/10 rounded-xl text-white">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">{suggestion.symbol}</p>
-              <p className="text-sm text-gray-600">{suggestion.companyName}</p>
+              <p className="text-sm font-medium text-white">{suggestion.symbol}</p>
+              <p className="text-sm text-white/70">{suggestion.company || suggestion.companyName}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">${suggestion.currentPrice}</p>
-              <p className={`text-sm ${suggestion.priceChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {suggestion.priceChange >= 0 ? '+' : ''}{suggestion.priceChange}%
-              </p>
+              {typeof suggestion.currentPrice === 'number' && (
+                <p className="text-sm font-semibold text-white">
+                  ${Number(suggestion.currentPrice).toFixed(2)}
+                </p>
+              )}
+              {typeof priceChange === 'number' && (
+                <p className={`text-sm font-medium ${priceChangeClass}`}>
+                  {priceChange >= 0 ? '+' : ''}
+                  {priceChange?.toFixed(2)}%
+                </p>
+              )}
             </div>
           </div>
+          {suggestion.marketContext?.previousClose && (
+            <p className="mt-2 text-xs text-white/60">
+              Prev close ${Number(suggestion.marketContext.previousClose).toFixed(2)}
+            </p>
+          )}
+        </div>
+      )}
+
+      {suggestion.news?.summary && (
+        <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-sm text-white/80">
+          <p className="font-semibold text-white mb-1">Market pulse</p>
+          <p>{suggestion.news.summary}</p>
+          {suggestion.news.sentimentLabel && (
+            <p className="mt-2 text-xs uppercase tracking-wide text-white/60">
+              Sentiment: {suggestion.news.sentimentLabel}
+            </p>
+          )}
         </div>
       )}
 
@@ -94,16 +150,25 @@ const SuggestionCard = ({ suggestion, onViewDetails, onDismiss }) => {
           >
             View Details
           </button>
-          <button className="text-gray-600 hover:text-gray-700 text-sm font-medium">
+          <button
+            className="text-gray-300 hover:text-white text-sm font-medium"
+            onClick={() => handleRecordInteraction('learn_more')}
+          >
             Learn More
           </button>
         </div>
         
         <div className="flex items-center space-x-2">
-          <button className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-full hover:bg-gray-200">
+          <button
+            className="px-3 py-1 text-xs font-medium text-white/80 bg-white/10 rounded-full hover:bg-white/20"
+            onClick={() => handleConfidenceAdjust(-15, 'not_interested')}
+          >
             Not Interested
           </button>
-          <button className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-full hover:bg-blue-700">
+          <button
+            className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-full hover:bg-blue-700"
+            onClick={() => handleConfidenceAdjust(10, 'consider')}
+          >
             Consider
           </button>
         </div>

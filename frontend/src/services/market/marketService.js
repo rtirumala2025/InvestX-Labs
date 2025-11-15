@@ -3,12 +3,16 @@
  * Provides real-time stock market data integration for InvestX Labs
  */
 
-const ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
+const ALPHA_VANTAGE_BASE_URL = process.env.REACT_APP_ALPHA_VANTAGE_BASE_URL || 'https://www.alphavantage.co/query';
 const API_KEY = process.env.REACT_APP_ALPHA_VANTAGE_API_KEY;
 
 // Cache for API responses to avoid excessive calls
 const priceCache = new Map();
 const CACHE_DURATION = 60000; // 1 minute cache
+
+// LocalStorage cache key
+const STORAGE_CACHE_KEY = 'investx_market_cache';
+const STORAGE_CACHE_DURATION = 300000; // 5 minutes for localStorage cache
 
 /**
  * Get current stock quote from Alpha Vantage
@@ -28,7 +32,7 @@ export const getQuote = async (symbol) => {
     return null;
   }
 
-  // Check cache first
+  // Check in-memory cache first
   const cacheKey = symbol.toUpperCase();
   const cached = priceCache.get(cacheKey);
   const cacheAge = cached ? Date.now() - cached.timestamp : null;
@@ -40,6 +44,23 @@ export const getQuote = async (symbol) => {
     console.log('📈 [MarketService] ⏰ Cache MISS for', symbol, '- stale data, age:', Math.round(cacheAge / 1000), 'seconds');
   } else {
     console.log('📈 [MarketService] 🆕 Cache MISS for', symbol, '- no cached data');
+  }
+
+  // Check localStorage cache as fallback
+  try {
+    const storedCache = localStorage.getItem(STORAGE_CACHE_KEY);
+    if (storedCache) {
+      const cacheData = JSON.parse(storedCache);
+      const cachedQuote = cacheData[cacheKey];
+      if (cachedQuote && (Date.now() - cachedQuote.timestamp) < STORAGE_CACHE_DURATION) {
+        console.log('📈 [MarketService] 💾 localStorage Cache HIT for', symbol);
+        // Restore to in-memory cache
+        priceCache.set(cacheKey, cachedQuote);
+        return cachedQuote.data;
+      }
+    }
+  } catch (storageError) {
+    console.warn('📈 [MarketService] Error reading localStorage cache:', storageError);
   }
 
   try {
@@ -96,11 +117,29 @@ export const getQuote = async (symbol) => {
       previousClose: transformedQuote.previousClose
     });
 
-    // Cache the result
-    priceCache.set(cacheKey, {
+    // Cache the result in memory
+    const cacheEntry = {
       data: transformedQuote,
       timestamp: Date.now()
-    });
+    };
+    priceCache.set(cacheKey, cacheEntry);
+    
+    // Also cache in localStorage
+    try {
+      const storedCache = localStorage.getItem(STORAGE_CACHE_KEY);
+      const cacheData = storedCache ? JSON.parse(storedCache) : {};
+      cacheData[cacheKey] = cacheEntry;
+      // Keep only last 50 entries to avoid storage bloat
+      const keys = Object.keys(cacheData);
+      if (keys.length > 50) {
+        // Remove oldest entries
+        const sortedKeys = keys.sort((a, b) => (cacheData[a].timestamp || 0) - (cacheData[b].timestamp || 0));
+        sortedKeys.slice(0, keys.length - 50).forEach(key => delete cacheData[key]);
+      }
+      localStorage.setItem(STORAGE_CACHE_KEY, JSON.stringify(cacheData));
+    } catch (storageError) {
+      console.warn('📈 [MarketService] Error writing to localStorage cache:', storageError);
+    }
     
     console.log('📈 [MarketService] 💾 Cached quote for', symbol, '- cache size:', priceCache.size);
 
@@ -108,11 +147,31 @@ export const getQuote = async (symbol) => {
   } catch (error) {
     console.error('📈 [MarketService] ❌ Error fetching quote for', symbol, ':', error);
     
-    // Try to return cached data as fallback
+    // Try to return cached data as fallback (in-memory first)
     const cached = priceCache.get(cacheKey);
     if (cached) {
-      console.log('📈 [MarketService] 🔄 Returning stale cached data as fallback for', symbol);
+      console.log('📈 [MarketService] 🔄 Returning stale in-memory cached data as fallback for', symbol);
       return cached.data;
+    }
+    
+    // Try localStorage cache as last resort
+    try {
+      const storedCache = localStorage.getItem(STORAGE_CACHE_KEY);
+      if (storedCache) {
+        const cacheData = JSON.parse(storedCache);
+        const cachedQuote = cacheData[cacheKey];
+        if (cachedQuote) {
+          console.log('📈 [MarketService] 🔄 Returning stale localStorage cached data as fallback for', symbol, '(may be outdated)');
+          // Add warning that data may be stale
+          return {
+            ...cachedQuote.data,
+            _stale: true,
+            _staleWarning: 'Market data may be outdated. Please refresh.'
+          };
+        }
+      }
+    } catch (storageError) {
+      console.warn('📈 [MarketService] Error reading localStorage cache on error fallback:', storageError);
     }
     
     return null;

@@ -207,23 +207,42 @@ export const calculatePortfolioCorrelation = (holdings, correlationMatrix) => {
  * @param {Object} marketData - Market data
  * @returns {Object} Performance metrics
  */
-export const calculatePerformanceMetrics = (holdings, marketData = {}) => {
+export const calculatePerformanceMetrics = (holdings, marketData = {}, transactions = [], historicalData = []) => {
   const totalValue = calculateTotalValue(holdings);
   const totalCostBasis = calculateTotalCostBasis(holdings);
   const totalGainLoss = calculateTotalGainLoss(holdings);
   const totalGainLossPercentage = calculateTotalGainLossPercentage(holdings);
+  
+  // Calculate ROI
+  const roi = calculateROI(holdings, transactions);
+  
+  // Calculate benchmark comparison
+  const benchmarkComparison = compareToBenchmark(holdings, totalGainLossPercentage);
+  
+  // Calculate historical performance if data available
+  const historicalPerformance = calculateHistoricalPerformance(historicalData);
+  
+  // Generate sector allocation chart data
+  const sectorAllocation = calculateSectorAllocation(holdings);
+  const sectorChartData = generateSectorAllocationChartData(sectorAllocation);
   
   return {
     totalValue,
     totalCostBasis,
     totalGainLoss,
     totalGainLossPercentage,
-    sectorAllocation: calculateSectorAllocation(holdings),
+    roi: roi.roi,
+    roiPercentage: roi.roiPercentage,
+    annualizedReturn: roi.annualizedReturn,
+    sectorAllocation,
+    sectorChartData,
     assetTypeAllocation: calculateAssetTypeAllocation(holdings),
     portfolioBeta: calculatePortfolioBeta(holdings, marketData),
     sharpeRatio: calculateSharpeRatio(holdings),
     volatility: calculatePortfolioVolatility(holdings),
     diversificationScore: calculateDiversificationScore(holdings),
+    benchmarkComparison,
+    historicalPerformance,
     lastUpdated: new Date().toISOString()
   };
 };
@@ -244,6 +263,195 @@ export const calculateDiversificationScore = (holdings) => {
   const holdingCountScore = Math.min(20, holdings.length * 2);
   
   return sectorScore + assetTypeScore + holdingCountScore;
+};
+
+/**
+ * Calculate ROI (Return on Investment) with time-weighted returns
+ * @param {Array} holdings - Portfolio holdings
+ * @param {Array} transactions - Transaction history
+ * @param {Date} startDate - Start date for ROI calculation
+ * @returns {Object} ROI metrics
+ */
+export const calculateROI = (holdings, transactions = [], startDate = null) => {
+  if (!holdings || holdings.length === 0) {
+    return {
+      roi: 0,
+      roiPercentage: 0,
+      timeWeightedReturn: 0,
+      annualizedReturn: 0
+    };
+  }
+
+  const totalValue = calculateTotalValue(holdings);
+  const totalCostBasis = calculateTotalCostBasis(holdings);
+  const totalGainLoss = totalValue - totalCostBasis;
+  const roiPercentage = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
+
+  // Calculate time-weighted return if we have transaction history
+  let timeWeightedReturn = 0;
+  let annualizedReturn = 0;
+
+  if (transactions.length > 0 && startDate) {
+    const sortedTransactions = [...transactions]
+      .filter(tx => tx.transaction_date)
+      .sort((a, b) => new Date(a.transaction_date) - new Date(b.transaction_date));
+
+    if (sortedTransactions.length > 0) {
+      const firstDate = new Date(sortedTransactions[0].transaction_date);
+      const lastDate = new Date();
+      const daysDiff = (lastDate - firstDate) / (1000 * 60 * 60 * 24);
+      const years = daysDiff / 365;
+
+      if (years > 0 && totalCostBasis > 0) {
+        // Simple annualized return calculation
+        const totalReturn = totalValue / totalCostBasis;
+        annualizedReturn = (Math.pow(totalReturn, 1 / years) - 1) * 100;
+        timeWeightedReturn = roiPercentage;
+      }
+    }
+  }
+
+  return {
+    roi: totalGainLoss,
+    roiPercentage,
+    timeWeightedReturn,
+    annualizedReturn: annualizedReturn || roiPercentage
+  };
+};
+
+/**
+ * Compare portfolio to benchmark (S&P 500)
+ * @param {Array} holdings - Portfolio holdings
+ * @param {number} portfolioReturn - Portfolio return percentage
+ * @param {number} benchmarkReturn - Benchmark return percentage (default S&P 500 ~10% annual)
+ * @returns {Object} Benchmark comparison
+ */
+export const compareToBenchmark = (holdings, portfolioReturn, benchmarkReturn = 10) => {
+  if (!holdings || holdings.length === 0) {
+    return {
+      portfolioReturn: 0,
+      benchmarkReturn,
+      outperformance: 0,
+      alpha: 0,
+      relativePerformance: 'neutral'
+    };
+  }
+
+  const outperformance = portfolioReturn - benchmarkReturn;
+  const alpha = outperformance; // Simplified alpha calculation
+  const relativePerformance = outperformance > 2 ? 'outperforming' : outperformance < -2 ? 'underperforming' : 'neutral';
+
+  return {
+    portfolioReturn,
+    benchmarkReturn,
+    outperformance,
+    alpha,
+    relativePerformance,
+    benchmarkName: 'S&P 500'
+  };
+};
+
+/**
+ * Calculate historical performance metrics
+ * @param {Array} historicalData - Historical portfolio value data points
+ * @returns {Object} Historical performance metrics
+ */
+export const calculateHistoricalPerformance = (historicalData = []) => {
+  if (!historicalData || historicalData.length < 2) {
+    return {
+      totalReturn: 0,
+      bestMonth: 0,
+      worstMonth: 0,
+      averageMonthlyReturn: 0,
+      volatility: 0,
+      maxDrawdown: 0
+    };
+  }
+
+  const sortedData = [...historicalData]
+    .filter(point => point.date && point.value)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  if (sortedData.length < 2) {
+    return {
+      totalReturn: 0,
+      bestMonth: 0,
+      worstMonth: 0,
+      averageMonthlyReturn: 0,
+      volatility: 0,
+      maxDrawdown: 0
+    };
+  }
+
+  const firstValue = sortedData[0].value;
+  const lastValue = sortedData[sortedData.length - 1].value;
+  const totalReturn = firstValue > 0 ? ((lastValue - firstValue) / firstValue) * 100 : 0;
+
+  // Calculate monthly returns
+  const monthlyReturns = [];
+  let peak = firstValue;
+  let maxDrawdown = 0;
+
+  for (let i = 1; i < sortedData.length; i++) {
+    const prevValue = sortedData[i - 1].value;
+    const currValue = sortedData[i].value;
+    const monthlyReturn = prevValue > 0 ? ((currValue - prevValue) / prevValue) * 100 : 0;
+    monthlyReturns.push(monthlyReturn);
+
+    // Track peak and drawdown
+    if (currValue > peak) {
+      peak = currValue;
+    }
+    const drawdown = peak > 0 ? ((currValue - peak) / peak) * 100 : 0;
+    if (drawdown < maxDrawdown) {
+      maxDrawdown = drawdown;
+    }
+  }
+
+  const bestMonth = monthlyReturns.length > 0 ? Math.max(...monthlyReturns) : 0;
+  const worstMonth = monthlyReturns.length > 0 ? Math.min(...monthlyReturns) : 0;
+  const averageMonthlyReturn = monthlyReturns.length > 0
+    ? monthlyReturns.reduce((sum, ret) => sum + ret, 0) / monthlyReturns.length
+    : 0;
+
+  // Calculate volatility (standard deviation of returns)
+  const variance = monthlyReturns.length > 0
+    ? monthlyReturns.reduce((sum, ret) => sum + Math.pow(ret - averageMonthlyReturn, 2), 0) / monthlyReturns.length
+    : 0;
+  const volatility = Math.sqrt(variance);
+
+  return {
+    totalReturn,
+    bestMonth,
+    worstMonth,
+    averageMonthlyReturn,
+    volatility,
+    maxDrawdown: Math.abs(maxDrawdown)
+  };
+};
+
+/**
+ * Generate sector allocation chart data
+ * @param {Object} sectorAllocation - Sector allocation percentages
+ * @returns {Array} Chart data for sector allocation
+ */
+export const generateSectorAllocationChartData = (sectorAllocation) => {
+  if (!sectorAllocation || Object.keys(sectorAllocation).length === 0) {
+    return [];
+  }
+
+  const colors = [
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+    '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
+  ];
+
+  return Object.entries(sectorAllocation)
+    .sort((a, b) => b[1] - a[1])
+    .map(([sector, percentage], index) => ({
+      name: sector,
+      value: percentage,
+      color: colors[index % colors.length]
+    }));
 };
 
 /**

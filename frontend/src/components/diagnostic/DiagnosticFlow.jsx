@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useApp } from '../../contexts/AppContext';
 import GlassCard from '../ui/GlassCard';
 import GlassButton from '../ui/GlassButton';
-import { useFirestore } from '../../hooks/useFirestore';
+import { supabase } from '../../services/supabase/config';
+import { useAuth } from '../../hooks/useAuth';
+import { useAchievements } from '../../contexts/AchievementsContext';
 
 const DiagnosticFlow = () => {
+  const { currentUser } = useAuth();
+  const { queueToast } = useApp();
+  const { addAchievement } = useAchievements();
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(false);
-  const { addDocument } = useFirestore('userDiagnostics');
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  const steps = [
+  const steps = useMemo(() => [
     {
       id: 'goals',
       title: 'What are your main money goals?',
@@ -49,7 +55,7 @@ const DiagnosticFlow = () => {
         { id: 'retirement', label: 'Planning for retirement' }
       ]
     }
-  ];
+  ], []);
 
   const handleAnswer = (stepId, answer) => {
     setAnswers(prev => ({
@@ -73,25 +79,51 @@ const DiagnosticFlow = () => {
   };
 
   const handleComplete = async () => {
+    if (!currentUser?.id) {
+      queueToast('Please sign in to complete the diagnostic.', 'error');
+      return;
+    }
+
     setLoading(true);
+    setError(null);
+
     try {
-      // Save diagnostic results
-      await addDocument({
-        ...answers,
-        completedAt: new Date(),
-        userId: 'current-user' // This would come from auth context
-      });
-      
-      // Navigate to personalized dashboard
-      navigate('/dashboard', { 
-        state: { 
+      const payload = {
+        user_id: currentUser.id,
+        responses: answers,
+        completed_at: new Date().toISOString(),
+      };
+
+      const { error: insertError } = await supabase
+        .from('user_diagnostics')
+        .insert(payload);
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      queueToast('Diagnostic complete! We’ve saved your responses.', 'success');
+
+      await addAchievement(
+        'diagnostic_complete',
+        {
+          description: 'Completed the financial diagnostic assessment',
+          responses: answers,
+        },
+        { xpReward: 120, allowDuplicates: false }
+      );
+
+      navigate('/dashboard', {
+        state: {
           diagnosticComplete: true,
-          answers 
-        } 
+          answers,
+        },
       });
-    } catch (error) {
-      console.error('Error saving diagnostic:', error);
-      // Handle error gracefully
+    } catch (submissionError) {
+      console.error('Error saving diagnostic:', submissionError);
+      const message = submissionError?.message || 'Unable to save diagnostic responses. Please try again.';
+      setError(message);
+      queueToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -149,6 +181,12 @@ const DiagnosticFlow = () => {
                 {currentStepData.subtitle}
               </p>
             </div>
+
+            {error && (
+              <div className="mb-4 p-4 rounded-lg border border-red-500/30 bg-red-500/10 text-red-200 text-sm">
+                ⚠️ {error}
+              </div>
+            )}
 
             {currentStepData.type === 'rating' ? (
               <div className="space-y-6">
