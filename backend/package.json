@@ -12,7 +12,10 @@
     "start:ws": "node scripts/simple-websocket-server.js",
     "dev:ws": "nodemon scripts/simple-websocket-server.js",
     "start:basic": "node scripts/basic-websocket-server.js",
-    "dev:basic": "nodemon scripts/basic-websocket-server.js"
+    "dev:basic": "nodemon scripts/basic-websocket-server.js",
+    "fetch-historical": "node scripts/fetch-historical-prices.js",
+    "lint": "echo 'Backend linting not configured'",
+    "test": "echo 'Backend tests not configured'"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.1",

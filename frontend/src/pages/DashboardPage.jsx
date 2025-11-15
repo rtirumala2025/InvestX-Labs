@@ -337,6 +337,23 @@ function DashboardPageContent() {
           <MarketTicker />
         </motion.div>
         
+        {/* Empty State for No Portfolio */}
+        {hasNoData && (
+          <motion.div variants={fadeIn} initial="hidden" animate="visible" className="flex justify-center py-20">
+            <GlassCard variant="default" padding="large" className="max-w-md text-center">
+              <div className="text-6xl mb-4">📊</div>
+              <h2 className="text-2xl font-bold text-white mb-3">Start Building Your Portfolio</h2>
+              <p className="text-white/70 mb-6">
+                You haven't added any investments yet. Add your first holding to track your portfolio performance and see insights.
+              </p>
+              <GlassButton as={Link} to="/portfolio" variant="primary" size="default">
+                Add Your First Investment
+              </GlassButton>
+            </GlassCard>
+          </motion.div>
+        )}
+
+        {!hasNoData && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-4 lg:space-y-6">
@@ -517,6 +534,7 @@ function DashboardPageContent() {
             </motion.div>
           </div>
         </div>
+        )}
       </main>
     </div>
   );

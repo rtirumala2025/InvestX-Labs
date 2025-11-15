@@ -277,12 +277,33 @@ const EducationPage = () => {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-semibold text-red-300 mb-1">We ran into an issue loading your education content.</h3>
-                  <p className="text-sm text-red-200/80">{error}</p>
+                  <p className="text-sm text-red-200/80">{typeof error === 'string' ? error : error.message || 'An error occurred'}</p>
                 </div>
                 <GlassButton variant="primary" onClick={refreshEducation} disabled={loading}>
                   Try Again
                 </GlassButton>
               </div>
+            </GlassCard>
+          </motion.div>
+        )}
+
+        {/* Empty State for No Courses */}
+        {!loading && !error && (!courses || courses.length === 0) && (
+          <motion.div variants={fadeIn} initial="hidden" animate="visible" className="flex justify-center py-20">
+            <GlassCard variant="default" padding="large" className="max-w-md text-center">
+              <div className="text-6xl mb-4">📚</div>
+              <h2 className="text-2xl font-bold text-white mb-3">Education Content Coming Soon</h2>
+              <p className="text-white/70 mb-6">
+                {offline 
+                  ? "Education content is not available in offline mode. Please check your connection."
+                  : "We're preparing exciting courses for you. Check back soon for investment education content."
+                }
+              </p>
+              {offline && (
+                <GlassButton variant="primary" onClick={refreshEducation} disabled={loading}>
+                  Retry Connection
+                </GlassButton>
+              )}
             </GlassCard>
           </motion.div>
         )}
