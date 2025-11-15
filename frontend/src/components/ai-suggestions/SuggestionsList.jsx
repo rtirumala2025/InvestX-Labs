@@ -194,4 +194,4 @@ const SuggestionsList = ({
   );
 };
 
-export default SuggestionsList;
+export default React.memo(SuggestionsList);

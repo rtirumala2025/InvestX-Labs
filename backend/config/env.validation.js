@@ -8,6 +8,7 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import logger from '../utils/logger.js';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +40,11 @@ const REQUIRED_ENV_VARS = {
     description: 'Alpha Vantage API key for real-time market data',
     example: 'YOUR_ALPHA_VANTAGE_API_KEY',
   },
+  ALPHA_VANTAGE_KEY: {
+    required: false,
+    description: 'Alias for Alpha Vantage API key',
+    example: 'YOUR_ALPHA_VANTAGE_API_KEY',
+  },
   
   // OpenRouter Configuration (for AI features)
   OPENROUTER_API_KEY: {
@@ -51,14 +57,19 @@ const REQUIRED_ENV_VARS = {
   PORT: {
     required: false,
     description: 'Server port',
-    example: '3001',
-    default: '3001',
+    example: '5001',
+    default: '5001',
   },
   NODE_ENV: {
     required: false,
     description: 'Node environment',
     example: 'development',
     default: 'development',
+  },
+  APP_URL: {
+    required: false,
+    description: 'Public application URL for referer headers',
+    example: 'https://app.investxlabs.com',
   },
   
   // MCP Configuration
@@ -67,6 +78,18 @@ const REQUIRED_ENV_VARS = {
     description: 'MCP server port',
     example: '3002',
     default: '3002',
+  },
+  MCP_ENABLED: {
+    required: false,
+    description: 'Enable MCP server',
+    example: 'false',
+    default: 'false',
+  },
+  MCP_ENABLED: {
+    required: false,
+    description: 'Feature flag to enable Model Context Protocol (MCP) server',
+    example: 'false',
+    default: 'false',
   },
 };
 
@@ -82,14 +105,16 @@ const validationResults = {
  * Validate environment variables
  */
 export function validateEnv() {
-  console.log('\n🔍 Validating environment variables...\n');
+  const isProd = (process.env.NODE_ENV || 'development') === 'production';
+  logger.info('🔍 Validating environment variables...');
   
   Object.entries(REQUIRED_ENV_VARS).forEach(([key, config]) => {
     const value = process.env[key] ||
       (key === 'SUPABASE_SERVICE_ROLE_KEY' ? process.env.SUPABASE_SERVICE_KEY : undefined);
     
     if (!value) {
-      if (config.required) {
+      const isCritical = config.required || (isProd && ['SUPABASE_URL','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','ALPHA_VANTAGE_API_KEY','ALPHA_VANTAGE_KEY','APP_URL'].includes(key));
+      if (isCritical) {
         validationResults.valid = false;
         validationResults.missing.push(key);
         validationResults.errors.push({
@@ -98,48 +123,46 @@ export function validateEnv() {
           description: config.description,
           example: config.example,
         });
-        console.error(`❌ ${key}: MISSING (required)`);
-        console.error(`   Description: ${config.description}`);
-        console.error(`   Example: ${config.example}\n`);
+        logger.error(`❌ ${key}: MISSING${isProd ? ' (required in production)' : ' (required)'}`);
+        logger.error(`   Description: ${config.description}`);
+        if (config.example) logger.error(`   Example: ${config.example}`);
       } else {
         if (config.default) {
           process.env[key] = config.default;
-          console.log(`⚠️  ${key}: Using default value (${config.default})`);
+          logger.warn(`⚠️  ${key}: Using default value (${config.default})`);
         } else {
           validationResults.warnings.push({
             key,
             message: `Optional environment variable not set: ${key}`,
             description: config.description,
           });
-          console.warn(`⚠️  ${key}: Not set (optional)`);
+          logger.warn(`⚠️  ${key}: Not set (optional)`);
         }
       }
     } else {
       // Mask sensitive values in logs
       const maskedValue = key.includes('KEY') || key.includes('SECRET')
-        ? `${value.substring(0, 10)}...`
+        ? `${value.substring(0, 6)}...`
         : value;
-      console.log(`✅ ${key}: ${maskedValue}`);
+      logger.info(`✅ ${key}: ${maskedValue}`);
     }
   });
   
-  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-  
   if (!validationResults.valid) {
-    console.error('❌ Environment validation FAILED\n');
-    console.error('Missing required variables:');
+    logger.error('❌ Environment validation FAILED');
+    logger.error('Missing required variables:');
     validationResults.missing.forEach(key => {
-      console.error(`  - ${key}`);
+      logger.error(`  - ${key}`);
     });
-    console.error('\nPlease set these variables in your .env file\n');
+    logger.error('Please set these variables in your .env file');
     return false;
   }
   
   if (validationResults.warnings.length > 0) {
-    console.warn(`⚠️  ${validationResults.warnings.length} optional variables not set\n`);
+    logger.warn(`⚠️  ${validationResults.warnings.length} optional variables not set`);
   }
   
-  console.log('✅ Environment validation PASSED\n');
+  logger.info('✅ Environment validation PASSED');
   return true;
 }
 
@@ -154,16 +177,14 @@ export function getValidationResults() {
  * Print environment setup instructions
  */
 export function printSetupInstructions() {
-  console.log('\n📝 Environment Setup Instructions\n');
-  console.log('Create a .env file in the backend directory with the following variables:\n');
+  logger.info('📝 Environment Setup Instructions');
+  logger.info('Create a .env file in the backend directory with the following variables:');
   
   Object.entries(REQUIRED_ENV_VARS).forEach(([key, config]) => {
     const required = config.required ? '(REQUIRED)' : '(optional)';
-    console.log(`${key}=${config.example} ${required}`);
-    console.log(`# ${config.description}\n`);
+    logger.info(`${key}=${config.example} ${required}`);
+    logger.info(`# ${config.description}`);
   });
-  
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }
 
 /**
@@ -171,10 +192,11 @@ export function printSetupInstructions() {
  */
 export function validateOrExit() {
   const isValid = validateEnv();
+  const isProd = (process.env.NODE_ENV || 'development') === 'production';
   
-  if (!isValid) {
+  if (!isValid && isProd) {
     printSetupInstructions();
-    console.error('❌ Cannot start server without required environment variables\n');
+    logger.error('❌ Cannot start server without required environment variables');
     process.exit(1);
   }
 }

@@ -5,7 +5,9 @@ import {
   updateSuggestionConfidence,
   recordSuggestionInteraction,
   getSuggestionLogs,
-  chat
+  chat,
+  getRecommendationExplanation,
+  computeAnalytics
 } from '../controllers/aiController.js';
 
 const router = express.Router();
@@ -16,5 +18,7 @@ router.patch('/suggestions/:logId/confidence', updateSuggestionConfidence);
 router.post('/suggestions/:logId/interactions', recordSuggestionInteraction);
 router.get('/suggestions/logs/:userId', getSuggestionLogs);
 router.post('/chat', chat);
+router.get('/recommendations/:recommendationId/explanation', getRecommendationExplanation);
+router.post('/analytics', computeAnalytics);
 
 export default router;

@@ -14,6 +14,18 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 async function startMCPServer() {
   try {
+    const enabled = String(process.env.MCP_ENABLED || 'false').toLowerCase() === 'true';
+    const isProduction = (process.env.NODE_ENV || 'development') === 'production';
+
+    if (!enabled) {
+      logger.info('⚙️ MCP server disabled by feature flag (MCP_ENABLED=false). Skipping start.');
+      return;
+    }
+    if (isProduction) {
+      logger.info('🏭 Production environment detected. MCP server will not start in production.');
+      return;
+    }
+
     logger.info('🚀 Starting MCP Server...');
     
     // Initialize the MCP server

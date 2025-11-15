@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase/config';
 import { calculatePerformanceMetrics } from '../services/portfolio/portfolioCalculations';
+import { computeServerAnalytics } from '../services/portfolio/analyticsService';
 import { trackPortfolioPerformance } from '../services/portfolio/performanceTracking';
 import { analyzeDiversification } from '../services/portfolio/diversificationAnalysis';
 import { getPortfolioMarketData } from '../services/market/marketData';
@@ -380,8 +381,23 @@ export const usePortfolio = () => {
       }
       setError(null);
 
-      // Calculate performance metrics
-      const performanceMetrics = calculatePerformanceMetrics(holdings, marketData);
+      // Prefer server-side analytics; fallback to client-side calculations
+      let performanceMetrics = await computeServerAnalytics({
+        holdings: holdings.map(h => ({
+          symbol: h.symbol,
+          shares: h.shares,
+          currentPrice: h.current_price ?? h.currentPrice ?? h.purchase_price,
+          costBasis: h.purchase_price ?? h.costBasis ?? h.avgCost,
+          sector: h.sector,
+          assetType: h.asset_type
+        })),
+        transactions,
+        marketData
+      });
+
+      if (!performanceMetrics) {
+        performanceMetrics = calculatePerformanceMetrics(holdings, marketData);
+      }
       console.log('📊 [usePortfolio] Performance metrics calculated:', {
         totalValue: performanceMetrics.totalValue,
         totalGainLoss: performanceMetrics.totalGainLoss,

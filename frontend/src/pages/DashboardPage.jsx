@@ -245,10 +245,10 @@ function DashboardPageContent() {
     console.log('🏠 [DashboardPage] ❌ Showing error state:', error);
     return (
       <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-md px-4">
           <div className="text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold mb-2">Unable to Load Dashboard</h2>
-          <p className="text-gray-300 mb-4">{error}</p>
+          <p className="text-gray-300 mb-6">{typeof error === 'string' ? error : error.message || 'An error occurred while loading your dashboard'}</p>
           <GlassButton onClick={() => window.location.reload()} variant="primary">
             Try Again
           </GlassButton>
@@ -256,6 +256,9 @@ function DashboardPageContent() {
       </div>
     );
   }
+
+  // Empty state when no portfolio data
+  const hasNoData = !loading && !error && (!portfolio || !holdings || holdings.length === 0);
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">

@@ -190,13 +190,14 @@ const getAIRecommendations = async (userProfile, options = {}) => {
 };
 
 /**
- * Get explanation for a specific recommendation using Supabase RPC
+ * Get explanation for a specific recommendation.
+ * Tries backend endpoint first; falls back to Supabase RPC if backend unavailable.
  * @param {string} recommendationId - ID of the recommendation
  * @param {string} userId - ID of the user (default: 'anonymous')
  * @param {Object} options - Additional options
  * @param {boolean} options.useCache - Whether to use cache (default: true)
  * @param {number} options.retries - Number of retry attempts (default: MAX_RETRIES)
- * @returns {Promise<string>} - Explanation text
+ * @returns {Promise<string|Object>} - Explanation payload or text
  */
 const getRecommendationExplanation = async (recommendationId, userId = 'anonymous', options = {}) => {
   const { 
@@ -207,7 +208,6 @@ const getRecommendationExplanation = async (recommendationId, userId = 'anonymou
   
   const cacheKey = `ai:explanation:${recommendationId}:${userId}`;
   
-  // Return cached explanation if available and cache is enabled
   if (useCache) {
     const cached = getCachedData(cacheKey);
     if (cached) {
@@ -216,10 +216,22 @@ const getRecommendationExplanation = async (recommendationId, userId = 'anonymou
     }
   }
   
+  // Attempt 1: Backend API
   try {
-    logInfo(`Fetching explanation for recommendation ${recommendationId}`);
-    
-    // Call the Supabase RPC function
+    const { data } = await apiClient.get(`/recommendations/${encodeURIComponent(recommendationId)}/explanation`, {
+      params: { userId }
+    });
+    const explanation = data?.data || data?.explanation || data;
+    if (useCache && explanation) {
+      setCachedData(cacheKey, explanation, cacheTtl);
+    }
+    return explanation;
+  } catch (backendErr) {
+    logError('Backend explanation fetch failed, falling back to Supabase RPC', backendErr);
+  }
+
+  // Attempt 2: Direct Supabase RPC fallback
+  try {
     const { data, error } = await supabase
       .rpc('get_recommendation_explanation', { 
         recommendation_id: recommendationId,
@@ -227,26 +239,18 @@ const getRecommendationExplanation = async (recommendationId, userId = 'anonymou
       });
     
     if (error) throw error;
-    
-    const explanation = data?.explanation || 'No explanation available';
-    
-    // Cache the successful response
+    const explanation = data?.explanation || data || 'No explanation available';
     if (useCache) {
       setCachedData(cacheKey, explanation, cacheTtl);
     }
-    
     return explanation;
   } catch (error) {
     logError(`Error fetching explanation for recommendation ${recommendationId}:`, error);
-    
-    // Return cached explanation if available, even if it's stale
     const cached = getCachedData(cacheKey);
     if (cached) {
       logInfo(`Returning stale cached explanation for recommendation ${recommendationId}`);
       return cached;
     }
-    
-    // Return a default explanation in case of error
     return 'Unable to load explanation at this time. Please try again later.';
   }
 };

@@ -193,6 +193,135 @@ class DataInsights {
       throw error;
     }
   }
+
+  async getTimeSeries(symbol, interval = 'daily', fullOutput = false) {
+    const requestId = `req_${Date.now()}`;
+    const logContext = { symbol, interval, fullOutput, requestId };
+    
+    logger.debug('Fetching time series data', logContext);
+    
+    try {
+      // Check cache first
+      if (this.supabase) {
+        const cacheKey = `TIME_SERIES_${interval.toUpperCase()}_${symbol}`;
+        const cachedResponse = await exponentialBackoff(
+          () => this.supabase
+            .from('market_cache')
+            .select('data, expires_at')
+            .eq('key', cacheKey)
+            .gt('expires_at', new Date().toISOString())
+            .maybeSingle(),
+          3,
+          1000,
+          (error) => {
+            logger.warn('Supabase cache query failed, retrying...', {
+              ...logContext,
+              error: error.message
+            });
+            return true;
+          }
+        );
+
+        if (cachedResponse?.data) {
+          logger.debug('Returning cached time series data', {
+            ...logContext,
+            cacheHit: true
+          });
+          const timeSeries = cachedResponse.data.data;
+          // Extract time series data (format varies by interval)
+          const timeSeriesKey = Object.keys(timeSeries).find(key => 
+            key.includes('Time Series') || key.includes('Meta Data')
+          );
+          if (timeSeriesKey && timeSeriesKey.includes('Time Series')) {
+            return timeSeries[timeSeriesKey];
+          }
+          // Fallback: return first non-Meta Data key
+          const dataKey = Object.keys(timeSeries).find(key => 
+            !key.includes('Meta Data') && !key.includes('Information') && !key.includes('Note')
+          );
+          return timeSeries[dataKey] || timeSeries;
+        }
+      }
+
+      // Fetch from Alpha Vantage
+      const functionType = `TIME_SERIES_${interval.toUpperCase()}`.replace('DAILY', 'DAILY');
+      const outputsize = fullOutput ? 'full' : 'compact';
+      
+      const params = new URLSearchParams({
+        function: functionType,
+        symbol,
+        apikey: this.ALPHA_VANTAGE_KEY,
+        datatype: 'json',
+        outputsize
+      });
+
+      const fetchedData = await exponentialBackoff(
+        async () => {
+          const res = await fetch(`${this.ALPHA_VANTAGE_URL}?${params}`);
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+          return res.json();
+        },
+        3,
+        1000,
+        (error) => {
+          logger.warn('Alpha Vantage API request failed, retrying...', {
+            ...logContext,
+            error: error.message
+          });
+          return true;
+        }
+      );
+
+      if (fetchedData?.Information && fetchedData.Information.includes('API call frequency')) {
+        throw new Error('Alpha Vantage API rate limit exceeded');
+      }
+
+      // Cache the result
+      const expiresAt = new Date(Date.now() + CACHE_TTL);
+      if (this.supabase) {
+        try {
+          const cacheKey = `TIME_SERIES_${interval.toUpperCase()}_${symbol}`;
+          const { error } = await this.supabase
+            .from('market_cache')
+            .upsert({
+              key: cacheKey,
+              data: fetchedData,
+              expires_at: expiresAt.toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (error) throw error;
+        } catch (error) {
+          logger.error('Error caching time series data', {
+            ...logContext,
+            error: error.message
+          });
+        }
+      }
+
+      // Extract time series data
+      const timeSeriesKey = Object.keys(fetchedData).find(key => 
+        key.includes('Time Series') || (key.includes('Meta Data') && Object.keys(fetchedData).length > 1)
+      );
+      
+      if (timeSeriesKey && timeSeriesKey.includes('Time Series')) {
+        return fetchedData[timeSeriesKey];
+      }
+      
+      // Fallback: return first non-Meta Data key
+      const dataKey = Object.keys(fetchedData).find(key => 
+        !key.includes('Meta Data') && !key.includes('Information') && !key.includes('Note')
+      );
+      
+      return fetchedData[dataKey] || null;
+    } catch (error) {
+      logger.error('Error getting time series:', error);
+      throw error;
+    }
+  }
 }
 
 // Create a singleton instance

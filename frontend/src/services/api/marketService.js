@@ -195,19 +195,65 @@ const searchStocks = async (query, options = {}) => {
  * @param {Object} options - Date range options
  * @param {string} [options.startDate] - Start date (YYYY-MM-DD)
  * @param {string} [options.endDate] - End date (YYYY-MM-DD)
+ * @param {string} [options.interval='daily'] - Interval (daily, weekly, monthly)
  * @param {boolean} [options.useCache=true] - Whether to use cache
  * @returns {Promise<Array>} Historical price data
  */
 const getHistoricalData = async (symbol, options = {}) => {
-  const { useCache = true, ...params } = options;
+  const { useCache = true, interval = 'daily', startDate, endDate } = options;
   
   try {
-    const response = await supabase
-      .rpc('get_historical_data', { symbol, ...params });
+    // First try Supabase RPC function (from market_history table)
+    if (supabase) {
+      const { data: cachedData, error: rpcError } = await supabase
+        .rpc('get_market_history', {
+          p_symbol: symbol.toUpperCase(),
+          p_start_date: startDate || null,
+          p_end_date: endDate || null,
+          p_interval: interval,
+          p_limit: 1000
+        });
+      
+      if (!rpcError && cachedData && cachedData.length > 0) {
+        logInfo(`Returning historical data from Supabase for ${symbol}`);
+        return cachedData.map(point => ({
+          date: point.date,
+          open: parseFloat(point.open),
+          high: parseFloat(point.high),
+          low: parseFloat(point.low),
+          close: parseFloat(point.close),
+          volume: parseInt(point.volume, 10)
+        }));
+      }
+    }
     
-    return response.data;
+    // Fallback to API endpoint
+    const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+    const response = await fetch(
+      `${apiBaseUrl}/api/market/historical/${symbol}?interval=${interval}${startDate ? `&startDate=${startDate}` : ''}${endDate ? `&endDate=${endDate}` : ''}`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.success && result.data?.dataPoints) {
+      logInfo(`Returning historical data from API for ${symbol}`);
+      return result.data.dataPoints.map(point => ({
+        date: point.date,
+        open: parseFloat(point.open),
+        high: parseFloat(point.high),
+        low: parseFloat(point.low),
+        close: parseFloat(point.close),
+        volume: parseInt(point.volume, 10)
+      }));
+    }
+    
+    return [];
   } catch (error) {
-    console.error(`Error fetching historical data for ${symbol}:`, error);
+    logError(`Error fetching historical data for ${symbol}:`, error);
     
     // Return empty array in case of error
     return [];

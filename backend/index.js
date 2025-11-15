@@ -11,8 +11,12 @@ import marketRoutes from './routes/market.js';
 import educationRoutes from './routes/education.js';
 import clubsRoutes from './routes/clubs.js';
 import logger from './utils/logger.js';
+import { validateOrExit } from './config/env.validation.js';
 
 dotenv.config();
+
+// Validate environment (hard-fail only in production)
+validateOrExit();
 
 const app = express();
 const PORT = process.env.PORT || 5001;

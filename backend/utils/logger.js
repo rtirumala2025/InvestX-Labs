@@ -131,3 +131,4 @@ process.on('unhandledRejection', (reason) => {
 });
 
 export default logger;
+export { logger };

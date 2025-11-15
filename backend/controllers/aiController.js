@@ -11,6 +11,7 @@ import {
 import {
   fallbackStrategies
 } from '../ai-system/fallbackData.js';
+import { supabase } from '../ai-system/supabaseClient.js';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_KEY || process.env.ALPHAVANTAGE_API_KEY;
@@ -101,6 +102,131 @@ export const generateSuggestions = async (req, res) => {
     return res.status(503).json(buildEducationalFallback(
       'Live AI suggestions are temporarily unavailable. Showing an educational set instead.'
     ));
+  }
+};
+
+/**
+ * Fetch recommendation explanation via Supabase RPC
+ */
+export const getRecommendationExplanation = async (req, res) => {
+  try {
+    const { recommendationId } = req.params;
+    const userId = req.query.userId || 'anonymous';
+
+    if (!recommendationId) {
+      return res.status(400).json(createApiResponse(null, {
+        success: false,
+        statusCode: 400,
+        message: 'recommendationId is required'
+      }));
+    }
+
+    const { data, error } = await supabase
+      .rpc('get_recommendation_explanation', {
+        recommendation_id: recommendationId,
+        user_id: userId
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const explanation = data || { explanation: 'No explanation available' };
+    return res.status(200).json(createApiResponse(explanation, 'Explanation retrieved'));
+  } catch (error) {
+    logger.error('Failed to fetch recommendation explanation', {
+      error: error.message,
+      stack: error.stack
+    });
+
+    // Return graceful fallback
+    return res.status(503).json(createApiResponse(
+      { explanation: 'Unable to load explanation at this time. Please try again later.' },
+      {
+        success: false,
+        statusCode: 503,
+        message: 'Explanation service unavailable',
+        metadata: { offline: true }
+      }
+    ));
+  }
+};
+
+/**
+ * Compute portfolio analytics server-side
+ */
+export const computeAnalytics = async (req, res) => {
+  try {
+    const { holdings = [], transactions = [], marketData = {} } = req.body || {};
+
+    if (!Array.isArray(holdings)) {
+      return res.status(400).json(createApiResponse(null, {
+        success: false,
+        statusCode: 400,
+        message: 'holdings must be an array'
+      }));
+    }
+
+    const safeNumber = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const totalValue = holdings.reduce((sum, h) => {
+      return sum + safeNumber(h.shares) * safeNumber(h.currentPrice || h.price || 0);
+    }, 0);
+
+    const totalCostBasis = holdings.reduce((sum, h) => {
+      return sum + safeNumber(h.shares) * safeNumber(h.costBasis || h.avgCost || h.purchasePrice || 0);
+    }, 0);
+
+    const totalGainLoss = totalValue - totalCostBasis;
+    const totalGainLossPercentage = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
+
+    // Simple ROI approximation from transactions if available
+    const invested = transactions
+      .filter((t) => (t.type || t.action)?.toLowerCase() === 'buy')
+      .reduce((sum, t) => sum + safeNumber(t.amount || t.total || (t.shares * t.price)), 0);
+    const realized = transactions
+      .filter((t) => (t.type || t.action)?.toLowerCase() === 'sell')
+      .reduce((sum, t) => sum + safeNumber(t.amount || t.total || (t.shares * t.price)), 0);
+    const roi = invested > 0 ? ((realized + totalValue - invested) / invested) : 0;
+
+    // Sector allocation
+    const sectorAllocation = holdings.reduce((acc, h) => {
+      const sector = h.sector || 'Unknown';
+      const value = safeNumber(h.shares) * safeNumber(h.currentPrice || h.price || 0);
+      acc[sector] = (acc[sector] || 0) + value;
+      return acc;
+    }, {});
+    const sectorTotal = Object.values(sectorAllocation).reduce((a, b) => a + b, 0) || 1;
+    const sectorPercentages = Object.fromEntries(
+      Object.entries(sectorAllocation).map(([k, v]) => [k, (v / sectorTotal) * 100])
+    );
+
+    const response = {
+      totalValue,
+      totalCostBasis,
+      totalGainLoss,
+      totalGainLossPercentage,
+      roi,
+      sectorAllocation: sectorPercentages,
+      lastUpdated: new Date().toISOString()
+    };
+
+    return res.status(200).json(createApiResponse(response, 'Analytics computed'));
+  } catch (error) {
+    logger.error('Failed to compute analytics', {
+      error: error.message,
+      stack: error.stack
+    });
+
+    return res.status(503).json(createApiResponse(null, {
+      success: false,
+      statusCode: 503,
+      message: 'Analytics service unavailable',
+      metadata: { offline: true }
+    }));
   }
 };
 

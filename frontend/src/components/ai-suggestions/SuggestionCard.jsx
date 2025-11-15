@@ -177,4 +177,4 @@ const SuggestionCard = ({ suggestion, onViewDetails, onDismiss, onAdjustConfiden
   );
 };
 
-export default SuggestionCard;
+export default React.memo(SuggestionCard);

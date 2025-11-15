@@ -38,8 +38,8 @@
     "postcss": "^8.4.14"
   },
   "scripts": {
-    "dev": "PORT=3000 react-scripts start",
-    "start": "PORT=3000 react-scripts start",
+    "dev": "PORT=3002 react-scripts start",
+    "start": "PORT=3002 react-scripts start",
     "build": "react-scripts build",
     "vercel-build": "npm run build",
     "test": "react-scripts test",
