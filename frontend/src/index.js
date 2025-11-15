@@ -1,18 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { ThemeProvider } from './context/ThemeContext';
 import App from './App';
 import './index.css';
-
-// Debug: Check if AuthProvider is properly imported
-console.log('AuthProvider:', AuthProvider);
-
-// Debug: Check if window is available
-if (typeof window !== 'undefined') {
-  console.log('Window is available');
-}
 
 // Global error handler for unhandled promise rejections
 window.addEventListener('unhandledrejection', (event) => {
@@ -46,11 +36,7 @@ if (!rootElement) {
   const AppWithProviders = () => (
     <React.StrictMode>
       <Router>
-        <AuthProvider>
-          <ThemeProvider>
-            <App />
-          </ThemeProvider>
-        </AuthProvider>
+        <App />
       </Router>
     </React.StrictMode>
   );

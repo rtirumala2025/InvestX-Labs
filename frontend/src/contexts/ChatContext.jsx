@@ -1,199 +1,314 @@
-import React, { createContext, useContext, useEffect, useReducer } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useCallback,
+} from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { useAuth } from './AuthContext';
+import {
+  loadConversation,
+  sendMessage as sendMessageToSupabase,
+  subscribeToMessages,
+} from '../services/chat/supabaseChatService';
+import { supabase } from '../services/supabase/config';
+import { useApp } from './AppContext';
 
-// Action types
 const ACTIONS = {
-  ADD_MESSAGE: 'ADD_MESSAGE',
-  SET_MESSAGES: 'SET_MESSAGES',
   SET_LOADING: 'SET_LOADING',
+  SET_SENDING: 'SET_SENDING',
   SET_ERROR: 'SET_ERROR',
-  QUEUE_MESSAGE: 'QUEUE_MESSAGE',
-  CLEAR_QUEUE: 'CLEAR_QUEUE',
-  UPDATE_USER_PROFILE: 'UPDATE_USER_PROFILE',
+  SET_MESSAGES: 'SET_MESSAGES',
+  ADD_OPTIMISTIC_MESSAGE: 'ADD_OPTIMISTIC_MESSAGE',
+  REPLACE_OPTIMISTIC_MESSAGE: 'REPLACE_OPTIMISTIC_MESSAGE',
+  UPSERT_MESSAGE: 'UPSERT_MESSAGE',
+  REMOVE_MESSAGE: 'REMOVE_MESSAGE',
+  CLEAR_MESSAGES: 'CLEAR_MESSAGES',
 };
 
-// Initial state
 const initialState = {
   messages: [],
-  isLoading: false,
+  loading: false,
+  sending: false,
   error: null,
-  offlineQueue: [],
-  userProfile: {
-    id: null,
-    name: 'Guest',
-    experienceLevel: 'beginner',
-    riskTolerance: 'moderate',
-    interests: [],
-    portfolioValue: 0,
-  },
-  isOnline: true,
 };
 
-// Reducer function
+const sortMessages = (messages) =>
+  [...messages].sort((a, b) => new Date(a.created_at || a.timestamp) - new Date(b.created_at || b.timestamp));
+
 const chatReducer = (state, action) => {
   switch (action.type) {
-    case ACTIONS.ADD_MESSAGE:
-      return {
-        ...state,
-        messages: [...state.messages, action.payload],
-      };
-    
-    case ACTIONS.SET_MESSAGES:
-      return {
-        ...state,
-        messages: action.payload,
-      };
-    
     case ACTIONS.SET_LOADING:
-      return {
-        ...state,
-        isLoading: action.payload,
-      };
-    
+      return { ...state, loading: action.payload };
+    case ACTIONS.SET_SENDING:
+      return { ...state, sending: action.payload };
     case ACTIONS.SET_ERROR:
+      return { ...state, error: action.payload };
+    case ACTIONS.SET_MESSAGES:
+      return { ...state, messages: sortMessages(action.payload || []) };
+    case ACTIONS.ADD_OPTIMISTIC_MESSAGE:
+      return { ...state, messages: sortMessages([...state.messages, action.payload]) }; 
+    case ACTIONS.REPLACE_OPTIMISTIC_MESSAGE: {
+      const { tempId, message } = action.payload;
+      const updated = state.messages.map((msg) =>
+        msg.id === tempId ? { ...message, pending: false } : msg
+      );
+      return { ...state, messages: sortMessages(updated) };
+    }
+    case ACTIONS.UPSERT_MESSAGE: {
+      const incoming = { ...action.payload, pending: false };
+      const existsIndex = state.messages.findIndex((msg) => msg.id === incoming.id);
+      if (existsIndex >= 0) {
+        const updated = [...state.messages];
+        updated[existsIndex] = { ...updated[existsIndex], ...incoming };
+        return { ...state, messages: sortMessages(updated) };
+      }
+      // Avoid duplicating optimistic message if it matches by content/timestamp
+      const optimisticIndex = state.messages.findIndex(
+        (msg) => msg.pending && msg.content === incoming.content && msg.role === incoming.role
+      );
+      if (optimisticIndex >= 0) {
+        const updated = [...state.messages];
+        updated[optimisticIndex] = { ...incoming };
+        return { ...state, messages: sortMessages(updated) };
+      }
+      return { ...state, messages: sortMessages([...state.messages, incoming]) };
+    }
+    case ACTIONS.REMOVE_MESSAGE:
       return {
         ...state,
-        error: action.payload,
+        messages: state.messages.filter((msg) => msg.id !== action.payload),
       };
-    
-    case ACTIONS.QUEUE_MESSAGE:
-      return {
-        ...state,
-        offlineQueue: [...state.offlineQueue, action.payload],
-      };
-    
-    case ACTIONS.CLEAR_QUEUE:
-      return {
-        ...state,
-        offlineQueue: [],
-      };
-    
-    case ACTIONS.UPDATE_USER_PROFILE:
-      return {
-        ...state,
-        userProfile: {
-          ...state.userProfile,
-          ...action.payload,
-        },
-      };
-    
-    case 'SET_ONLINE_STATUS':
-      return {
-        ...state,
-        isOnline: action.payload,
-      };
-    
+    case ACTIONS.CLEAR_MESSAGES:
+      return { ...state, messages: [] };
     default:
       return state;
   }
 };
 
-// Create context
 const ChatContext = createContext();
 
-// Provider component
 export const ChatProvider = ({ children }) => {
+  const { currentUser } = useAuth();
+  const userId = currentUser?.id;
   const [state, dispatch] = useReducer(chatReducer, initialState);
+  const subscriptionRef = useRef(null);
+  const { isOnline, queueToast, registerContext } = useApp();
 
-  // Load state from localStorage on mount
   useEffect(() => {
-    const loadState = () => {
-      try {
-        const savedState = localStorage.getItem('chatState');
-        if (savedState) {
-          const parsedState = JSON.parse(savedState);
-          // Don't load loading state from localStorage
-          const { isLoading, ...rest } = parsedState;
-          dispatch({ type: ACTIONS.SET_MESSAGES, payload: rest.messages || [] });
-          dispatch({ type: ACTIONS.UPDATE_USER_PROFILE, payload: rest.userProfile || initialState.userProfile });
-        }
-      } catch (error) {
-        console.error('Failed to load chat state from localStorage:', error);
+    dispatch({ type: ACTIONS.CLEAR_MESSAGES });
+    dispatch({ type: ACTIONS.SET_ERROR, payload: null });
+
+    if (!userId) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    const fetchMessages = async () => {
+      dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+      const { data, error } = await loadConversation(userId);
+      if (!isMounted) return;
+
+      if (error) {
+        dispatch({
+          type: ACTIONS.SET_ERROR,
+          payload: error.message || 'Unable to load chat history',
+        });
+      } else {
+        dispatch({ type: ACTIONS.SET_MESSAGES, payload: data });
       }
+      dispatch({ type: ACTIONS.SET_LOADING, payload: false });
     };
 
-    // Set up online/offline detection
-    const handleOnline = () => {
-      dispatch({ type: 'SET_ONLINE_STATUS', payload: true });
-      // Process any queued messages
-      if (state.offlineQueue.length > 0) {
-        // In a real app, you would process the queue here
-        console.log('Back online. Process queued messages:', state.offlineQueue);
-        // For now, we'll just clear the queue
-        dispatch({ type: ACTIONS.CLEAR_QUEUE });
-      }
-    };
-
-    const handleOffline = () => {
-      dispatch({ type: 'SET_ONLINE_STATUS', payload: false });
-    };
-
-    loadState();
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    // Set initial online status
-    dispatch({ type: 'SET_ONLINE_STATUS', payload: navigator.onLine });
+    fetchMessages();
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      isMounted = false;
     };
-  }, []);
+  }, [queueToast, userId]);
 
-  // Save state to localStorage when it changes
   useEffect(() => {
-    try {
-      // Don't save loading state to localStorage
-      const { isLoading, ...stateToSave } = state;
-      localStorage.setItem('chatState', JSON.stringify(stateToSave));
-    } catch (error) {
-      console.error('Failed to save chat state to localStorage:', error);
-    }
-  }, [state.messages, state.userProfile, state.offlineQueue, state.isOnline]);
-
-  // Context value
-  const value = {
-    ...state,
-    addMessage: (message) => {
-      const messageWithId = {
-        ...message,
-        id: message.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: message.timestamp || new Date().toISOString(),
-      };
-      
-      // If offline and message is from user, add to queue
-      if (!state.isOnline && message.role === 'user') {
-        dispatch({ 
-          type: ACTIONS.QUEUE_MESSAGE, 
-          payload: messageWithId 
-        });
-        return;
+    if (!userId) {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
       }
-      
-      dispatch({ type: ACTIONS.ADD_MESSAGE, payload: messageWithId });
-    },
-    setMessages: (messages) => {
-      dispatch({ type: ACTIONS.SET_MESSAGES, payload: messages });
-    },
-    setLoading: (isLoading) => {
-      dispatch({ type: ACTIONS.SET_LOADING, payload: isLoading });
-    },
-    setError: (error) => {
-      dispatch({ type: ACTIONS.SET_ERROR, payload: error });
-    },
-    updateUserProfile: (updates) => {
-      dispatch({ type: ACTIONS.UPDATE_USER_PROFILE, payload: updates });
-    },
-    clearError: () => {
-      dispatch({ type: ACTIONS.SET_ERROR, payload: null });
-    },
-  };
+      return undefined;
+    }
+
+    const subscription = subscribeToMessages(userId, (message) => {
+      if (!message) return;
+      dispatch({ type: ACTIONS.UPSERT_MESSAGE, payload: message });
+    });
+
+    if (subscription.error) {
+      dispatch({
+        type: ACTIONS.SET_ERROR,
+        payload: subscription.error.message || 'Unable to subscribe to chat messages',
+      });
+    }
+
+    subscriptionRef.current = subscription;
+
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
+    };
+  }, [queueToast, userId]);
+
+  const clearConversation = useCallback(async () => {
+    dispatch({ type: ACTIONS.CLEAR_MESSAGES });
+    dispatch({ type: ACTIONS.SET_ERROR, payload: null });
+
+    if (!userId) return;
+
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.debug?.('ChatContext clearConversation error', error);
+      queueToast(error.message || 'Unable to clear conversation', 'error');
+    }
+  }, [userId]);
+
+  const sendMessage = useCallback(async (content, role = 'user') => {
+    if (!userId) {
+      queueToast('Please sign in to chat', 'error');
+      return { data: null, error: new Error('User not authenticated') };
+    }
+
+    const trimmed = content?.trim();
+    if (!trimmed) {
+      return { data: null, error: new Error('Message cannot be empty') };
+    }
+
+    dispatch({ type: ACTIONS.SET_ERROR, payload: null });
+
+    const tempId = uuidv4();
+    const optimisticMessage = {
+      id: tempId,
+      role,
+      content: trimmed,
+      created_at: new Date().toISOString(),
+      pending: true,
+    };
+
+    dispatch({ type: ACTIONS.ADD_OPTIMISTIC_MESSAGE, payload: optimisticMessage });
+    dispatch({ type: ACTIONS.SET_SENDING, payload: true });
+
+    const { data, error } = await sendMessageToSupabase({
+      userId,
+      content: trimmed,
+      role,
+    });
+
+    dispatch({ type: ACTIONS.SET_SENDING, payload: false });
+
+    if (error) {
+      dispatch({ type: ACTIONS.REMOVE_MESSAGE, payload: tempId });
+      dispatch({ type: ACTIONS.SET_ERROR, payload: error.message || 'Unable to send message' });
+      return { data: null, error };
+    }
+
+    dispatch({
+      type: ACTIONS.REPLACE_OPTIMISTIC_MESSAGE,
+      payload: { tempId, message: data },
+    });
+
+    return { data, error: null };
+  }, [userId]);
+
+  const retryLastMessage = useCallback(async () => {
+    const lastUserMessage = [...state.messages]
+      .reverse()
+      .find((message) => message.role === 'user');
+
+    if (!lastUserMessage) return;
+
+    await sendMessage(lastUserMessage.content, 'user');
+  }, [sendMessage, state.messages]);
+
+  const startNewConversation = useCallback(async () => {
+    await clearConversation();
+    if (userId) {
+      const { data, error } = await loadConversation(userId);
+      if (error) {
+        dispatch({ type: ACTIONS.SET_ERROR, payload: error.message || 'Unable to load chat history' });
+      } else {
+        dispatch({ type: ACTIONS.SET_MESSAGES, payload: data });
+      }
+    }
+  }, [clearConversation, userId]);
+
+  const refreshMessages = useCallback(async () => {
+    if (!userId) return;
+    dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+    const { data, error } = await loadConversation(userId);
+    if (error) {
+      dispatch({ type: ACTIONS.SET_ERROR, payload: error.message || 'Unable to load chat history' });
+    } else {
+      dispatch({ type: ACTIONS.SET_MESSAGES, payload: data });
+    }
+    dispatch({ type: ACTIONS.SET_LOADING, payload: false });
+  }, [userId]);
+
+  const value = useMemo(
+    () => ({
+      messages: state.messages,
+      loading: state.loading,
+      sending: state.sending,
+      error: state.error,
+      isOnline,
+      sendMessage,
+      retryLastMessage,
+      startNewConversation,
+      clearConversation,
+      refreshMessages,
+      setError: (err) => dispatch({ type: ACTIONS.SET_ERROR, payload: err }),
+    }),
+    [
+      state.messages,
+      state.loading,
+      state.sending,
+      state.error,
+      isOnline,
+      sendMessage,
+      retryLastMessage,
+      startNewConversation,
+      clearConversation,
+      refreshMessages,
+    ]
+  );
+
+  useEffect(() => {
+    let unregister;
+    if (registerContext) {
+      unregister = registerContext('chat', {
+        messageCount: state.messages.length,
+        loading: state.loading,
+        sending: state.sending,
+        error: state.error,
+        isOnline,
+      });
+    }
+    return () => unregister?.();
+  }, [isOnline, registerContext, state.error, state.loading, state.messages.length, state.sending]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
 
-// Custom hook for using the chat context
 export const useChat = () => {
   const context = useContext(ChatContext);
   if (!context) {

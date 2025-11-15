@@ -43,7 +43,7 @@ export const showPopupBlockerWarning = (onRetry) => {
     - Safari: Safari menu → Preferences → Websites → Pop-up Windows → Allow
   `;
   
-  if (confirm(warningMessage + '\n\nClick OK to try again, or Cancel to continue with email sign-in.')) {
+  if (window.confirm(warningMessage + '\n\nClick OK to try again, or Cancel to continue with email sign-in.')) {
     onRetry();
   }
 };

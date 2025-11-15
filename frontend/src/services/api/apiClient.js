@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../supabase/config';
 
 // Cache configuration
 const cacheConfig = {

@@ -1,25 +1,37 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getQuote, getMultipleQuotes, calculateLivePortfolioMetrics } from '../services/market/marketService';
+import { getBatchMarketData } from '../services/api/marketService';
+import { useApp } from '../contexts/AppContext';
 
 /**
- * Custom hook for Alpha Vantage market data integration
- * @param {Array} holdings - User's portfolio holdings
- * @returns {Object} Market data and portfolio calculations
+ * useAlphaVantageData
+ *
+ * Handles retrieval of live market pricing for a set of holdings using the Alpha Vantage API,
+ * automatically falls back to cached Supabase batch quotes when the upstream API is unavailable,
+ * and derives portfolio-level metrics so dashboard/portfolio views stay reactive.
+ *
+ * @param {Array} holdings - Portfolio holdings used to determine which symbols to quote.
+ * @returns {Object} Market data, computed metrics, loading/error state, and refresh helpers.
  */
 export const useAlphaVantageData = (holdings = []) => {
   console.log('🚀 [useAlphaVantageData] Hook initialized with', holdings.length, 'holdings');
   
+  const { queueToast } = useApp();
+
   const [marketData, setMarketData] = useState({});
   const [portfolioMetrics, setPortfolioMetrics] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Extract unique symbols from holdings
-  const symbols = holdings.map(holding => holding.symbol).filter(Boolean);
-  const uniqueSymbols = [...new Set(symbols)];
-  
-  console.log('🚀 [useAlphaVantageData] Extracted symbols:', uniqueSymbols);
+  const uniqueSymbols = useMemo(() => {
+    const symbols = holdings.map((holding) => holding.symbol).filter(Boolean);
+    const deduped = [...new Set(symbols)];
+    console.log('🚀 [useAlphaVantageData] Extracted symbols:', deduped);
+    return deduped;
+  }, [holdings]);
+
+  console.log('🚀 [useAlphaVantageData] Holdings snapshot:', holdings.length);
 
   // Fetch market data for portfolio symbols
   const fetchMarketData = useCallback(async () => {
@@ -65,15 +77,30 @@ export const useAlphaVantageData = (holdings = []) => {
     } catch (err) {
       console.error('🚀 [useAlphaVantageData] ❌ Error fetching market data:', err);
       setError(err.message || 'Failed to fetch market data');
-      
-      // Fallback to static calculations if API fails
-      console.log('🚀 [useAlphaVantageData] 🔄 Using fallback static calculations due to API error');
+
+      try {
+        console.log('🚀 [useAlphaVantageData] 🔄 Attempting Supabase fallback for market data.');
+        const fallbackQuotes = await getBatchMarketData(uniqueSymbols);
+
+        if (fallbackQuotes && Object.keys(fallbackQuotes).length > 0) {
+          setMarketData(fallbackQuotes);
+          const fallbackMetrics = calculateLivePortfolioMetrics(holdings, fallbackQuotes);
+          setPortfolioMetrics(fallbackMetrics);
+          setLastUpdated(new Date().toISOString());
+          queueToast('Live price feed unavailable. Showing cached market data.', 'warning');
+          return;
+        }
+      } catch (fallbackError) {
+        console.error('🚀 [useAlphaVantageData] ❌ Supabase fallback failed:', fallbackError);
+      }
+
+      console.log('🚀 [useAlphaVantageData] 🔄 Using static portfolio calculations due to market data failure');
       const fallbackMetrics = calculateLivePortfolioMetrics(holdings, {});
       setPortfolioMetrics(fallbackMetrics);
     } finally {
       setLoading(false);
     }
-  }, [uniqueSymbols.join(','), holdings.length]);
+  }, [uniqueSymbols, holdings, queueToast]);
 
   // Fetch single quote
   const fetchQuote = useCallback(async (symbol) => {

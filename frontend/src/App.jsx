@@ -1,132 +1,199 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { AppProvider } from './contexts/AppContext';
-import { ChatProvider } from './contexts/ChatContext';
+import { AppContextProvider } from './contexts/AppContext';
 import theme from './theme';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import DisclaimerBanner from './components/common/DisclaimerBanner';
 import NetworkStatus from './components/common/NetworkStatus';
+import GlobalErrorBanner from './components/common/GlobalErrorBanner';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
-import DevTools from './components/dev/DevTools';
-import ConnectionTester from './components/ConnectionTester';
+import ToastViewport from './components/common/ToastViewport';
+import LoadingSpinner from './components/common/LoadingSpinner';
 
-// Pages
+// Critical pages - load immediately for better UX
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
-import OnboardingPage from './pages/OnboardingPage';
-import DiagnosticPage from './pages/DiagnosticPage';
-import DashboardPage from './pages/DashboardPage';
-import SuggestionsPage from './pages/SuggestionsPage';
-import PortfolioPage from './pages/PortfolioPage';
-import EducationPage from './pages/EducationPage';
-import ProfilePage from './pages/ProfilePage';
-import PrivacyPage from './pages/PrivacyPage';
-import ChatPage from './pages/ChatPage';
 
-// Developer Tools - Only in development
-const DevToolsWrapper = () => {
-  if (process.env.NODE_ENV !== 'development') return null;
-  
-  return (
-    <div className="fixed bottom-4 right-4 z-50">
-      <div className="bg-gray-800 bg-opacity-90 p-2 rounded-lg shadow-lg">
-        <DevTools />
-      </div>
-    </div>
-  );
-};
+// Lazy load other pages for code splitting and performance
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
+const DiagnosticPage = lazy(() => import('./pages/DiagnosticPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const SuggestionsPage = lazy(() => import('./pages/SuggestionsPage'));
+const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
+const EducationPage = lazy(() => import('./pages/EducationPage'));
+const LessonView = lazy(() => import('./pages/LessonView'));
+const ClubsPage = lazy(() => import('./pages/ClubsPage'));
+const ClubDetailPage = lazy(() => import('./pages/ClubDetailPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const ChatPage = lazy(() => import('./pages/ChatPage'));
+const SimulationPage = lazy(() => import('./pages/SimulationPage'));
+const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
+const AchievementsPage = lazy(() => import('./pages/AchievementsPage'));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-900">
+    <LoadingSpinner size="large" />
+  </div>
+);
 
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <AppProvider>
-          <ChatProvider>
-              <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+        <AppContextProvider>
+          <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+                <ToastViewport />
+                <GlobalErrorBanner />
                 <NetworkStatus />
                 <DisclaimerBanner />
                 <Header />
                 <main className="flex-grow">
                   <ErrorBoundary>
-                    <Routes>
-                      {/* Public Routes */}
-                      <Route path="/" element={<HomePage />} />
-                      <Route path="/login" element={<LoginPage />} />
-                      <Route path="/signup" element={<SignupPage />} />
-                      <Route path="/privacy" element={<PrivacyPage />} />
-                      
-                      {/* Protected Routes */}
-                      <Route path="/onboarding" element={
-                        <ProtectedRoute>
-                          <OnboardingPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/diagnostic" element={
-                        <ProtectedRoute>
-                          <DiagnosticPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/dashboard" element={
-                        <ProtectedRoute>
-                          <DashboardPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/suggestions" element={
-                        <ProtectedRoute>
-                          <SuggestionsPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/portfolio" element={
-                        <ProtectedRoute>
-                          <PortfolioPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/education" element={
-                        <ProtectedRoute>
-                          <EducationPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/profile" element={
-                        <ProtectedRoute>
-                          <ProfilePage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      <Route path="/chat" element={
-                        <ProtectedRoute>
-                          <ChatPage />
-                        </ProtectedRoute>
-                      } />
-                      
-                      {/* Development routes */}
-                      {process.env.NODE_ENV === 'development' && (
-                        <Route path="/dev/connections" element={<ConnectionTester />} />
-                      )}
-                      
-                      {/* Catch all route */}
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
+                    <Suspense fallback={<PageLoader />}>
+                      <Routes>
+                        {/* Public Routes */}
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/signup" element={<SignupPage />} />
+                        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                        <Route path="/reset-password" element={<ResetPasswordPage />} />
+                        <Route path="/verify-email" element={<VerifyEmailPage />} />
+                        <Route path="/privacy" element={<PrivacyPage />} />
+                        
+                        <Route
+                          path="/onboarding"
+                          element={
+                            <ProtectedRoute>
+                              <OnboardingPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/diagnostic"
+                          element={
+                            <ProtectedRoute>
+                              <DiagnosticPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/dashboard"
+                          element={
+                            <ProtectedRoute>
+                              <DashboardPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/suggestions"
+                          element={
+                            <ProtectedRoute>
+                              <SuggestionsPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/portfolio"
+                          element={
+                            <ProtectedRoute>
+                              <PortfolioPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/education"
+                          element={
+                            <ProtectedRoute>
+                              <EducationPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/education/lessons/:lessonId"
+                          element={
+                            <ProtectedRoute>
+                              <LessonView />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/clubs"
+                          element={
+                            <ProtectedRoute>
+                              <ClubsPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/clubs/:clubId"
+                          element={
+                            <ProtectedRoute>
+                              <ClubDetailPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/profile"
+                          element={
+                            <ProtectedRoute>
+                              <ProfilePage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/chat"
+                          element={
+                            <ProtectedRoute>
+                              <ChatPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/simulation"
+                          element={
+                            <ProtectedRoute>
+                              <SimulationPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/leaderboard"
+                          element={
+                            <ProtectedRoute>
+                              <LeaderboardPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/achievements"
+                          element={
+                            <ProtectedRoute>
+                              <AchievementsPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        
+                        {/* Catch all route */}
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </Routes>
+                    </Suspense>
                   </ErrorBoundary>
                 </main>
                 
-                {/* Developer Tools */}
-                <DevToolsWrapper />
                 <Footer />
               </div>
-            </ChatProvider>
-          </AppProvider>
+        </AppContextProvider>
         </ThemeProvider>
       </ErrorBoundary>
   );

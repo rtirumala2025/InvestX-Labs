@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useChat } from '../../hooks/useChat';
+import { useChat } from '../../contexts/ChatContext';
 import { useAuth } from '../../hooks/useAuth';
 import GlassCard from '../ui/GlassCard';
 import GlassButton from '../ui/GlassButton';
@@ -12,24 +12,16 @@ const ChatInterface = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
 
-  // Initialize chat with user context
-  const userContext = {
-    age: user?.age || 16,
-    budget: user?.budget || 100,
-    risk_tolerance: user?.risk_tolerance || 'moderate',
-    investment_goals: user?.investment_goals || [],
-    experience_level: user?.experience_level || 'beginner',
-  };
-
   const {
     messages,
     loading,
+    sending,
     error,
     sendMessage,
     clearConversation,
     startNewConversation,
     retryLastMessage,
-  } = useChat(user?.uid, userContext);
+  } = useChat();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -45,24 +37,25 @@ const ChatInterface = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputMessage.trim() || loading) return;
+    if (!inputMessage.trim() || loading || sending) return;
 
     const message = inputMessage.trim();
     setInputMessage('');
 
     try {
-      await sendMessage(message);
+      await sendMessage(message, 'user');
     } catch (err) {
       console.error('Failed to send message:', err);
     }
   };
 
   const handleSuggestionClick = async (suggestion) => {
+    if (loading || sending) return;
     if (suggestion.action === 'calculate_compound_interest') {
       const message = `Can you calculate compound interest for $${suggestion.parameters?.amount || 100} per month for ${suggestion.parameters?.years || 10} years?`;
-      await sendMessage(message);
+      await sendMessage(message, 'user');
     } else if (suggestion.title) {
-      await sendMessage(suggestion.title);
+      await sendMessage(suggestion.title, 'user');
     }
   };
 
@@ -74,6 +67,7 @@ const ChatInterface = () => {
   };
 
   const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
     return new Date(timestamp).toLocaleTimeString([], { 
       hour: '2-digit', 
       minute: '2-digit' 
@@ -81,33 +75,35 @@ const ChatInterface = () => {
   };
 
   const renderMessage = (message) => {
-    const isUser = message.type === 'user';
-    const isError = message.isError;
+    const role = message.role || message.type || 'assistant';
+    const isUser = role === 'user';
+    const isError = Boolean(message.isError);
+    const timestamp = message.created_at || message.timestamp;
 
     return (
-      <div key={message.id} className={`message ${message.type} ${isError ? 'error' : ''}`}>
+      <div key={message.id || message.timestamp} className={`message ${isUser ? 'user' : 'assistant'} ${isError ? 'error' : ''}`}>
         <div className="message-content">
           {!isUser && (
             <div className="assistant-avatar">
               {isError ? '⚠️' : '🤖'}
             </div>
           )}
-          
+
           <div className="message-bubble">
             <div className="message-text">
-              {message.content.split('\n').map((line, index) => (
+              {(message.content || '').split('\n').map((line, index) => (
                 <p key={index}>{line}</p>
               ))}
             </div>
-            
-            {message.suggestions && message.suggestions.length > 0 && (
+
+            {Array.isArray(message.suggestions) && message.suggestions.length > 0 && (
               <div className="suggestions">
                 {message.suggestions.map((suggestion, index) => (
                   <button
                     key={index}
                     className="suggestion-button"
                     onClick={() => handleSuggestionClick(suggestion)}
-                    disabled={loading}
+                    disabled={loading || sending}
                   >
                     {suggestion.title || suggestion}
                   </button>
@@ -116,9 +112,10 @@ const ChatInterface = () => {
             )}
           </div>
         </div>
-        
+
         <div className="message-timestamp">
-          {formatTimestamp(message.timestamp)}
+          {timestamp ? formatTimestamp(timestamp) : ''}
+          {message.pending && <span className="pending-indicator"> • Sending…</span>}
         </div>
       </div>
     );
@@ -143,8 +140,8 @@ const ChatInterface = () => {
             <button
               key={index}
               className="starter-button"
-              onClick={() => sendMessage(starter)}
-              disabled={loading}
+                onClick={() => sendMessage(starter, 'user')}
+                disabled={loading || sending}
             >
               {starter}
             </button>
@@ -189,7 +186,7 @@ const ChatInterface = () => {
               variant="ghost"
               size="small"
               onClick={startNewConversation}
-              disabled={loading}
+              disabled={loading || sending}
               aria-label="Start new conversation"
             >
               🆕
