@@ -40,11 +40,6 @@ const REQUIRED_ENV_VARS = {
     description: 'Alpha Vantage API key for real-time market data',
     example: 'YOUR_ALPHA_VANTAGE_API_KEY',
   },
-  ALPHA_VANTAGE_KEY: {
-    required: false,
-    description: 'Alias for Alpha Vantage API key',
-    example: 'YOUR_ALPHA_VANTAGE_API_KEY',
-  },
   
   // OpenRouter Configuration (for AI features)
   OPENROUTER_API_KEY: {
@@ -81,12 +76,6 @@ const REQUIRED_ENV_VARS = {
   },
   MCP_ENABLED: {
     required: false,
-    description: 'Enable MCP server',
-    example: 'false',
-    default: 'false',
-  },
-  MCP_ENABLED: {
-    required: false,
     description: 'Feature flag to enable Model Context Protocol (MCP) server',
     example: 'false',
     default: 'false',
@@ -113,7 +102,7 @@ export function validateEnv() {
       (key === 'SUPABASE_SERVICE_ROLE_KEY' ? process.env.SUPABASE_SERVICE_KEY : undefined);
     
     if (!value) {
-      const isCritical = config.required || (isProd && ['SUPABASE_URL','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','ALPHA_VANTAGE_API_KEY','ALPHA_VANTAGE_KEY','APP_URL'].includes(key));
+      const isCritical = config.required || (isProd && ['SUPABASE_URL','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','ALPHA_VANTAGE_API_KEY','APP_URL'].includes(key));
       if (isCritical) {
         validationResults.valid = false;
         validationResults.missing.push(key);

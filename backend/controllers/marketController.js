@@ -4,7 +4,7 @@ import {
   logger
 } from '../ai-system/index.js';
 
-const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_KEY || process.env.ALPHAVANTAGE_API_KEY;
+const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 
 const ensureAlphaVantage = () => {
   if (!ALPHA_VANTAGE_KEY) {

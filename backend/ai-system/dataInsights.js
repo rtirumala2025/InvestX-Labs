@@ -327,7 +327,5 @@ class DataInsights {
 // Create a singleton instance
 export const dataInsights = new DataInsights(
   adminSupabase,
-  process.env.ALPHA_VANTAGE_KEY ||
-    process.env.ALPHA_VANTAGE_API_KEY ||
-    process.env.ALPHAVANTAGE_API_KEY
+  process.env.ALPHA_VANTAGE_API_KEY
 );

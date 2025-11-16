@@ -14,7 +14,7 @@ import {
 import { supabase } from '../ai-system/supabaseClient.js';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_KEY || process.env.ALPHAVANTAGE_API_KEY;
+const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 
 const buildEducationalFallback = (message) => createApiResponse({
   suggestions: fallbackStrategies.map((strategy, index) => ({
