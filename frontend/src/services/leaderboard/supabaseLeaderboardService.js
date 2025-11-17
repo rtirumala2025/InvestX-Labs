@@ -2,7 +2,7 @@ import { supabase } from '../supabase/config';
 import offlineLeaderboard from '../../data/offlineLeaderboard';
 
 const LEADERBOARD_TABLE = 'leaderboard_scores';
-const LEGACY_LEADERBOARD_TABLE = 'leaderboard';
+const LEGACY_LEADERBOARD_TABLE = 'leaderboard_scores';
 const USER_PROFILES_TABLE = 'user_profiles';
 
 const STORAGE_KEYS = {
