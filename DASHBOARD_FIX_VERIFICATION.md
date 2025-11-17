@@ -324,9 +324,12 @@ Apply the migration that:
 - [ ] ⏳ No console errors
 - [ ] ⏳ Smoke tests pass
 
-**Current Status:** ✅ **CODE READY** - ⚠️ **MIGRATION PENDING APPLICATION**
+**Current Status:** ✅ **CODE VERIFIED & READY** - ⚠️ **MIGRATION REQUIRES MANUAL APPLICATION**
 
-**Next Action:** Apply migration using `MIGRATION_APPLICATION_GUIDE.md`
+**Next Action:** 
+1. Apply migration via Supabase Dashboard (see `MIGRATION_APPLICATION_GUIDE.md`)
+2. Run verification: `node backend/scripts/verify_migration_complete.js`
+3. Follow `COMPLETE_DASHBOARD_FIX_ACTION_PLAN.md` for complete steps
 
 ---
 
