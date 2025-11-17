@@ -71,8 +71,10 @@ export const offlineLeaderboardRank = {
   }
 };
 
-export default {
+const offlineLeaderboardData = {
   entries: offlineLeaderboardEntries,
   userRank: offlineLeaderboardRank
 };
+
+export default offlineLeaderboardData;
 

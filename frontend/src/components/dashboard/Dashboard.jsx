@@ -424,7 +424,6 @@ const Dashboard = () => {
   );
 };
 
-// Prop types for better development experience
 // Prop types for better development experience and type checking
 Dashboard.propTypes = {
   // All data and handlers come from context

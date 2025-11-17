@@ -267,12 +267,9 @@ export class ConversationManager {
   static async loadFromFirestore(db, userId, conversationId) {
     if (!db || !userId || !conversationId) return null;
     
-    try {
-      return null;
-    } catch (error) {
-      console.error('Error loading conversation:', error);
-      throw error;
-    }
+    // Firestore functionality removed - using Supabase instead
+    // This method is kept for backward compatibility
+    return null;
   }
 
   exportConversation() {

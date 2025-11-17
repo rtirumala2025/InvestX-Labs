@@ -44,10 +44,12 @@ export const logDebug = (message, data) => {
   }
 };
 
-export default {
+const logger = {
   logError,
   logInfo,
   logWarn,
   logDebug,
   levels: logLevels
 };
+
+export default logger;

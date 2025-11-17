@@ -207,7 +207,7 @@ export {
 };
 
 // For backward compatibility
-export default {
+const apiClient = {
   get,
   post,
   put,
@@ -216,3 +216,5 @@ export default {
   handleApiError,
   request
 };
+
+export default apiClient;

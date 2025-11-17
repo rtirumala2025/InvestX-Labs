@@ -362,6 +362,7 @@ export const parseDate = (dateString, formats = []) => {
   }
   
   // Try custom formats
+  // Note: Currently using simple Date parsing, format parameter reserved for future use
   for (const _format of formats) {
     try {
       // This is a simplified implementation

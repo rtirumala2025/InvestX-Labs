@@ -47,8 +47,10 @@ export const offlineClubMembers = [
   }
 ];
 
-export default {
+const offlineClubsData = {
   clubs: offlineClubs,
   members: offlineClubMembers
 };
+
+export default offlineClubsData;
 
