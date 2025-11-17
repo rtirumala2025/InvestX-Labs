@@ -71,8 +71,10 @@ export const subscribeToMessages = (userId, callback) => {
         }
       )
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.warn('Chat realtime connection error');
+        if (status === 'SUBSCRIBED') {
+          console.log('💬 [ChatService] ✅ Chat realtime subscription connected');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('💬 [ChatService] ⚠️ Chat realtime connection issue:', status);
         }
       });
 
