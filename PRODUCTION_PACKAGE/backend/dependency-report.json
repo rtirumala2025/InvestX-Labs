@@ -1,0 +1,31 @@
+{
+  "totalDependencies": 17,
+  "largeDependencies": [
+    {
+      "name": "winston",
+      "estimatedSize": "~500KB"
+    },
+    {
+      "name": "express",
+      "estimatedSize": "~200KB"
+    },
+    {
+      "name": "@supabase/supabase-js",
+      "estimatedSize": "~300KB"
+    },
+    {
+      "name": "@modelcontextprotocol/sdk",
+      "estimatedSize": "~400KB"
+    }
+  ],
+  "recommendations": [
+    {
+      "type": "unused_dependencies",
+      "dependencies": [
+        "undici",
+        "nodemon"
+      ],
+      "note": "These dependencies may be unused. Review before removing."
+    }
+  ]
+}

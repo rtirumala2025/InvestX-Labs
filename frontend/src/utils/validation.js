@@ -323,6 +323,9 @@ export const validateForm = (data, rules) => {
             fieldErrors.push(`${rule.label || field} must be a valid URL`);
           }
           break;
+        default:
+          // Unknown validation type, skip type-specific validation
+          break;
       }
       
       // Length validation

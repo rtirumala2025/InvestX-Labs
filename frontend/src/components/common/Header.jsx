@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 
 /**
  * Header Component
- * 
+ *
  * Main navigation header with responsive design.
  * Displays different buttons based on authentication state:
  * - Logged out: Shows Login and Sign Up buttons
  * - Logged in: Shows user welcome message and Logout button
- * 
+ *
  * Features:
  * - Sticky header with scroll-based styling
  * - Responsive mobile menu
@@ -25,8 +25,8 @@ const Header = () => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   /**
@@ -36,21 +36,24 @@ const Header = () => {
   const handleLogout = async () => {
     try {
       await signOut();
-      navigate('/');
+      navigate("/");
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   };
 
   return (
     <>
-      <header className={`
+      <header
+        className={`
         sticky top-0 z-50 transition-all duration-300 ease-out
-        ${scrolled 
-          ? 'bg-white/8 backdrop-blur-2xl backdrop-saturate-150 border-b border-white/20 shadow-2xl shadow-black/10' 
-          : 'bg-white/5 backdrop-blur-xl backdrop-saturate-125 border-b border-white/10 shadow-xl shadow-black/5'
+        ${
+          scrolled
+            ? "bg-white/8 backdrop-blur-2xl backdrop-saturate-150 border-b border-white/20 shadow-2xl shadow-black/10"
+            : "bg-white/5 backdrop-blur-xl backdrop-saturate-125 border-b border-white/10 shadow-xl shadow-black/5"
         }
-      `}>
+      `}
+      >
         <div className="w-full mx-auto px-6 lg:px-8 xl:px-12">
           <div className="flex justify-between items-center h-20">
             {/* Logo - Always visible */}
@@ -61,65 +64,65 @@ const Header = () => {
                 </h1>
               </Link>
             </div>
-          
+
             {/* Desktop Navigation - Spread across full width */}
             <nav className="hidden lg:flex items-center justify-center flex-1 gap-6 xl:gap-8 2xl:gap-12 px-8">
-              <Link 
-                to="/dashboard" 
+              <Link
+                to="/dashboard"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 Dashboard
               </Link>
-              <Link 
-                to="/portfolio" 
+              <Link
+                to="/portfolio"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 Portfolio
               </Link>
-              <Link 
-                to="/suggestions" 
+              <Link
+                to="/suggestions"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 AI Suggestions
               </Link>
-              <Link 
-                to="/education" 
+              <Link
+                to="/education"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 Education
               </Link>
-              <Link 
-                to="/clubs" 
+              <Link
+                to="/clubs"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 🏛️ Clubs
               </Link>
-              <Link 
-                to="/chat" 
+              <Link
+                to="/chat"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 💬 Chat
               </Link>
-              <Link 
-                to="/simulation" 
+              <Link
+                to="/simulation"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 🎮 Simulation
               </Link>
-              <Link 
-                to="/leaderboard" 
+              <Link
+                to="/leaderboard"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 🏆 Leaderboard
               </Link>
-              <Link 
-                to="/achievements" 
+              <Link
+                to="/achievements"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 🏅 Achievements
               </Link>
-              <Link 
-                to="/privacy" 
+              <Link
+                to="/privacy"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               >
                 Privacy
@@ -131,7 +134,7 @@ const Header = () => {
               {user ? (
                 <>
                   <span className="hidden xl:block bg-white/85 hover:bg-white/95 text-neutral-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border border-white/25 hover:border-white/35 backdrop-blur-xl">
-                    Welcome, {user?.profile?.full_name || user?.email || 'User'}
+                    Welcome, {user?.profile?.full_name || user?.email || "User"}
                   </span>
                   <button
                     onClick={handleLogout}
@@ -143,8 +146,8 @@ const Header = () => {
                 </>
               ) : (
                 <>
-                  <Link 
-                    to="/login" 
+                  <Link
+                    to="/login"
                     className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:scale-[0.98]"
                   >
                     Login
@@ -157,93 +160,108 @@ const Header = () => {
                   </Link>
                 </>
               )}
-              
+
               {/* Mobile menu button - Always visible on mobile */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="lg:hidden p-2 rounded-lg text-white hover:bg-white/20 transition-colors duration-200"
                 aria-label="Toggle mobile menu"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   {isMobileMenuOpen ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
                   )}
                 </svg>
               </button>
             </div>
           </div>
-          
+
           {/* Mobile Navigation - Always visible when open */}
           {isMobileMenuOpen && (
             <div className="lg:hidden border-t border-white/20 py-4">
               <nav className="flex flex-col space-y-3">
-                <Link 
-                  to="/dashboard" 
+                <Link
+                  to="/dashboard"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Dashboard
                 </Link>
-                <Link 
-                  to="/portfolio" 
+                <Link
+                  to="/portfolio"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Portfolio
                 </Link>
-                <Link 
-                  to="/suggestions" 
+                <Link
+                  to="/suggestions"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   AI Suggestions
                 </Link>
-                <Link 
-                  to="/education" 
+                <Link
+                  to="/education"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Education
                 </Link>
-                <Link 
-                  to="/clubs" 
+                <Link
+                  to="/clubs"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Clubs
                 </Link>
-                <Link 
-                  to="/chat" 
+                <Link
+                  to="/chat"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   💬 Chat
                 </Link>
-                <Link 
-                  to="/simulation" 
+                <Link
+                  to="/simulation"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   🎮 Simulation
                 </Link>
-                <Link 
-                  to="/leaderboard" 
+                <Link
+                  to="/leaderboard"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   🏆 Leaderboard
                 </Link>
-              <Link 
-                to="/achievements" 
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                🏅 Achievements
-              </Link>
-                <Link 
-                  to="/privacy" 
+                <Link
+                  to="/achievements"
+                  className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  🏅 Achievements
+                </Link>
+                <Link
+                  to="/privacy"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >

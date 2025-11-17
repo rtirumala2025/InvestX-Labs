@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import LoadingSpinner from '../common/LoadingSpinner';
-import { getSession as getCachedSession } from '../../services/api/auth';
+import React, { useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import LoadingSpinner from "../common/LoadingSpinner";
+import { getSession as getCachedSession } from "../../services/api/auth";
 
 const ProtectedRoute = ({ children }) => {
   const { currentUser, loading } = useAuth();
@@ -67,8 +67,8 @@ const ProtectedRoute = ({ children }) => {
           <div className="bg-amber-500/20 border border-amber-500 text-amber-100 px-6 py-4 text-sm md:text-base rounded-none md:rounded-md shadow-lg md:m-6 md:mt-6">
             <p className="font-semibold">Offline read-only mode</p>
             <p className="mt-1 text-amber-200/80">
-              We could not verify your session with Supabase. You are viewing cached data and some actions may be disabled
-              until you reconnect.
+              We could not verify your session with Supabase. You are viewing
+              cached data and some actions may be disabled until you reconnect.
             </p>
           </div>
           {children}

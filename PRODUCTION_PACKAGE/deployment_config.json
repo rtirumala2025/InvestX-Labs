@@ -1,0 +1,64 @@
+{
+  "buildInfo": {
+    "timestamp": "2025-11-17T01:40:07.924Z",
+    "version": "1.0.0",
+    "environment": "production"
+  },
+  "frontend": {
+    "buildDirectory": "frontend/dist",
+    "totalSize": 12221481,
+    "totalSizeFormatted": "11.66 MB",
+    "fileCount": 82,
+    "buildTool": "react-scripts",
+    "optimizations": {
+      "sourceMaps": false,
+      "minification": true,
+      "treeShaking": true
+    }
+  },
+  "backend": {
+    "entryPoint": "index.js",
+    "nodeVersion": "v22.17.0",
+    "totalDependencies": 17,
+    "largeDependencies": [
+      {
+        "name": "winston",
+        "estimatedSize": "~500KB"
+      },
+      {
+        "name": "express",
+        "estimatedSize": "~200KB"
+      },
+      {
+        "name": "@supabase/supabase-js",
+        "estimatedSize": "~300KB"
+      },
+      {
+        "name": "@modelcontextprotocol/sdk",
+        "estimatedSize": "~400KB"
+      }
+    ]
+  },
+  "deployment": {
+    "frontend": {
+      "type": "static",
+      "serveDirectory": "frontend/dist",
+      "recommendedPlatform": "Vercel, Netlify, or Cloudflare Pages"
+    },
+    "backend": {
+      "type": "node",
+      "startCommand": "npm install && npm start",
+      "port": "5001",
+      "recommendedPlatform": "Railway, Render, or AWS Elastic Beanstalk",
+      "environmentVariables": "See backend/env-validation.json"
+    }
+  },
+  "notes": [
+    "Frontend is a static build - serve the frontend/dist directory",
+    "Backend requires Node.js environment with all dependencies installed",
+    "Set all required environment variables before starting backend",
+    "Backend logs are configured for production (JSON format)",
+    "No source maps included in frontend build",
+    "All assets are minified and optimized"
+  ]
+}

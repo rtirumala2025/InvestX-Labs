@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../supabase/config';
 
 // Cache configuration
@@ -30,7 +29,6 @@ async function request(config, {
 } = {}) {
   const { method = 'GET', url, data, params = {} } = config;
   const cacheKey = JSON.stringify({ method, url, params, data });
-  const requestId = uuidv4();
 
   // Return cached response if available and valid
   if (useCache && cacheConfig.enabled) {

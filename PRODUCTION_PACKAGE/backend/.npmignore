@@ -1,0 +1,14 @@
+node_modules/
+logs/
+scripts/
+test-server/
+legacy/
+ai_services/
+data/
+*.test.js
+*.test.mjs
+*.test.cjs
+.env
+.env.*
+.git/
+.gitignore

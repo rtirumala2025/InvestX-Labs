@@ -44,15 +44,6 @@ const setCachedData = (key, data, ttl = CACHE_TTL.REALTIME) => {
   });
 };
 
-/**
- * Generate cache key from function name and arguments
- * @param {string} functionName - Name of the function
- * @param {any} args - Function arguments
- * @returns {string} Cache key
- */
-const generateCacheKey = (functionName, ...args) => {
-  return `${functionName}:${JSON.stringify(args)}`;
-};
 
 
 /**
@@ -200,7 +191,7 @@ const searchStocks = async (query, options = {}) => {
  * @returns {Promise<Array>} Historical price data
  */
 const getHistoricalData = async (symbol, options = {}) => {
-  const { useCache = true, interval = 'daily', startDate, endDate } = options;
+  const { interval = 'daily', startDate, endDate } = options;
   
   try {
     // First try Supabase RPC function (from market_history table)
@@ -269,7 +260,7 @@ const getHistoricalData = async (symbol, options = {}) => {
  * @returns {Promise<Array>} List of news articles
  */
 const getMarketNews = async (options = {}) => {
-  const { useCache = true, ...params } = options;
+  const { ...params } = options;
   
   try {
     const response = await supabase
@@ -367,7 +358,7 @@ const getBatchMarketData = async (symbols = [], options = {}) => {
 const testConnection = async () => {
   try {
     // Test Supabase connection by fetching a quote
-    const { data, error } = await supabase
+    const { error } = await supabase
       .rpc('get_quote', { symbol: 'AAPL' })
       .single();
     

@@ -4,8 +4,6 @@
  * a proper financial data API like Alpha Vantage, IEX Cloud, or Yahoo Finance API
  */
 
-const YAHOO_FINANCE_BASE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
-
 /**
  * Get stock quote data from Yahoo Finance
  * @param {string} symbol - Stock symbol

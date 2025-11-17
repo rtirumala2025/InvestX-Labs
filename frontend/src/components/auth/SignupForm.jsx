@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import LoadingSpinner from '../common/LoadingSpinner';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
+import LoadingSpinner from "../common/LoadingSpinner";
 
 const SignupForm = () => {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { signup, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
@@ -19,21 +19,21 @@ const SignupForm = () => {
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError("Password must be at least 6 characters");
       return;
     }
 
@@ -42,40 +42,48 @@ const SignupForm = () => {
     try {
       await signup(formData.email, formData.password, {
         firstName: formData.firstName,
-        lastName: formData.lastName
+        lastName: formData.lastName,
       });
-      navigate('/onboarding');
+      navigate("/onboarding");
     } catch (error) {
-      setError('Failed to create account. Please try again.');
-      console.error('Signup error:', error);
+      setError("Failed to create account. Please try again.");
+      console.error("Signup error:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       await loginWithGoogle();
-      navigate('/onboarding');
+      navigate("/onboarding");
     } catch (error) {
-      console.error('Google sign-in error:', error);
-      
+      console.error("Google sign-in error:", error);
+
       // Provide more specific error messages
-      if (error.message.includes('Popup blocked')) {
-        setError('Popup blocked. Please allow popups for this site and try again.');
-      } else if (error.message.includes('cancelled')) {
-        setError('Sign-in cancelled. Please try again.');
-      } else if (error.message.includes('Firebase is not properly configured')) {
-        setError('Authentication service is not configured. Please contact support.');
-      } else if (error.message.includes('account already exists')) {
-        setError('An account already exists with this email using a different sign-in method.');
-      } else if (error.message.includes('not enabled')) {
-        setError('Google sign-in is not enabled. Please contact support.');
+      if (error.message.includes("Popup blocked")) {
+        setError(
+          "Popup blocked. Please allow popups for this site and try again.",
+        );
+      } else if (error.message.includes("cancelled")) {
+        setError("Sign-in cancelled. Please try again.");
+      } else if (
+        error.message.includes("Firebase is not properly configured")
+      ) {
+        setError(
+          "Authentication service is not configured. Please contact support.",
+        );
+      } else if (error.message.includes("account already exists")) {
+        setError(
+          "An account already exists with this email using a different sign-in method.",
+        );
+      } else if (error.message.includes("not enabled")) {
+        setError("Google sign-in is not enabled. Please contact support.");
       } else {
-        setError('Failed to sign in with Google. Please try again.');
+        setError("Failed to sign in with Google. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -90,8 +98,11 @@ const SignupForm = () => {
             Create your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+            Or{" "}
+            <Link
+              to="/login"
+              className="font-medium text-blue-600 hover:text-blue-500"
+            >
               sign in to your existing account
             </Link>
           </p>
@@ -100,7 +111,10 @@ const SignupForm = () => {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="firstName"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   First Name
                 </label>
                 <input
@@ -115,7 +129,10 @@ const SignupForm = () => {
                 />
               </div>
               <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="lastName"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Last Name
                 </label>
                 <input
@@ -130,9 +147,12 @@ const SignupForm = () => {
                 />
               </div>
             </div>
-            
+
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Email Address
               </label>
               <input
@@ -147,9 +167,12 @@ const SignupForm = () => {
                 onChange={handleChange}
               />
             </div>
-            
+
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Password
               </label>
               <input
@@ -164,9 +187,12 @@ const SignupForm = () => {
                 onChange={handleChange}
               />
             </div>
-            
+
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="confirmPassword"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Confirm Password
               </label>
               <input
@@ -198,11 +224,11 @@ const SignupForm = () => {
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
             <label htmlFor="terms" className="ml-2 block text-sm text-gray-900">
-              I agree to the{' '}
+              I agree to the{" "}
               <a href="#" className="text-blue-600 hover:text-blue-500">
                 Terms of Service
-              </a>{' '}
-              and{' '}
+              </a>{" "}
+              and{" "}
               <a href="#" className="text-blue-600 hover:text-blue-500">
                 Privacy Policy
               </a>
@@ -215,11 +241,7 @@ const SignupForm = () => {
               disabled={loading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
-                <LoadingSpinner size="small" />
-              ) : (
-                'Create Account'
-              )}
+              {loading ? <LoadingSpinner size="small" /> : "Create Account"}
             </button>
 
             <div className="relative">
@@ -227,7 +249,9 @@ const SignupForm = () => {
                 <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
+                <span className="px-2 bg-gray-50 text-gray-500">
+                  Or continue with
+                </span>
               </div>
             </div>
 

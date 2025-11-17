@@ -1,55 +1,63 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import LoadingSpinner from '../common/LoadingSpinner';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
+import LoadingSpinner from "../common/LoadingSpinner";
 
 const LoginForm = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      navigate("/dashboard");
     } catch (error) {
-      setError('Failed to log in. Please check your credentials.');
-      console.error('Login error:', error);
+      setError("Failed to log in. Please check your credentials.");
+      console.error("Login error:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       await loginWithGoogle();
-      navigate('/dashboard');
+      navigate("/dashboard");
     } catch (error) {
-      console.error('Google sign-in error:', error);
-      
+      console.error("Google sign-in error:", error);
+
       // Provide more specific error messages
-      if (error.message.includes('Popup blocked')) {
-        setError('Popup blocked. Please allow popups for this site and try again.');
-      } else if (error.message.includes('cancelled')) {
-        setError('Sign-in cancelled. Please try again.');
-      } else if (error.message.includes('Firebase is not properly configured')) {
-        setError('Authentication service is not configured. Please contact support.');
-      } else if (error.message.includes('account already exists')) {
-        setError('An account already exists with this email using a different sign-in method.');
-      } else if (error.message.includes('not enabled')) {
-        setError('Google sign-in is not enabled. Please contact support.');
+      if (error.message.includes("Popup blocked")) {
+        setError(
+          "Popup blocked. Please allow popups for this site and try again.",
+        );
+      } else if (error.message.includes("cancelled")) {
+        setError("Sign-in cancelled. Please try again.");
+      } else if (
+        error.message.includes("Firebase is not properly configured")
+      ) {
+        setError(
+          "Authentication service is not configured. Please contact support.",
+        );
+      } else if (error.message.includes("account already exists")) {
+        setError(
+          "An account already exists with this email using a different sign-in method.",
+        );
+      } else if (error.message.includes("not enabled")) {
+        setError("Google sign-in is not enabled. Please contact support.");
       } else {
-        setError('Failed to sign in with Google. Please try again.');
+        setError("Failed to sign in with Google. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -64,8 +72,11 @@ const LoginForm = () => {
             Sign in to your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-500">
+            Or{" "}
+            <Link
+              to="/signup"
+              className="font-medium text-blue-600 hover:text-blue-500"
+            >
               create a new account
             </Link>
           </p>
@@ -120,13 +131,19 @@ const LoginForm = () => {
                 type="checkbox"
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+              <label
+                htmlFor="remember-me"
+                className="ml-2 block text-sm text-gray-900"
+              >
                 Remember me
               </label>
             </div>
 
             <div className="text-sm">
-              <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+              <a
+                href="#"
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
                 Forgot your password?
               </a>
             </div>
@@ -138,11 +155,7 @@ const LoginForm = () => {
               disabled={loading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
-                <LoadingSpinner size="small" />
-              ) : (
-                'Sign in'
-              )}
+              {loading ? <LoadingSpinner size="small" /> : "Sign in"}
             </button>
 
             <div className="relative">
@@ -150,7 +163,9 @@ const LoginForm = () => {
                 <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
+                <span className="px-2 bg-gray-50 text-gray-500">
+                  Or continue with
+                </span>
               </div>
             </div>
 

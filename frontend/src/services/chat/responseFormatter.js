@@ -172,7 +172,6 @@ function applyTemplate(template, content, metadata = {}) {
   // Process sections
   for (let i = 0; i < template.sections.length; i++) {
     const section = template.sections[i];
-    const nextSection = template.sections[i + 1];
     
     // Skip empty sections
     if (section.includes('{content}')) {
@@ -185,7 +184,7 @@ function applyTemplate(template, content, metadata = {}) {
     let sectionContent = '';
     
     // Try to find section content in the response
-    const sectionMatch = new RegExp(`##\s*${sectionName}[\s\S]*?(?=##|$)`, 'i');
+    const sectionMatch = new RegExp(`##\\s*${sectionName}[\\s\\S]*?(?=##|$)`, 'i');
     const match = content.match(sectionMatch);
     
     if (match) {

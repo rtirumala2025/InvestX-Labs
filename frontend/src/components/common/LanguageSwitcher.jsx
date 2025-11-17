@@ -1,12 +1,12 @@
-import React from 'react';
-import { useTranslation } from '../../hooks/useTranslation';
+import React from "react";
+import { useTranslation } from "../../hooks/useTranslation";
 
 const LanguageSwitcher = () => {
   const { language, changeLanguage, availableLanguages } = useTranslation();
 
   const languageNames = {
-    en: 'English',
-    es: 'Español'
+    en: "English",
+    es: "Español",
   };
 
   return (

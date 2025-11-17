@@ -91,7 +91,6 @@ export class ConversationManager {
   getRelevantContext(query, maxMessages = 5, options = {}) {
     const {
       useSemanticRanking = true,
-      prioritizeRecent = true,
       maxTokens = 2000
     } = options;
 
@@ -269,18 +268,6 @@ export class ConversationManager {
     if (!db || !userId || !conversationId) return null;
     
     try {
-      // This would integrate with Firebase
-      // const docRef = doc(db, 'conversations', conversationId);
-      // const docSnap = await getDoc(docRef);
-      
-      // if (docSnap.exists()) {
-      //   const data = docSnap.data();
-      //   const manager = new ConversationManager(userId);
-      //   manager.messages = data.messages || [];
-      //   manager.metadata = data.metadata || manager.metadata;
-      //   return manager;
-      // }
-      
       return null;
     } catch (error) {
       console.error('Error loading conversation:', error);

@@ -460,7 +460,7 @@ export const usePortfolio = () => {
         setLoading(false);
       }
     }
-  }, [holdings, marketData, portfolio, queueToast, userId]);
+  }, [holdings, marketData, portfolio, queueToast, userId, transactions]);
 
   /**
    * Add a holding to the portfolio

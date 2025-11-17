@@ -1,0 +1,99 @@
+# Supabase CLI Configuration
+# Run `supabase init` to generate a new project
+
+[api]
+# The port on which the API server will listen
+port = 54321
+
+# The host to bind the API server to
+host = "0.0.0.0"
+
+[db]
+# The port on which the database will listen
+port = 54322
+
+# The host to bind the database to
+host = "0.0.0.0"
+
+# The name of the database
+database = "postgres"
+
+# The database user
+user = "postgres"
+
+# The database password
+password = "postgres"
+
+[studio]
+# The port on which the Studio will listen
+port = 3000
+
+# The host to bind the Studio to
+host = "0.0.0.0"
+
+# Enable or disable the Studio
+enabled = true
+
+[inbucket]
+# The port on which Inbucket will listen
+port = 54324
+
+# The host to bind Inbucket to
+host = "0.0.0.0"
+
+# Enable or disable Inbucket
+enabled = true
+
+[storage]
+# The port on which the Storage API will listen
+port = 54321
+
+# The host to bind the Storage API to
+host = "0.0.0.0"
+
+# Enable or disable the Storage API
+enabled = true
+
+[functions]
+# The port on which the Functions will listen
+port = 54321
+
+# The host to bind the Functions to
+host = "0.0.0.0"
+
+# Enable or disable the Functions
+enabled = true
+
+[realtime]
+# The port on which the Realtime API will listen
+port = 54321
+
+# The host to bind the Realtime API to
+host = "0.0.0.0"
+
+# Enable or disable the Realtime API
+enabled = true
+
+[auth]
+# The port on which the Auth API will listen
+port = 54321
+
+# The host to bind the Auth API to
+host = "0.0.0.0"
+
+# Enable or disable the Auth API
+enabled = true
+
+[rest]
+# The port on which the REST API will listen
+port = 54321
+
+# The host to bind the REST API to
+host = "0.0.0.0"
+
+# Enable or disable the REST API
+enabled = true
+
+[meta]
+# The version of the Supabase CLI
+version = 1

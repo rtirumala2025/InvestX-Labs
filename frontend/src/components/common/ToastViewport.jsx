@@ -1,18 +1,30 @@
-import React, { useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { useApp } from '../../contexts/AppContext';
+import React, { useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useApp } from "../../contexts/AppContext";
 
 const toastVariants = {
   initial: { opacity: 0, y: 20, scale: 0.95 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.25, ease: 'easeOut' } },
-  exit: { opacity: 0, y: -20, scale: 0.95, transition: { duration: 0.2, ease: 'easeIn' } },
+  animate: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.25, ease: "easeOut" },
+  },
+  exit: {
+    opacity: 0,
+    y: -20,
+    scale: 0.95,
+    transition: { duration: 0.2, ease: "easeIn" },
+  },
 };
 
 const toneStyles = {
-  success: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100 shadow-emerald-500/20',
-  error: 'border-rose-400/40 bg-rose-500/15 text-rose-100 shadow-rose-500/20',
-  warning: 'border-amber-400/40 bg-amber-500/15 text-amber-100 shadow-amber-500/20',
-  info: 'border-sky-400/40 bg-sky-500/15 text-sky-100 shadow-sky-500/20',
+  success:
+    "border-emerald-400/40 bg-emerald-500/15 text-emerald-100 shadow-emerald-500/20",
+  error: "border-rose-400/40 bg-rose-500/15 text-rose-100 shadow-rose-500/20",
+  warning:
+    "border-amber-400/40 bg-amber-500/15 text-amber-100 shadow-amber-500/20",
+  info: "border-sky-400/40 bg-sky-500/15 text-sky-100 shadow-sky-500/20",
 };
 
 const ToastViewport = () => {
@@ -60,4 +72,3 @@ const ToastViewport = () => {
 };
 
 export default ToastViewport;
-

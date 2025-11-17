@@ -2,7 +2,7 @@
  * Market Data service for aggregating and processing market information
  */
 
-import { getStockQuote, getMultipleStockQuotes, getHistoricalData } from './yahooFinance';
+import { getMultipleStockQuotes, getHistoricalData } from './yahooFinance';
 
 /**
  * Get comprehensive market data for a portfolio

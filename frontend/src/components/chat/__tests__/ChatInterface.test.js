@@ -1,23 +1,23 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import ChatInterface from '../ChatInterface';
-import { useAuth } from '../../../hooks/useAuth';
-import { useChat } from '../../../contexts/ChatContext';
+import React from "react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { BrowserRouter } from "react-router-dom";
+import ChatInterface from "../ChatInterface";
+import { useAuth } from "../../../hooks/useAuth";
+import { useChat } from "../../../contexts/ChatContext";
 
 // Mock the hooks
-jest.mock('../../../hooks/useAuth');
-jest.mock('../../../contexts/ChatContext');
+jest.mock("../../../hooks/useAuth");
+jest.mock("../../../contexts/ChatContext");
 
 const mockUser = {
-  uid: 'test-user-123',
-  displayName: 'Test User',
-  email: 'test@example.com',
+  uid: "test-user-123",
+  displayName: "Test User",
+  email: "test@example.com",
   age: 16,
   budget: 100,
-  risk_tolerance: 'moderate',
-  investment_goals: ['college', 'car'],
-  experience_level: 'beginner',
+  risk_tolerance: "moderate",
+  investment_goals: ["college", "car"],
+  experience_level: "beginner",
 };
 
 const mockChatHook = {
@@ -33,14 +33,10 @@ const mockChatHook = {
 };
 
 const renderWithRouter = (component) => {
-  return render(
-    <BrowserRouter>
-      {component}
-    </BrowserRouter>
-  );
+  return render(<BrowserRouter>{component}</BrowserRouter>);
 };
 
-describe('ChatInterface', () => {
+describe("ChatInterface", () => {
   beforeEach(() => {
     useAuth.mockReturnValue({
       user: mockUser,
@@ -58,119 +54,150 @@ describe('ChatInterface', () => {
     jest.clearAllMocks();
   });
 
-  it('renders chat interface for authenticated user', () => {
+  it("renders chat interface for authenticated user", () => {
     renderWithRouter(<ChatInterface />);
-    
-    expect(screen.getByText('💬 Chat with Finley')).toBeInTheDocument();
-    expect(screen.getByText('Your AI investment education assistant')).toBeInTheDocument();
+
+    expect(screen.getByText("💬 Chat with Finley")).toBeInTheDocument();
+    expect(
+      screen.getByText("Your AI investment education assistant"),
+    ).toBeInTheDocument();
   });
 
-  it('shows login prompt for unauthenticated user', () => {
+  it("shows login prompt for unauthenticated user", () => {
     useAuth.mockReturnValue({
       user: null,
       logout: jest.fn(),
     });
 
     renderWithRouter(<ChatInterface />);
-    
-    expect(screen.getByText('🔒 Please log in to chat')).toBeInTheDocument();
-    expect(screen.getByText('You need to be logged in to use the chat feature.')).toBeInTheDocument();
+
+    expect(screen.getByText("🔒 Please log in to chat")).toBeInTheDocument();
+    expect(
+      screen.getByText("You need to be logged in to use the chat feature."),
+    ).toBeInTheDocument();
   });
 
-  it('displays welcome message when no messages exist', () => {
+  it("displays welcome message when no messages exist", () => {
     renderWithRouter(<ChatInterface />);
-    
-    expect(screen.getByText('👋 Hey there!')).toBeInTheDocument();
-    expect(screen.getByText("I'm Finley, your AI investment education assistant!")).toBeInTheDocument();
-    expect(screen.getByText('Try asking me:')).toBeInTheDocument();
+
+    expect(screen.getByText("👋 Hey there!")).toBeInTheDocument();
+    expect(
+      screen.getByText("I'm Finley, your AI investment education assistant!"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Try asking me:")).toBeInTheDocument();
   });
 
-  it('displays conversation starter buttons', () => {
+  it("displays conversation starter buttons", () => {
     renderWithRouter(<ChatInterface />);
-    
-    expect(screen.getByText("What's the difference between stocks and bonds?")).toBeInTheDocument();
-    expect(screen.getByText('How does compound interest work?')).toBeInTheDocument();
-    expect(screen.getByText('What are index funds?')).toBeInTheDocument();
-    expect(screen.getByText('How much should I invest each month?')).toBeInTheDocument();
+
+    expect(
+      screen.getByText("What's the difference between stocks and bonds?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("How does compound interest work?"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("What are index funds?")).toBeInTheDocument();
+    expect(
+      screen.getByText("How much should I invest each month?"),
+    ).toBeInTheDocument();
   });
 
-  it('allows sending messages through input', async () => {
+  it("allows sending messages through input", async () => {
     renderWithRouter(<ChatInterface />);
-    
-    const input = screen.getByPlaceholderText('Ask Finley anything about investing...');
-    const sendButton = screen.getByLabelText('Send message');
-    
-    fireEvent.change(input, { target: { value: 'Hello Finley!' } });
+
+    const input = screen.getByPlaceholderText(
+      "Ask Finley anything about investing...",
+    );
+    const sendButton = screen.getByLabelText("Send message");
+
+    fireEvent.change(input, { target: { value: "Hello Finley!" } });
     fireEvent.click(sendButton);
-    
-    expect(mockChatHook.sendMessage).toHaveBeenCalledWith('Hello Finley!', 'user');
+
+    expect(mockChatHook.sendMessage).toHaveBeenCalledWith(
+      "Hello Finley!",
+      "user",
+    );
   });
 
-  it('handles Enter key to send messages', async () => {
+  it("handles Enter key to send messages", async () => {
     renderWithRouter(<ChatInterface />);
-    
-    const input = screen.getByPlaceholderText('Ask Finley anything about investing...');
-    
-    fireEvent.change(input, { target: { value: 'Test message' } });
-    fireEvent.keyPress(input, { key: 'Enter', code: 'Enter' });
-    
-    expect(mockChatHook.sendMessage).toHaveBeenCalledWith('Test message', 'user');
+
+    const input = screen.getByPlaceholderText(
+      "Ask Finley anything about investing...",
+    );
+
+    fireEvent.change(input, { target: { value: "Test message" } });
+    fireEvent.keyPress(input, { key: "Enter", code: "Enter" });
+
+    expect(mockChatHook.sendMessage).toHaveBeenCalledWith(
+      "Test message",
+      "user",
+    );
   });
 
-  it('shows loading state when sending message', () => {
+  it("shows loading state when sending message", () => {
     useChat.mockReturnValue({
       ...mockChatHook,
       loading: true,
     });
 
     renderWithRouter(<ChatInterface />);
-    
-    expect(screen.getByText('⏳')).toBeInTheDocument();
+
+    expect(screen.getByText("⏳")).toBeInTheDocument();
   });
 
-  it('displays error messages', () => {
+  it("displays error messages", () => {
     useChat.mockReturnValue({
       ...mockChatHook,
-      error: 'Connection failed',
+      error: "Connection failed",
     });
 
     renderWithRouter(<ChatInterface />);
-    
-    expect(screen.getByText('⚠️ Connection failed')).toBeInTheDocument();
-    expect(screen.getByText('Retry')).toBeInTheDocument();
+
+    expect(screen.getByText("⚠️ Connection failed")).toBeInTheDocument();
+    expect(screen.getByText("Retry")).toBeInTheDocument();
   });
 
-  it('allows starting new conversation', () => {
+  it("allows starting new conversation", () => {
     renderWithRouter(<ChatInterface />);
-    
-    const newConversationButton = screen.getByLabelText('Start new conversation');
+
+    const newConversationButton = screen.getByLabelText(
+      "Start new conversation",
+    );
     fireEvent.click(newConversationButton);
-    
+
     expect(mockChatHook.startNewConversation).toHaveBeenCalled();
   });
 
-  it('handles conversation starter clicks', async () => {
+  it("handles conversation starter clicks", async () => {
     renderWithRouter(<ChatInterface />);
-    
-    const starterButton = screen.getByText("What's the difference between stocks and bonds?");
+
+    const starterButton = screen.getByText(
+      "What's the difference between stocks and bonds?",
+    );
     fireEvent.click(starterButton);
-    
-    expect(mockChatHook.sendMessage).toHaveBeenCalledWith("What's the difference between stocks and bonds?", 'user');
+
+    expect(mockChatHook.sendMessage).toHaveBeenCalledWith(
+      "What's the difference between stocks and bonds?",
+      "user",
+    );
   });
 
-  it('displays character count in input', () => {
+  it("displays character count in input", () => {
     renderWithRouter(<ChatInterface />);
-    
-    const input = screen.getByPlaceholderText('Ask Finley anything about investing...');
-    fireEvent.change(input, { target: { value: 'Hello' } });
-    
-    expect(screen.getByText('5/1000')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(
+      "Ask Finley anything about investing...",
+    );
+    fireEvent.change(input, { target: { value: "Hello" } });
+
+    expect(screen.getByText("5/1000")).toBeInTheDocument();
   });
 
-  it('prevents sending empty messages', () => {
+  it("prevents sending empty messages", () => {
     renderWithRouter(<ChatInterface />);
-    
-    const sendButton = screen.getByLabelText('Send message');
+
+    const sendButton = screen.getByLabelText("Send message");
     expect(sendButton).toBeDisabled();
   });
 });

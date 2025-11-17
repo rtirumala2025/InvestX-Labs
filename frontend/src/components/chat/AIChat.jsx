@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import {
   Send,
   Loader2,
@@ -9,50 +9,59 @@ import {
   AlertCircle,
   Wifi,
   WifiOff,
-} from 'lucide-react';
-import { useChat } from '../../contexts/ChatContext';
-import analytics from '../../services/analytics/mockAnalytics';
-import LoadingSpinner from '../common/LoadingSpinner';
+} from "lucide-react";
+import { useChat } from "../../contexts/ChatContext";
+import analytics from "../../services/analytics/mockAnalytics";
+import LoadingSpinner from "../common/LoadingSpinner";
 
 const quickPrompts = [
-  { icon: TrendingUp, text: 'Explain stock market basics', color: 'from-blue-500 to-cyan-500' },
-  { icon: DollarSign, text: 'What is compound interest?', color: 'from-purple-500 to-pink-500' },
-  { icon: BookOpen, text: 'How do ETFs work?', color: 'from-orange-500 to-red-500' },
-  { icon: Sparkles, text: 'Build a beginner portfolio', color: 'from-green-500 to-emerald-500' },
+  {
+    icon: TrendingUp,
+    text: "Explain stock market basics",
+    color: "from-blue-500 to-cyan-500",
+  },
+  {
+    icon: DollarSign,
+    text: "What is compound interest?",
+    color: "from-purple-500 to-pink-500",
+  },
+  {
+    icon: BookOpen,
+    text: "How do ETFs work?",
+    color: "from-orange-500 to-red-500",
+  },
+  {
+    icon: Sparkles,
+    text: "Build a beginner portfolio",
+    color: "from-green-500 to-emerald-500",
+  },
 ];
 
 const validateAndSanitizeInput = (input) => {
   let sanitized = input.trim();
-  sanitized = sanitized.replace(/<[^>]*>?/gm, '');
+  sanitized = sanitized.replace(/<[^>]*>?/gm, "");
 
   if (sanitized.length > 2000) {
-    throw new Error('Message exceeds maximum length of 2000 characters');
+    throw new Error("Message exceeds maximum length of 2000 characters");
   }
 
   if (!sanitized) {
-    throw new Error('Message cannot be empty');
+    throw new Error("Message cannot be empty");
   }
 
   return sanitized;
 };
 
 const AIChat = () => {
-  const {
-    messages,
-    loading,
-    sending,
-    error,
-    isOnline,
-    sendMessage,
-    setError,
-  } = useChat();
+  const { messages, loading, sending, error, isOnline, sendMessage, setError } =
+    useChat();
 
-  const [inputMessage, setInputMessage] = useState('');
+  const [inputMessage, setInputMessage] = useState("");
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSendMessage = async (event) => {
@@ -64,32 +73,32 @@ const AIChat = () => {
       sanitizedMessage = validateAndSanitizeInput(inputMessage);
     } catch (validationError) {
       setError(validationError.message);
-      analytics.logError(validationError, 'chat_input_validation');
+      analytics.logError(validationError, "chat_input_validation");
       return;
     }
 
     if (sending) return;
 
-    setInputMessage('');
+    setInputMessage("");
 
     try {
       analytics.logChatMessage(
         `user-${Date.now()}`,
-        'user',
-        'user_message',
+        "user",
+        "user_message",
         null,
         { contentLength: sanitizedMessage.length },
       );
 
-      const { error: sendError } = await sendMessage(sanitizedMessage, 'user');
+      const { error: sendError } = await sendMessage(sanitizedMessage, "user");
 
       if (sendError) {
         setInputMessage(sanitizedMessage);
-        setError(sendError.message || 'Unable to send message');
+        setError(sendError.message || "Unable to send message");
       }
     } catch (sendError) {
-      console.error('Error sending message:', sendError);
-      analytics.logError(sendError, 'send_message', {
+      console.error("Error sending message:", sendError);
+      analytics.logError(sendError, "send_message", {
         contentLength: sanitizedMessage.length,
         online: isOnline,
       });
@@ -113,11 +122,11 @@ const AIChat = () => {
         <div className="absolute top-20 left-10 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
         <div
           className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse"
-          style={{ animationDelay: '1s' }}
+          style={{ animationDelay: "1s" }}
         />
         <div
           className="absolute top-1/2 left-1/2 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse"
-          style={{ animationDelay: '2s' }}
+          style={{ animationDelay: "2s" }}
         />
       </div>
 
@@ -131,13 +140,18 @@ const AIChat = () => {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                 InvestX Labs Assistant
               </h1>
-              <p className="text-sm text-gray-400">Your personal AI investment assistant</p>
+              <p className="text-sm text-gray-400">
+                Your personal AI investment assistant
+              </p>
             </div>
           </div>
         </div>
 
         <div className="flex-1 backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+          <div
+            className="flex-1 overflow-y-auto p-6 space-y-4"
+            style={{ maxHeight: "calc(100vh - 300px)" }}
+          >
             {loading && messages.length === 0 && (
               <div className="flex justify-center py-10">
                 <LoadingSpinner size="large" />
@@ -146,7 +160,9 @@ const AIChat = () => {
 
             {showEmptyState && (
               <div className="mb-6">
-                <p className="text-gray-400 text-sm mb-4 text-center">Try asking about:</p>
+                <p className="text-gray-400 text-sm mb-4 text-center">
+                  Try asking about:
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {quickPrompts.map((prompt, index) => {
                     const Icon = prompt.icon;
@@ -156,10 +172,14 @@ const AIChat = () => {
                         onClick={() => {
                           setInputMessage(prompt.text);
                           inputRef.current?.focus();
-                          analytics.logInteraction('quick_prompt_selected', 'quick_prompt', {
-                            promptText: prompt.text,
-                            timestamp: new Date().toISOString(),
-                          });
+                          analytics.logInteraction(
+                            "quick_prompt_selected",
+                            "quick_prompt",
+                            {
+                              promptText: prompt.text,
+                              timestamp: new Date().toISOString(),
+                            },
+                          );
                         }}
                         className="group backdrop-blur-xl bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-4 transition-all duration-300 hover:scale-105 hover:shadow-xl text-left"
                       >
@@ -181,19 +201,19 @@ const AIChat = () => {
             )}
 
             {messages.map((message) => {
-              const isUser = message.role === 'user';
+              const isUser = message.role === "user";
               const timestamp = message.created_at || message.timestamp;
 
               return (
                 <div
                   key={message.id}
-                  className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+                  className={`flex ${isUser ? "justify-end" : "justify-start"} animate-fadeIn`}
                 >
                   <div
                     className={`max-w-[80%] rounded-2xl p-4 ${
                       isUser
-                        ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg'
-                        : 'backdrop-blur-xl bg-white/10 border border-white/10 text-gray-100 shadow-xl'
+                        ? "bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg"
+                        : "backdrop-blur-xl bg-white/10 border border-white/10 text-gray-100 shadow-xl"
                     }`}
                   >
                     {!isUser && (
@@ -201,16 +221,27 @@ const AIChat = () => {
                         <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-purple-600">
                           <Sparkles className="w-3 h-3 text-white" />
                         </div>
-                        <span className="text-xs text-gray-400 font-medium">InvestX Labs</span>
+                        <span className="text-xs text-gray-400 font-medium">
+                          InvestX Labs
+                        </span>
                       </div>
                     )}
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {message.content}
+                    </p>
                     {message.pending && (
-                      <span className="text-xs mt-2 block text-blue-200">Sending…</span>
+                      <span className="text-xs mt-2 block text-blue-200">
+                        Sending…
+                      </span>
                     )}
                     {timestamp && (
-                      <span className={`text-xs mt-2 block ${isUser ? 'text-blue-200' : 'text-gray-500'}`}>
-                        {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <span
+                        className={`text-xs mt-2 block ${isUser ? "text-blue-200" : "text-gray-500"}`}
+                      >
+                        {new Date(timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </span>
                     )}
                   </div>
@@ -227,11 +258,11 @@ const AIChat = () => {
                       <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" />
                       <span
                         className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
-                        style={{ animationDelay: '0.1s' }}
+                        style={{ animationDelay: "0.1s" }}
                       />
                       <span
                         className="w-2 h-2 bg-pink-400 rounded-full animate-bounce"
-                        style={{ animationDelay: '0.2s' }}
+                        style={{ animationDelay: "0.2s" }}
                       />
                     </div>
                   </div>
@@ -244,7 +275,7 @@ const AIChat = () => {
           <div className="p-6 border-t border-white/10 backdrop-blur-xl bg-white/5">
             <div
               className={`flex items-center gap-2 mb-3 text-sm ${
-                isOnline ? 'text-green-400' : 'text-yellow-400'
+                isOnline ? "text-green-400" : "text-yellow-400"
               }`}
             >
               {isOnline ? (
@@ -267,7 +298,10 @@ const AIChat = () => {
                   role="alert"
                   aria-live="assertive"
                 >
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                  <AlertCircle
+                    className="w-4 h-4 flex-shrink-0"
+                    aria-hidden="true"
+                  />
                   <span>{error}</span>
                 </div>
               )}
@@ -289,7 +323,7 @@ const AIChat = () => {
                     className="w-full bg-white/10 backdrop-blur-xl border border-white/10 rounded-xl px-6 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all disabled:opacity-50 pr-12"
                     maxLength={2000}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter' && !event.shiftKey) {
+                      if (event.key === "Enter" && !event.shiftKey) {
                         event.preventDefault();
                         handleSendMessage(event);
                       }
@@ -307,14 +341,17 @@ const AIChat = () => {
                   aria-label="Send message"
                   className="p-3 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   onClick={() => {
-                    analytics.logInteraction('send_button_click', 'button', {
+                    analytics.logInteraction("send_button_click", "button", {
                       inputLength: inputMessage.length,
                       timestamp: new Date().toISOString(),
                     });
                   }}
                 >
                   {sending ? (
-                    <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                    <Loader2
+                      className="w-5 h-5 animate-spin"
+                      aria-hidden="true"
+                    />
                   ) : (
                     <Send className="w-5 h-5" aria-hidden="true" />
                   )}
@@ -324,11 +361,13 @@ const AIChat = () => {
             </form>
             <div className="text-center mt-3">
               <p className="text-xs text-gray-500">
-                InvestX Labs provides educational information only. Not financial advice.
+                InvestX Labs provides educational information only. Not
+                financial advice.
               </p>
               {!isOnline && (
                 <p className="text-xs text-yellow-400 mt-1">
-                  You\'re currently offline. Messages will be sent when you\'re back online.
+                  You\'re currently offline. Messages will be sent when you\'re
+                  back online.
                 </p>
               )}
             </div>

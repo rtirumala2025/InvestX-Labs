@@ -1,9 +1,6 @@
 import { supabase } from '../supabase/config';
 import { logError, logInfo } from '../../utils/logger';
 
-// Base URL for API calls (not needed for Supabase RPC)
-const API_BASE_URL = '';
-
 // Cache configuration
 const CACHE_TTL = {
   SHORT: 5 * 60 * 1000, // 5 minutes
@@ -90,18 +87,6 @@ const getSession = async () => {
   }
 };
 
-// Default options for Supabase RPC calls
-const DEFAULT_RPC_OPTIONS = {
-  head: false,
-  count: null,
-  retry: true,
-  retryCount: MAX_RETRIES,
-  retryDelay: 1000,
-};
-
-// Base delay between retries (ms)
-const RETRY_DELAY = 1000;
-
 /**
  * Get MCP context for a user
  * @param {string} userId - User ID (defaults to 'anonymous' if not provided)
@@ -114,8 +99,7 @@ const RETRY_DELAY = 1000;
 const getMCPContext = async (userId = 'anonymous', options = {}) => {
   const {
     useCache = true,
-    cacheTtl = CACHE_TTL.MEDIUM,
-    retries = MAX_RETRIES
+    cacheTtl = CACHE_TTL.MEDIUM
   } = options;
 
   const cacheKey = `mcp:context:${userId}`;

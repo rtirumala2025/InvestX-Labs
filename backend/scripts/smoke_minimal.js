@@ -1,87 +1,201 @@
-/* Minimal end-to-end smoke tests for key endpoints */
+/* Enhanced end-to-end smoke tests for key endpoints with detailed logging */
 import assert from 'node:assert';
 const { default: fetch } = await import('node-fetch');
 
-const BASE = process.env.SMOKE_BASE_URL || 'http://localhost:5001/api';
+// Support --remote flag or SMOKE_BASE_URL env var
+const args = process.argv.slice(2);
+const remoteFlagIndex = args.indexOf('--remote');
+const BASE = remoteFlagIndex !== -1 && args[remoteFlagIndex + 1]
+  ? args[remoteFlagIndex + 1].replace(/\/$/, '') + '/api'
+  : process.env.SMOKE_BASE_URL || 'http://localhost:5001/api';
+
+const results = [];
 
 const json = async (path, method = 'GET', body) => {
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  const text = await res.text();
-  let data;
-  try { data = JSON.parse(text); } catch { data = { raw: text }; }
-  return { res, data };
+  const startTime = Date.now();
+  const url = `${BASE}${path}`;
+  
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const latency = Date.now() - startTime;
+    const text = await res.text();
+    let data;
+    try { 
+      data = JSON.parse(text); 
+    } catch { 
+      data = { raw: text }; 
+    }
+    
+    // Check for fallback indicators
+    const fallbackTriggered = 
+      text.includes('fallback') || 
+      text.includes('offline') || 
+      text.includes('mock') ||
+      (data && (data.fallback || data.offline || data.mock));
+    
+    return { res, data, latency, text, fallbackTriggered };
+  } catch (error) {
+    const latency = Date.now() - startTime;
+    return { 
+      error, 
+      latency, 
+      res: { status: 0 }, 
+      data: {}, 
+      text: error.message,
+      fallbackTriggered: false
+    };
+  }
 };
 
-const log = (status, msg) => {
-  const prefix = status ? 'PASS' : 'FAIL';
-  // eslint-disable-next-line no-console
-  console.log(`[${prefix}] ${msg}`);
+const logResult = (endpoint, method, result) => {
+  const { res, data, latency, text, fallbackTriggered, error } = result;
+  const statusCode = res?.status || 0;
+  const responsePreview = text ? text.substring(0, 300) : 'No response body';
+  const passed = !error && statusCode >= 200 && statusCode < 300;
+  
+  const resultObj = {
+    endpoint: `${method} ${endpoint}`,
+    statusCode,
+    latency: `${latency}ms`,
+    responsePreview,
+    fallbackTriggered,
+    passed,
+    error: error?.message
+  };
+  
+  results.push(resultObj);
+  
+  const prefix = passed ? 'PASS' : 'FAIL';
+  console.log(`\n[${prefix}] ${method} ${endpoint}`);
+  console.log(`  Status Code: ${statusCode}`);
+  console.log(`  Latency: ${latency}ms`);
+  console.log(`  Fallback Triggered: ${fallbackTriggered ? 'YES' : 'NO'}`);
+  if (error) {
+    console.log(`  Error: ${error.message}`);
+  }
+  console.log(`  Response Preview (first 300 chars):`);
+  console.log(`  ${responsePreview.replace(/\n/g, ' ')}`);
 };
 
 (async () => {
-  let failures = 0;
+  console.log('='.repeat(80));
+  console.log('SMOKE TEST SUITE - REMOTE STAGING TESTS');
+  console.log('='.repeat(80));
+  console.log(`Testing against: ${BASE}`);
+  console.log(`Started at: ${new Date().toISOString()}\n`);
 
   // 1) AI Suggestions
   try {
-    const { res, data } = await json('/ai/suggestions', 'POST', {
+    const result = await json('/ai/suggestions', 'POST', {
       userId: 'smoke-user',
       profile: { age: 16, interests: ['tech'] },
       options: { count: 2 }
     });
-    assert.equal(res.status, 200, 'status should be 200');
-    log(true, 'POST /ai/suggestions');
+    logResult('/ai/suggestions', 'POST', result);
+    if (result.error || (result.res.status !== 200 && result.res.status !== 0)) {
+      throw new Error(`Status ${result.res.status}`);
+    }
   } catch (e) {
-    failures++; log(false, `POST /ai/suggestions: ${e.message}`);
+    logResult('/ai/suggestions', 'POST', { 
+      error: e, 
+      res: { status: 0 }, 
+      latency: 0, 
+      text: e.message,
+      fallbackTriggered: false
+    });
   }
 
   // 2) AI Chat
   try {
-    const { res, data } = await json('/ai/chat', 'POST', {
+    const result = await json('/ai/chat', 'POST', {
       message: 'What is a stock?',
       userProfile: { age: 16 }
     });
-    assert.equal(res.status, 200, 'status should be 200');
-    const reply = data?.reply || '';
-    assert.ok(typeof reply === 'string' && reply.length > 0, 'reply should be non-empty');
-    // Soft assert: educational/guardian mention when offline or per policy
-    const advisory = /educational|not financial advice|parent|guardian/i.test(reply);
-    log(true, `POST /ai/chat${advisory ? ' (advisory present)' : ''}`);
-  } catch (e) {
-    failures++; log(false, `POST /ai/chat: ${e.message}`);
-  }
-
-  // 3) Market RPC via controller
-  try {
-    const { res, data } = await json('/market/quote/AAPL', 'GET');
-    if (res.status === 200) {
-      log(true, 'GET /market/quote/AAPL');
-    } else {
-      log(true, `GET /market/quote/AAPL (non-200 in dev: ${res.status})`);
+    logResult('/ai/chat', 'POST', result);
+    if (result.error || result.res.status !== 200) {
+      throw new Error(`Status ${result.res.status}`);
+    }
+    const reply = result.data?.reply || '';
+    if (typeof reply !== 'string' || reply.length === 0) {
+      throw new Error('Empty or invalid reply');
     }
   } catch (e) {
-    failures++; log(false, `GET /market/quote/AAPL: ${e.message}`);
+    logResult('/ai/chat', 'POST', { 
+      error: e, 
+      res: { status: 0 }, 
+      latency: 0, 
+      text: e.message,
+      fallbackTriggered: false
+    });
   }
 
-  // 4) Education progress upsert
+  // 3) Market Quote
   try {
-    const { res, data } = await json('/education/progress', 'POST', {
+    const result = await json('/market/quote/AAPL', 'GET');
+    logResult('/market/quote/AAPL', 'GET', result);
+    // Market endpoint may return non-200 in some cases, so we log but don't fail
+  } catch (e) {
+    logResult('/market/quote/AAPL', 'GET', { 
+      error: e, 
+      res: { status: 0 }, 
+      latency: 0, 
+      text: e.message,
+      fallbackTriggered: false
+    });
+  }
+
+  // 4) Education Progress
+  try {
+    const result = await json('/education/progress', 'POST', {
       userId: 'smoke-user',
       lessonId: 'intro-investing',
       progress: 20
     });
-    assert.ok([200,201].includes(res.status), 'status should be 200/201');
-    log(true, 'POST /education/progress');
+    logResult('/education/progress', 'POST', result);
+    if (result.error || ![200, 201].includes(result.res.status)) {
+      throw new Error(`Status ${result.res.status}`);
+    }
   } catch (e) {
-    failures++; log(false, `POST /education/progress: ${e.message}`);
+    logResult('/education/progress', 'POST', { 
+      error: e, 
+      res: { status: 0 }, 
+      latency: 0, 
+      text: e.message,
+      fallbackTriggered: false
+    });
   }
 
-  if (failures > 0) {
+  // Summary
+  console.log('\n' + '='.repeat(80));
+  console.log('TEST SUMMARY');
+  console.log('='.repeat(80));
+  
+  const passed = results.filter(r => r.passed).length;
+  const failed = results.filter(r => !r.passed).length;
+  const total = results.length;
+  
+  console.log(`Total Tests: ${total}`);
+  console.log(`Passed: ${passed}`);
+  console.log(`Failed: ${failed}`);
+  console.log(`\nDetailed Results:`);
+  results.forEach(r => {
+    const status = r.passed ? '✓' : '✗';
+    console.log(`  ${status} ${r.endpoint} - ${r.statusCode} (${r.latency})`);
+  });
+  
+  if (failed > 0) {
+    console.log('\n❌ SMOKE TESTS FAILED');
     process.exitCode = 1;
+  } else {
+    console.log('\n✅ ALL SMOKE TESTS PASSED');
   }
+  
+  console.log(`\nCompleted at: ${new Date().toISOString()}`);
+  console.log('='.repeat(80));
 })();
 
 

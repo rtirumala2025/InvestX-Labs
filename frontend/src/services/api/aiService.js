@@ -202,7 +202,6 @@ const getAIRecommendations = async (userProfile, options = {}) => {
 const getRecommendationExplanation = async (recommendationId, userId = 'anonymous', options = {}) => {
   const { 
     useCache = true, 
-    retries = MAX_RETRIES,
     cacheTtl = CACHE_TTL.MEDIUM
   } = options;
   
@@ -387,7 +386,6 @@ const getMarketInsights = async (filters = {}, options = {}) => {
  * @returns {Promise<Object>} - Confirmation of feedback submission
  */
 const submitFeedback = async (recommendationId, feedback, options = {}) => {
-  const { retries = MAX_RETRIES } = options;
   const userId = feedback.userId || getSession()?.user?.id || 'anonymous';
   
   try {

@@ -37,6 +37,9 @@ export const calculateRiskScore = (userProfile, portfolioData) => {
       case 'Beginner (0-1 years)':
         riskScore += 5;
         break;
+      default:
+        riskScore += 5;
+        break;
     }
   }
   

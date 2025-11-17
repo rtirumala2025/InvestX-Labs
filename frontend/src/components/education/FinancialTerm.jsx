@@ -1,16 +1,19 @@
-import React from 'react';
-import Tooltip from '../ui/Tooltip';
-import { getTermInfo } from '../../utils/financialTerms';
+import React from "react";
+import Tooltip from "../ui/Tooltip";
+import { getTermInfo } from "../../utils/financialTerms";
 
 const FinancialTerm = ({ term, children, definition, showFull = false }) => {
-  const termKey = term.toLowerCase().replace(/\s+/g, '_');
+  const termKey = term.toLowerCase().replace(/\s+/g, "_");
   const termInfo = getTermInfo(termKey);
-  
-  // Use provided definition, or fall back to our dictionary
-  const tooltipContent = definition || (showFull ? termInfo.full : termInfo.simple);
-  const exampleText = termInfo.example ? `\n\nExample: ${termInfo.example}` : '';
 
-  if (!tooltipContent || tooltipContent === 'Financial term') {
+  // Use provided definition, or fall back to our dictionary
+  const tooltipContent =
+    definition || (showFull ? termInfo.full : termInfo.simple);
+  const exampleText = termInfo.example
+    ? `\n\nExample: ${termInfo.example}`
+    : "";
+
+  if (!tooltipContent || tooltipContent === "Financial term") {
     return <span>{children}</span>;
   }
 

@@ -27,7 +27,7 @@ export const useLlamaAI = (portfolioData = {}) => {
     if (error) {
       setError(null);
     }
-  }, [portfolioData]);
+  }, [portfolioData, error]);
 
   /**
    * Send a message to LLaMA AI

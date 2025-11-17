@@ -362,7 +362,7 @@ export const parseDate = (dateString, formats = []) => {
   }
   
   // Try custom formats
-  for (const format of formats) {
+  for (const _format of formats) {
     try {
       // This is a simplified implementation
       // In production, you might want to use a library like date-fns or moment.js

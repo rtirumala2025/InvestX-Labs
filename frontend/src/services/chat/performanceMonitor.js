@@ -179,7 +179,7 @@ export class PerformanceMonitor {
    * @param {Object} engagement - Engagement data
    */
   recordEngagement(userId, engagement) {
-    const { messageCount, sentiment, topics, conversationDuration } = engagement;
+    const { messageCount, sentiment, topics } = engagement;
 
     this.metrics.engagement.totalMessages += messageCount;
 

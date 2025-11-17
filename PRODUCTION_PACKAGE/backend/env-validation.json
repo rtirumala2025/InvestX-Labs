@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-11-17T01:40:07.907Z",
+  "requiredVariables": [
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_SERVICE_KEY",
+    "ALPHA_VANTAGE_API_KEY",
+    "ALPHA_VANTAGE_BASE_URL",
+    "PORT",
+    "NODE_ENV",
+    "FRONTEND_URL"
+  ],
+  "note": "Set these variables in your production environment before deployment"
+}

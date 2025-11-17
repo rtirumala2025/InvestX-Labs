@@ -139,6 +139,9 @@ export const checkPriceAlerts = async (alerts) => {
         case 'equals':
           isTriggered = Math.abs(currentPrice.price - alert.targetPrice) < 0.01;
           break;
+        default:
+          isTriggered = false;
+          break;
       }
       
       if (isTriggered) {

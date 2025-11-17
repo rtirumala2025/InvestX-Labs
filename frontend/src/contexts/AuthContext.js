@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   signInUser,
   signUpUser,
@@ -104,7 +104,7 @@ export function AuthProvider({ children }) {
       if (user) {
         try {
           // Get user profile from Supabase
-          const { data: profile, error } = await supabase
+          const { data: profile } = await supabase
             .from('user_profiles')
             .select('*')
             .eq('id', user.id)
@@ -235,7 +235,7 @@ export function AuthProvider({ children }) {
   const signUp = async (email, password, userData) => {
     try {
       setLoading(true);
-      const { user, error } = await signUpUser(email, password, userData);
+      const { error } = await signUpUser(email, password, userData);
       
       if (error) throw error;
       
@@ -285,7 +285,7 @@ export function AuthProvider({ children }) {
   };
 
   // Sign out function
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       setLoading(true);
       await signOutUser();
@@ -299,7 +299,7 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [queueToast]);
 
   // Update user profile
   const updateProfile = async (updates = {}) => {

@@ -1,0 +1,416 @@
+{
+  "timestamp": "2025-11-17T01:40:07.869Z",
+  "files": [
+    {
+      "path": "static/js/main.b2266c68.js.map",
+      "size": 3299730,
+      "sizeFormatted": "3.15 MB"
+    },
+    {
+      "path": "static/js/171.e9dd7c22.chunk.js.map",
+      "size": 1574319,
+      "sizeFormatted": "1.5 MB"
+    },
+    {
+      "path": "static/js/8.db071244.chunk.js.map",
+      "size": 1475549,
+      "sizeFormatted": "1.41 MB"
+    },
+    {
+      "path": "static/js/484.224a9ab2.chunk.js.map",
+      "size": 965537,
+      "sizeFormatted": "942.91 KB"
+    },
+    {
+      "path": "static/js/main.b2266c68.js",
+      "size": 745987,
+      "sizeFormatted": "728.5 KB"
+    },
+    {
+      "path": "static/js/main.be316571.js",
+      "size": 745952,
+      "sizeFormatted": "728.47 KB"
+    },
+    {
+      "path": "static/js/171.e9dd7c22.chunk.js",
+      "size": 366304,
+      "sizeFormatted": "357.72 KB"
+    },
+    {
+      "path": "static/js/581.d5137a1d.chunk.js",
+      "size": 366217,
+      "sizeFormatted": "357.63 KB"
+    },
+    {
+      "path": "static/js/8.db071244.chunk.js",
+      "size": 328144,
+      "sizeFormatted": "320.45 KB"
+    },
+    {
+      "path": "static/js/295.de629cf2.chunk.js",
+      "size": 328103,
+      "sizeFormatted": "320.41 KB"
+    },
+    {
+      "path": "static/js/484.224a9ab2.chunk.js",
+      "size": 207021,
+      "sizeFormatted": "202.17 KB"
+    },
+    {
+      "path": "static/js/499.9a9d5977.chunk.js",
+      "size": 206973,
+      "sizeFormatted": "202.12 KB"
+    },
+    {
+      "path": "static/js/42.6c6b8197.chunk.js.map",
+      "size": 123265,
+      "sizeFormatted": "120.38 KB"
+    },
+    {
+      "path": "static/js/69.064c456b.chunk.js.map",
+      "size": 111863,
+      "sizeFormatted": "109.24 KB"
+    },
+    {
+      "path": "static/css/main.18b21026.css",
+      "size": 111717,
+      "sizeFormatted": "109.1 KB"
+    },
+    {
+      "path": "static/css/main.c29263d8.css",
+      "size": 111672,
+      "sizeFormatted": "109.05 KB"
+    },
+    {
+      "path": "static/js/847.1c40a233.chunk.js.map",
+      "size": 75663,
+      "sizeFormatted": "73.89 KB"
+    },
+    {
+      "path": "static/js/131.e217744d.chunk.js.map",
+      "size": 64082,
+      "sizeFormatted": "62.58 KB"
+    },
+    {
+      "path": "static/js/42.6c6b8197.chunk.js",
+      "size": 52578,
+      "sizeFormatted": "51.35 KB"
+    },
+    {
+      "path": "static/js/729.a85a1e96.chunk.js",
+      "size": 52531,
+      "sizeFormatted": "51.3 KB"
+    },
+    {
+      "path": "static/js/480.6869f75f.chunk.js.map",
+      "size": 52083,
+      "sizeFormatted": "50.86 KB"
+    },
+    {
+      "path": "static/js/552.67448edb.chunk.js.map",
+      "size": 45516,
+      "sizeFormatted": "44.45 KB"
+    },
+    {
+      "path": "static/css/main.18b21026.css.map",
+      "size": 41682,
+      "sizeFormatted": "40.71 KB"
+    },
+    {
+      "path": "static/js/455.fbc67c42.chunk.js.map",
+      "size": 39764,
+      "sizeFormatted": "38.83 KB"
+    },
+    {
+      "path": "static/js/69.064c456b.chunk.js",
+      "size": 39629,
+      "sizeFormatted": "38.7 KB"
+    },
+    {
+      "path": "static/js/22.68829102.chunk.js",
+      "size": 39582,
+      "sizeFormatted": "38.65 KB"
+    },
+    {
+      "path": "static/js/569.0835311e.chunk.js.map",
+      "size": 38647,
+      "sizeFormatted": "37.74 KB"
+    },
+    {
+      "path": "static/js/847.1c40a233.chunk.js",
+      "size": 28950,
+      "sizeFormatted": "28.27 KB"
+    },
+    {
+      "path": "static/js/727.4febbbf6.chunk.js",
+      "size": 28902,
+      "sizeFormatted": "28.22 KB"
+    },
+    {
+      "path": "static/js/594.7daf979e.chunk.js.map",
+      "size": 27717,
+      "sizeFormatted": "27.07 KB"
+    },
+    {
+      "path": "static/js/780.48df6c1f.chunk.js.map",
+      "size": 24572,
+      "sizeFormatted": "24 KB"
+    },
+    {
+      "path": "static/js/131.e217744d.chunk.js",
+      "size": 24232,
+      "sizeFormatted": "23.66 KB"
+    },
+    {
+      "path": "static/js/443.76d07bd9.chunk.js",
+      "size": 24186,
+      "sizeFormatted": "23.62 KB"
+    },
+    {
+      "path": "static/js/191.a920b297.chunk.js.map",
+      "size": 23380,
+      "sizeFormatted": "22.83 KB"
+    },
+    {
+      "path": "static/js/968.b9163294.chunk.js.map",
+      "size": 20032,
+      "sizeFormatted": "19.56 KB"
+    },
+    {
+      "path": "static/js/480.6869f75f.chunk.js",
+      "size": 19081,
+      "sizeFormatted": "18.63 KB"
+    },
+    {
+      "path": "static/js/706.131c9be8.chunk.js",
+      "size": 19036,
+      "sizeFormatted": "18.59 KB"
+    },
+    {
+      "path": "static/js/286.b59c25b3.chunk.js.map",
+      "size": 18844,
+      "sizeFormatted": "18.4 KB"
+    },
+    {
+      "path": "static/js/348.a361e86a.chunk.js.map",
+      "size": 18114,
+      "sizeFormatted": "17.69 KB"
+    },
+    {
+      "path": "static/js/455.fbc67c42.chunk.js",
+      "size": 17290,
+      "sizeFormatted": "16.88 KB"
+    },
+    {
+      "path": "static/js/407.31434ea7.chunk.js.map",
+      "size": 17262,
+      "sizeFormatted": "16.86 KB"
+    },
+    {
+      "path": "static/js/506.06743b8a.chunk.js",
+      "size": 17244,
+      "sizeFormatted": "16.84 KB"
+    },
+    {
+      "path": "static/js/671.af22100c.chunk.js.map",
+      "size": 14943,
+      "sizeFormatted": "14.59 KB"
+    },
+    {
+      "path": "static/js/637.28faa96b.chunk.js.map",
+      "size": 13624,
+      "sizeFormatted": "13.3 KB"
+    },
+    {
+      "path": "static/js/569.0835311e.chunk.js",
+      "size": 13313,
+      "sizeFormatted": "13 KB"
+    },
+    {
+      "path": "static/js/173.99ecd818.chunk.js",
+      "size": 13267,
+      "sizeFormatted": "12.96 KB"
+    },
+    {
+      "path": "static/js/552.67448edb.chunk.js",
+      "size": 13210,
+      "sizeFormatted": "12.9 KB"
+    },
+    {
+      "path": "static/js/881.a955f2fb.chunk.js",
+      "size": 13163,
+      "sizeFormatted": "12.85 KB"
+    },
+    {
+      "path": "static/js/780.48df6c1f.chunk.js",
+      "size": 12956,
+      "sizeFormatted": "12.65 KB"
+    },
+    {
+      "path": "static/js/976.cc61802f.chunk.js",
+      "size": 12908,
+      "sizeFormatted": "12.61 KB"
+    },
+    {
+      "path": "static/js/594.7daf979e.chunk.js",
+      "size": 12273,
+      "sizeFormatted": "11.99 KB"
+    },
+    {
+      "path": "static/js/485.7056860d.chunk.js",
+      "size": 12226,
+      "sizeFormatted": "11.94 KB"
+    },
+    {
+      "path": "static/js/610.ab0b352a.chunk.js.map",
+      "size": 11003,
+      "sizeFormatted": "10.75 KB"
+    },
+    {
+      "path": "static/js/830.499be825.chunk.js.map",
+      "size": 10287,
+      "sizeFormatted": "10.05 KB"
+    },
+    {
+      "path": "static/js/191.a920b297.chunk.js",
+      "size": 9520,
+      "sizeFormatted": "9.3 KB"
+    },
+    {
+      "path": "static/js/592.94801bbb.chunk.js",
+      "size": 9473,
+      "sizeFormatted": "9.25 KB"
+    },
+    {
+      "path": "static/js/968.b9163294.chunk.js",
+      "size": 8965,
+      "sizeFormatted": "8.75 KB"
+    },
+    {
+      "path": "static/js/389.a79f188b.chunk.js",
+      "size": 8920,
+      "sizeFormatted": "8.71 KB"
+    },
+    {
+      "path": "static/js/407.31434ea7.chunk.js",
+      "size": 7804,
+      "sizeFormatted": "7.62 KB"
+    },
+    {
+      "path": "static/js/132.787f97c3.chunk.js",
+      "size": 7757,
+      "sizeFormatted": "7.58 KB"
+    },
+    {
+      "path": "static/js/348.a361e86a.chunk.js",
+      "size": 7042,
+      "sizeFormatted": "6.88 KB"
+    },
+    {
+      "path": "static/js/564.f88cf524.chunk.js",
+      "size": 6996,
+      "sizeFormatted": "6.83 KB"
+    },
+    {
+      "path": "static/js/286.b59c25b3.chunk.js",
+      "size": 6693,
+      "sizeFormatted": "6.54 KB"
+    },
+    {
+      "path": "static/js/671.af22100c.chunk.js",
+      "size": 6659,
+      "sizeFormatted": "6.5 KB"
+    },
+    {
+      "path": "static/js/675.d53b1dc9.chunk.js",
+      "size": 6647,
+      "sizeFormatted": "6.49 KB"
+    },
+    {
+      "path": "static/js/954.01dc2070.chunk.js",
+      "size": 6612,
+      "sizeFormatted": "6.46 KB"
+    },
+    {
+      "path": "static/js/637.28faa96b.chunk.js",
+      "size": 5412,
+      "sizeFormatted": "5.29 KB"
+    },
+    {
+      "path": "static/js/874.d292e8f5.chunk.js",
+      "size": 5364,
+      "sizeFormatted": "5.24 KB"
+    },
+    {
+      "path": "static/js/610.ab0b352a.chunk.js",
+      "size": 4466,
+      "sizeFormatted": "4.36 KB"
+    },
+    {
+      "path": "static/js/91.36c4b53c.chunk.js",
+      "size": 4417,
+      "sizeFormatted": "4.31 KB"
+    },
+    {
+      "path": "static/js/830.499be825.chunk.js",
+      "size": 4210,
+      "sizeFormatted": "4.11 KB"
+    },
+    {
+      "path": "static/js/549.0595dc2a.chunk.js",
+      "size": 4163,
+      "sizeFormatted": "4.07 KB"
+    },
+    {
+      "path": "static/js/main.b2266c68.js.LICENSE.txt",
+      "size": 2138,
+      "sizeFormatted": "2.09 KB"
+    },
+    {
+      "path": "static/js/main.be316571.js.LICENSE.txt",
+      "size": 2138,
+      "sizeFormatted": "2.09 KB"
+    },
+    {
+      "path": "asset-manifest.json",
+      "size": 1886,
+      "sizeFormatted": "1.84 KB"
+    },
+    {
+      "path": "index.html",
+      "size": 662,
+      "sizeFormatted": "662 Bytes"
+    },
+    {
+      "path": "static/js/171.e9dd7c22.chunk.js.LICENSE.txt",
+      "size": 324,
+      "sizeFormatted": "324 Bytes"
+    },
+    {
+      "path": "static/js/581.d5137a1d.chunk.js.LICENSE.txt",
+      "size": 324,
+      "sizeFormatted": "324 Bytes"
+    },
+    {
+      "path": "static/js/484.224a9ab2.chunk.js.LICENSE.txt",
+      "size": 257,
+      "sizeFormatted": "257 Bytes"
+    },
+    {
+      "path": "static/js/499.9a9d5977.chunk.js.LICENSE.txt",
+      "size": 257,
+      "sizeFormatted": "257 Bytes"
+    },
+    {
+      "path": "static/js/295.de629cf2.chunk.js.LICENSE.txt",
+      "size": 125,
+      "sizeFormatted": "125 Bytes"
+    },
+    {
+      "path": "static/js/8.db071244.chunk.js.LICENSE.txt",
+      "size": 125,
+      "sizeFormatted": "125 Bytes"
+    }
+  ],
+  "totalSize": 12221481
+}

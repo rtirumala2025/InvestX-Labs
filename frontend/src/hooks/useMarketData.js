@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useErrorHandler } from 'react-error-boundary';
 import { 
-  getMarketData, 
   getHistoricalData, 
   searchStocks, 
   getMarketNews,

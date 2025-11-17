@@ -1,0 +1,42 @@
+{
+  "staging": {
+    "frontend": {
+      "provider": "vercel",
+      "url": "https://investx-labs-staging.vercel.app",
+      "buildCommand": "cd frontend && npm install && npm run build",
+      "outputDirectory": "frontend/build",
+      "environmentVariables": {
+        "REACT_APP_SUPABASE_URL": "REPLACE_WITH_STAGING_SUPABASE_URL",
+        "REACT_APP_SUPABASE_ANON_KEY": "REPLACE_WITH_STAGING_SUPABASE_ANON_KEY",
+        "REACT_APP_BACKEND_URL": "REPLACE_WITH_STAGING_BACKEND_URL",
+        "REACT_APP_ALPHA_VANTAGE_API_KEY": "REPLACE_WITH_ALPHA_VANTAGE_DEMO_KEY",
+        "REACT_APP_OPENROUTER_API_KEY": "REPLACE_WITH_OPENROUTER_API_KEY",
+        "REACT_APP_ENVIRONMENT": "staging"
+      }
+    },
+    "backend": {
+      "provider": "railway",
+      "url": "https://investx-labs-backend-staging.railway.app",
+      "rootDirectory": "backend",
+      "buildCommand": "npm install",
+      "startCommand": "npm start",
+      "environmentVariables": {
+        "PORT": "5001",
+        "NODE_ENV": "staging",
+        "FRONTEND_URL": "REPLACE_WITH_STAGING_FRONTEND_URL",
+        "APP_URL": "REPLACE_WITH_STAGING_FRONTEND_URL",
+        "SUPABASE_URL": "REPLACE_WITH_STAGING_SUPABASE_URL",
+        "SUPABASE_ANON_KEY": "REPLACE_WITH_STAGING_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY": "REPLACE_WITH_STAGING_SUPABASE_SERVICE_KEY",
+        "ALPHA_VANTAGE_API_KEY": "REPLACE_WITH_ALPHA_VANTAGE_DEMO_KEY",
+        "OPENROUTER_API_KEY": "REPLACE_WITH_OPENROUTER_API_KEY"
+      }
+    },
+    "smokeTest": {
+      "baseUrl": "REPLACE_WITH_STAGING_BACKEND_URL",
+      "script": "backend/scripts/smoke_minimal.js",
+      "command": "node backend/scripts/smoke_minimal.js --remote REPLACE_WITH_STAGING_BACKEND_URL"
+    }
+  }
+}
+
