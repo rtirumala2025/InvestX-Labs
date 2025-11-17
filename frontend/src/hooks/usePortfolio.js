@@ -817,7 +817,10 @@ export const usePortfolio = () => {
         }
       )
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
+        if (status === 'SUBSCRIBED') {
+          console.log('📊 [usePortfolio] ✅ Holdings realtime subscription connected');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('📊 [usePortfolio] ⚠️ Holdings realtime connection issue:', status);
           queueToast('Lost realtime connection for holdings. Some data may be stale.', 'error', {
             id: 'portfolio-holdings-sync',
             duration: 6000,
@@ -842,7 +845,10 @@ export const usePortfolio = () => {
         }
       )
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
+        if (status === 'SUBSCRIBED') {
+          console.log('📊 [usePortfolio] ✅ Transactions realtime subscription connected');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('📊 [usePortfolio] ⚠️ Transactions realtime connection issue:', status);
           queueToast('Lost realtime connection for transactions.', 'error', {
             id: 'portfolio-transactions-sync',
             duration: 6000,

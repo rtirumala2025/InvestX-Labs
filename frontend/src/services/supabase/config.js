@@ -73,6 +73,11 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
     }
   });
 }
