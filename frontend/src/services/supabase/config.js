@@ -77,7 +77,9 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
     realtime: {
       params: {
         eventsPerSecond: 10
-      }
+      },
+      // Enable WebSocket transport for better reliability
+      transport: 'websocket'
     }
   });
 }
