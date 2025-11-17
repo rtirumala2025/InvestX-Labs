@@ -79,23 +79,29 @@ BEGIN
     DROP POLICY IF EXISTS "Users can update messages in their own sessions" ON public.chat_messages;
     DROP POLICY IF EXISTS "Users can delete messages in their own sessions" ON public.chat_messages;
     
-    RAISE NOTICE '✅ Dropped old RLS policies';
+    -- Drop new policies if they already exist (for idempotency)
+    DROP POLICY IF EXISTS "Users can view own messages" ON public.chat_messages;
+    DROP POLICY IF EXISTS "Users can insert own messages" ON public.chat_messages;
+    DROP POLICY IF EXISTS "Users can update own messages" ON public.chat_messages;
+    DROP POLICY IF EXISTS "Users can delete own messages" ON public.chat_messages;
+    
+    RAISE NOTICE '✅ Dropped old and existing RLS policies';
 END $$;
 
--- Create new RLS policies using user_id directly
-CREATE POLICY IF NOT EXISTS "Users can view own messages"
+-- Create new RLS policies using user_id directly (IF NOT EXISTS not supported, so we drop first above)
+CREATE POLICY "Users can view own messages"
 ON public.chat_messages FOR SELECT
 USING (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can insert own messages"
+CREATE POLICY "Users can insert own messages"
 ON public.chat_messages FOR INSERT
 WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can update own messages"
+CREATE POLICY "Users can update own messages"
 ON public.chat_messages FOR UPDATE
 USING (auth.uid() = user_id);
 
-CREATE POLICY IF NOT EXISTS "Users can delete own messages"
+CREATE POLICY "Users can delete own messages"
 ON public.chat_messages FOR DELETE
 USING (auth.uid() = user_id);
 
