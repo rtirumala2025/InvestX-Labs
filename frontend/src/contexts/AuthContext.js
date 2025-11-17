@@ -477,8 +477,12 @@ export function AuthProvider({ children }) {
         }
       )
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          queueToast?.('Realtime profile sync disconnected. Some updates may be delayed.', 'warning');
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('🔐 [AuthContext] Realtime profile sync disconnected:', status);
+          // Don't show toast on every disconnect - only log it
+          // queueToast?.('Realtime profile sync disconnected. Some updates may be delayed.', 'warning');
+        } else if (status === 'SUBSCRIBED') {
+          console.log('🔐 [AuthContext] Realtime profile sync connected');
         }
       });
 

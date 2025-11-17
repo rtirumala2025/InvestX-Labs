@@ -192,7 +192,7 @@ export const usePortfolio = () => {
         .select('*')
         .eq('portfolio_id', portfolioId)
         .eq('user_id', userId)
-        .order('transaction_date', { ascending: false })
+        .order('transaction_date', { ascending: false, nullsFirst: false })
         .limit(100);
 
       if (transactionsError) {
@@ -300,6 +300,8 @@ export const usePortfolio = () => {
       } else {
         queueToast(`Failed to load portfolio: ${err.message}`, 'error');
       }
+      // Ensure loading state is cleared even on error
+      setLoading(false);
     }
   }, [queueToast, userId, loadHoldings, loadTransactions]);
   // Load portfolio when user changes

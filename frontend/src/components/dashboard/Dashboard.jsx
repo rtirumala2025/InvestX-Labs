@@ -149,7 +149,7 @@ const Dashboard = () => {
         if (document.visibilityState === "visible") {
           refreshData().catch(console.error);
         }
-      }, AUTO_REFRESH_INTERVAL);
+      }, REFRESH_INTERVAL);
     };
 
     setupRefreshInterval();

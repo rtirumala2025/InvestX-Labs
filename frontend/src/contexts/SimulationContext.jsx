@@ -94,7 +94,7 @@ export function SimulationProvider({ children }) {
         .select('*')
         .eq('portfolio_id', simulationPortfolio.id)
         .eq('user_id', currentUser.id)
-        .order('transaction_date', { ascending: false })
+        .order('transaction_date', { ascending: false, nullsFirst: false })
         .limit(50);
 
       if (transactionsError) throw transactionsError;
