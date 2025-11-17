@@ -53,6 +53,9 @@ const EducationPage = () => {
   const [celebrationData, setCelebrationData] = useState(null);
   const { queueToast } = useApp();
   
+  // Calculate achievements count first
+  const achievementsCount = achievementsList?.length || 0;
+  
   // Track previous achievement count to detect new achievements
   const prevAchievementsCount = React.useRef(achievementsCount);
   
@@ -167,8 +170,6 @@ const EducationPage = () => {
     () => (selectedCourseId ? modules[selectedCourseId] || [] : []),
     [modules, selectedCourseId]
   );
-
-  const achievementsCount = achievementsList?.length || 0;
 
   const filteredCourseCount = filteredCourses.length;
 
