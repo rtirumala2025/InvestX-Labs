@@ -77,15 +77,6 @@ BEGIN
             ALTER TABLE public.transactions 
             ADD COLUMN total_amount DECIMAL(15, 2);
             
-            -- Calculate total_amount from shares * price if available
-            UPDATE public.transactions 
-            SET total_amount = COALESCE(
-                total_amount,
-                shares * price,
-                0
-            )
-            WHERE total_amount IS NULL;
-            
             RAISE NOTICE '✅ Added total_amount column to transactions table';
         ELSE
             RAISE NOTICE '✅ total_amount column already exists in transactions table';
@@ -348,6 +339,40 @@ BEGIN
     ) THEN
         CREATE INDEX IF NOT EXISTS idx_transactions_portfolio_id 
         ON public.transactions(portfolio_id);
+    END IF;
+END $$;
+
+-- 13. Calculate total_amount from shares * price for rows where it's NULL (after all columns exist)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'transactions' 
+        AND column_name = 'total_amount'
+    ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'transactions' 
+        AND column_name = 'shares'
+    ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'transactions' 
+        AND column_name = 'price'
+    ) THEN
+        -- Calculate total_amount from shares * price if available and total_amount is NULL
+        UPDATE public.transactions 
+        SET total_amount = COALESCE(
+            total_amount,
+            CASE 
+                WHEN shares IS NOT NULL AND price IS NOT NULL THEN shares * price
+                ELSE 0
+            END
+        )
+        WHERE total_amount IS NULL;
+        
+        RAISE NOTICE '✅ Updated total_amount for existing transactions';
     END IF;
 END $$;
 
