@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { usePortfolio } from '../hooks/usePortfolio';
 import { useApp } from './AppContext';
 
@@ -13,16 +13,29 @@ export const usePortfolioContext = () => {
 };
 
 export const PortfolioProvider = ({ children }) => {
+  console.log('[PortfolioProvider] Mounted');
   const portfolioData = usePortfolio();
   const { registerContext } = useApp() || {};
+  const isRegisteredRef = useRef(false);
+  const unregisterRef = useRef(null);
 
   useEffect(() => {
-    let unregister;
-    if (registerContext) {
-      unregister = registerContext('portfolio', portfolioData);
+    // Only register once - use ref to track registration
+    if (registerContext && !isRegisteredRef.current) {
+      console.log('[PortfolioProvider] Registering portfolio context');
+      unregisterRef.current = registerContext('portfolio', portfolioData);
+      isRegisteredRef.current = true;
+      console.log('[PortfolioProvider] Loaded portfolio once');
     }
-    return () => unregister?.();
-  }, [portfolioData, registerContext]);
+    
+    return () => {
+      if (unregisterRef.current) {
+        unregisterRef.current();
+        unregisterRef.current = null;
+        isRegisteredRef.current = false;
+      }
+    };
+  }, [registerContext]); // Only depend on registerContext, not portfolioData
 
   return (
     <PortfolioContext.Provider value={portfolioData}>

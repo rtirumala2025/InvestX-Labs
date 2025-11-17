@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase/config';
 import { calculatePerformanceMetrics } from '../services/portfolio/portfolioCalculations';
@@ -116,6 +116,9 @@ export const usePortfolio = () => {
   const [marketData, setMarketData] = useState(null);
   const [offline, setOffline] = useState(false);
   const [pendingOperations, setPendingOperations] = useState(() => loadPendingOperations());
+  
+  // Track subscribed portfolio ID to prevent duplicate subscriptions
+  const subscribedPortfolioIdRef = useRef(null);
 
   const persistPending = useCallback((queue) => {
     setPendingOperations(queue);
@@ -334,7 +337,8 @@ export const usePortfolio = () => {
     return () => {
       isMounted = false;
     };
-  }, [userId, loadPortfolio, persistPending]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]); // Only depend on userId - loadPortfolio is stable and depends on userId
 
   const fetchMarketData = useCallback(async () => {
     try {
@@ -793,10 +797,30 @@ export const usePortfolio = () => {
     updatePortfolioMetrics({ notify: false });
   }, [portfolio?.id, holdings, marketData, updatePortfolioMetrics]);
 
+  // Realtime subscriptions - only create once per portfolio ID
   useEffect(() => {
-    if (!userId || !portfolio?.id) return;
+    if (!userId || !portfolio?.id) {
+      // Clean up if portfolio is removed
+      if (subscribedPortfolioIdRef.current) {
+        console.log('📊 [usePortfolio] Cleaning up realtime subscriptions (no portfolio)');
+        subscribedPortfolioIdRef.current = null;
+      }
+      return;
+    }
+
+    // Only subscribe if we haven't already subscribed to this portfolio
+    if (subscribedPortfolioIdRef.current === portfolio.id) {
+      return;
+    }
+
+    // Clean up previous subscription if portfolio ID changed
+    if (subscribedPortfolioIdRef.current && subscribedPortfolioIdRef.current !== portfolio.id) {
+      console.log('📊 [usePortfolio] Portfolio ID changed, cleaning up old subscription:', subscribedPortfolioIdRef.current);
+      // Channels will be cleaned up by the cleanup function below
+    }
 
     console.log('📊 [usePortfolio] Registering realtime channels for portfolio:', portfolio.id);
+    subscribedPortfolioIdRef.current = portfolio.id;
 
     const holdingsChannel = supabase
       .channel(`portfolio-holdings-${portfolio.id}`)
@@ -857,10 +881,14 @@ export const usePortfolio = () => {
       });
 
     return () => {
+      console.log('📊 [usePortfolio] Cleaning up realtime subscriptions for portfolio:', portfolio.id);
       supabase.removeChannel(holdingsChannel);
       supabase.removeChannel(transactionsChannel);
+      if (subscribedPortfolioIdRef.current === portfolio.id) {
+        subscribedPortfolioIdRef.current = null;
+      }
     };
-  }, [fetchMarketData, loadHoldings, loadTransactions, portfolio?.id, queueToast, updatePortfolioMetrics, userId]);
+  }, [portfolio?.id, userId]); // Only depend on portfolio.id and userId - callbacks are stable
 
   useEffect(() => {
     if (isOnline && pendingOperations.length && portfolio?.id) {
@@ -868,7 +896,8 @@ export const usePortfolio = () => {
     }
   }, [flushPendingOperations, isOnline, pendingOperations.length, portfolio?.id]);
 
-  return {
+  // Memoize return value to prevent object recreation on every render
+  return useMemo(() => ({
     portfolio: portfolio ? {
       ...portfolio,
       holdings: holdings
@@ -892,5 +921,26 @@ export const usePortfolio = () => {
     refreshPortfolioData,
     updatePortfolioMetrics,
     reloadPortfolio: loadPortfolio
-  };
+  }), [
+    portfolio,
+    holdings,
+    transactions,
+    marketData,
+    loading,
+    error,
+    offline,
+    pendingOperations,
+    addHoldingToPortfolio,
+    updateHoldingInPortfolio,
+    removeHoldingFromPortfolio,
+    getHoldingById,
+    getHoldingsBySector,
+    getHoldingsByAssetType,
+    getTopPerformers,
+    getWorstPerformers,
+    getLargestHoldings,
+    refreshPortfolioData,
+    updatePortfolioMetrics,
+    loadPortfolio
+  ]);
 };
