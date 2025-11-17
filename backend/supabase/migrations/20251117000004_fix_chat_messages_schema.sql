@@ -49,21 +49,6 @@ BEGIN
             ALTER TABLE public.chat_messages 
             ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
             
-            -- Create trigger to update updated_at on row update
-            CREATE OR REPLACE FUNCTION update_chat_messages_updated_at()
-            RETURNS TRIGGER AS $$
-            BEGIN
-                NEW.updated_at = NOW();
-                RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-            
-            DROP TRIGGER IF EXISTS trigger_update_chat_messages_updated_at ON public.chat_messages;
-            CREATE TRIGGER trigger_update_chat_messages_updated_at
-            BEFORE UPDATE ON public.chat_messages
-            FOR EACH ROW
-            EXECUTE FUNCTION update_chat_messages_updated_at();
-            
             RAISE NOTICE '✅ Added updated_at column to chat_messages table';
         ELSE
             RAISE NOTICE '✅ updated_at column already exists in chat_messages table';
@@ -137,10 +122,28 @@ BEGIN
     END IF;
 END $$;
 
--- STEP 5: Ensure indexes exist for performance
+-- STEP 5: Create trigger function and trigger for updated_at (outside DO block)
+CREATE OR REPLACE FUNCTION update_chat_messages_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_chat_messages_updated_at ON public.chat_messages;
+CREATE TRIGGER trigger_update_chat_messages_updated_at
+BEFORE UPDATE ON public.chat_messages
+FOR EACH ROW
+EXECUTE FUNCTION update_chat_messages_updated_at();
+
+-- STEP 6: Ensure indexes exist for performance
 CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON public.chat_messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON public.chat_messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON public.chat_messages(session_id);
 
-RAISE NOTICE '✅ Chat messages schema fix complete';
+DO $$
+BEGIN
+    RAISE NOTICE '✅ Chat messages schema fix complete';
+END $$;
 
