@@ -17,7 +17,10 @@ const SimulationPage = () => {
     transactions, 
     loading, 
     error,
-    resetSimulation 
+    resetSimulation,
+    undoLastTrade,
+    canUndo,
+    undoStack
   } = useSimulation();
 
   const { 
@@ -66,13 +69,24 @@ const SimulationPage = () => {
                 Practice trading with $10,000 virtual money
               </p>
             </div>
-            <GlassButton
-              variant="secondary"
-              size="small"
-              onClick={() => setShowResetConfirm(true)}
-            >
-              Reset Simulation
-            </GlassButton>
+            <div className="flex gap-3">
+              {canUndo && undoStack.length > 0 && (
+                <GlassButton
+                  variant="glass"
+                  size="small"
+                  onClick={undoLastTrade}
+                >
+                  ↶ Undo Last Trade ({Math.max(0, Math.ceil((60000 - (Date.now() - undoStack[undoStack.length - 1].timestamp)) / 1000))}s)
+                </GlassButton>
+              )}
+              <GlassButton
+                variant="secondary"
+                size="small"
+                onClick={() => setShowResetConfirm(true)}
+              >
+                Reset Simulation
+              </GlassButton>
+            </div>
           </div>
 
           {/* Quick Stats */}

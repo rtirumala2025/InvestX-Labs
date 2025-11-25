@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import SuggestionCard from "./SuggestionCard";
 import LoadingSpinner from "../common/LoadingSpinner";
+import { SkeletonSuggestion, SkeletonGrid } from "../common/SkeletonLoader";
 
 const SuggestionsList = ({
   suggestions,
@@ -77,13 +78,19 @@ const SuggestionsList = ({
     }
   };
 
+  // Task 14: Skeleton loaders and retry button
   if (loading) {
-    return <LoadingSpinner size="large" />;
+    return (
+      <div className="space-y-6">
+        <SkeletonGrid count={4} Component={SkeletonSuggestion} />
+      </div>
+    );
   }
 
   if (error) {
     return (
       <div className="max-w-4xl mx-auto py-10 text-center">
+        <div className="text-6xl mb-4">⚠️</div>
         <h2 className="text-xl font-semibold text-white mb-2">
           Unable to load AI suggestions
         </h2>
@@ -91,9 +98,9 @@ const SuggestionsList = ({
         {onRefresh && (
           <button
             onClick={onRefresh}
-            className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+            className="inline-flex items-center px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors font-medium"
           >
-            Retry
+            🔄 Retry
           </button>
         )}
       </div>

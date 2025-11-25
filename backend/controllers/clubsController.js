@@ -398,3 +398,368 @@ export const deleteClub = async (req, res) => {
   }
 };
 
+// Member Management Endpoints
+
+export const addClubMember = async (req, res) => {
+  const { clubId } = req.params;
+  const { userId, role = 'member' } = req.body || {};
+
+  if (!clubId) {
+    return res.status(400).json(
+      createApiResponse(null, {
+        success: false,
+        statusCode: 400,
+        message: 'clubId is required'
+      })
+    );
+  }
+
+  if (!userId) {
+    return res.status(400).json(
+      createApiResponse(null, {
+        success: false,
+        statusCode: 400,
+        message: 'userId is required'
+      })
+    );
+  }
+
+  if (!adminSupabase) {
+    logger.warn('Supabase unavailable: queueing member addition offline', { clubId, userId });
+    return res.status(200).json(
+      createApiResponse(
+        {
+          queued: true,
+          clubId,
+          userId,
+          role,
+          metadata: { offline: true }
+        },
+        {
+          message: 'Supabase unavailable; member addition queued locally.',
+          metadata: { offline: true }
+        }
+      )
+    );
+  }
+
+  try {
+    // Check if club exists
+    const { data: club, error: clubError } = await adminSupabase
+      .from('clubs')
+      .select('id')
+      .eq('id', clubId)
+      .maybeSingle();
+
+    if (clubError) throw clubError;
+    if (!club) {
+      return res.status(404).json(
+        createApiResponse(null, {
+          success: false,
+          statusCode: 404,
+          message: 'Club not found'
+        })
+      );
+    }
+
+    // Check if member already exists
+    const { data: existingMember } = await adminSupabase
+      .from('club_members')
+      .select('*')
+      .eq('club_id', clubId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (existingMember) {
+      return res.status(409).json(
+        createApiResponse(null, {
+          success: false,
+          statusCode: 409,
+          message: 'User is already a member of this club'
+        })
+      );
+    }
+
+    // Add member
+    const { data: member, error: memberError } = await adminSupabase
+      .from('club_members')
+      .insert({
+        club_id: clubId,
+        user_id: userId,
+        role: role,
+        joined_at: new Date().toISOString()
+      })
+      .select('*')
+      .maybeSingle();
+
+    if (memberError) throw memberError;
+
+    // Log activity
+    try {
+      await adminSupabase.from('club_activity').insert({
+        club_id: clubId,
+        user_id: userId,
+        activity_type: 'member_joined',
+        activity_data: { role },
+        created_at: new Date().toISOString()
+      });
+    } catch (activityError) {
+      logger.warn('Failed to log club activity', { error: activityError.message });
+    }
+
+    logger.info('Club member added successfully', { clubId, userId, role });
+    return res.status(201).json(
+      createApiResponse(
+        {
+          member,
+          metadata: { offline: false }
+        },
+        'Member added successfully'
+      )
+    );
+  } catch (error) {
+    const normalized = handleSupabaseError(error, { clubId, userId, scope: 'clubs:addMember' });
+    logger.error('Failed to add club member', normalized);
+    return res.status(500).json(
+      createApiResponse(null, {
+        success: false,
+        statusCode: 500,
+        message: normalized.message || 'Failed to add member to club'
+      })
+    );
+  }
+};
+
+export const removeClubMember = async (req, res) => {
+  const { clubId, userId } = req.params;
+
+  if (!clubId || !userId) {
+    return res.status(400).json(
+      createApiResponse(null, {
+        success: false,
+        statusCode: 400,
+        message: 'clubId and userId are required'
+      })
+    );
+  }
+
+  if (!adminSupabase) {
+    logger.warn('Supabase unavailable: queueing member removal offline', { clubId, userId });
+    return res.status(200).json(
+      createApiResponse(
+        {
+          queued: true,
+          clubId,
+          userId,
+          metadata: { offline: true }
+        },
+        {
+          message: 'Supabase unavailable; member removal queued locally.',
+          metadata: { offline: true }
+        }
+      )
+    );
+  }
+
+  try {
+    // Remove member
+    const { error: deleteError } = await adminSupabase
+      .from('club_members')
+      .delete()
+      .eq('club_id', clubId)
+      .eq('user_id', userId);
+
+    if (deleteError) throw deleteError;
+
+    // Log activity
+    try {
+      await adminSupabase.from('club_activity').insert({
+        club_id: clubId,
+        user_id: userId,
+        activity_type: 'member_left',
+        activity_data: {},
+        created_at: new Date().toISOString()
+      });
+    } catch (activityError) {
+      logger.warn('Failed to log club activity', { error: activityError.message });
+    }
+
+    logger.info('Club member removed successfully', { clubId, userId });
+    return res.status(200).json(
+      createApiResponse(
+        {
+          clubId,
+          userId,
+          metadata: { offline: false }
+        },
+        'Member removed successfully'
+      )
+    );
+  } catch (error) {
+    const normalized = handleSupabaseError(error, { clubId, userId, scope: 'clubs:removeMember' });
+    logger.error('Failed to remove club member', normalized);
+    return res.status(500).json(
+      createApiResponse(null, {
+        success: false,
+        statusCode: 500,
+        message: normalized.message || 'Failed to remove member from club'
+      })
+    );
+  }
+};
+
+export const listClubMembers = async (req, res) => {
+  const { clubId } = req.params;
+
+  if (!clubId) {
+    return res.status(400).json(
+      createApiResponse(null, {
+        success: false,
+        statusCode: 400,
+        message: 'clubId is required'
+      })
+    );
+  }
+
+  if (!adminSupabase) {
+    logger.warn('Supabase unavailable: returning offline members list', { clubId });
+    const offlineMembers = offlineClubsData.clubMembers.filter(m => m.club_id === clubId);
+    return res.status(200).json(
+      createApiResponse(
+        {
+          members: offlineMembers,
+          metadata: { offline: true }
+        },
+        {
+          message: 'Supabase unavailable; serving offline members list.',
+          metadata: { offline: true }
+        }
+      )
+    );
+  }
+
+  try {
+    const { data: members, error: membersError } = await adminSupabase
+      .from('club_members')
+      .select('club_id, user_id, role, joined_at')
+      .eq('club_id', clubId)
+      .order('joined_at', { ascending: false });
+
+    if (membersError) throw membersError;
+
+    logger.info('Club members listed successfully', { clubId, count: members?.length || 0 });
+    return res.status(200).json(
+      createApiResponse(
+        {
+          members: members || [],
+          count: members?.length || 0,
+          metadata: { offline: false }
+        },
+        'Members retrieved successfully'
+      )
+    );
+  } catch (error) {
+    const normalized = handleSupabaseError(error, { clubId, scope: 'clubs:listMembers' });
+    logger.warn('Failed to list club members. Returning offline data.', normalized);
+    const offlineMembers = offlineClubsData.clubMembers.filter(m => m.club_id === clubId);
+    return res.status(200).json(
+      createApiResponse(
+        {
+          members: offlineMembers,
+          metadata: { offline: true }
+        },
+        {
+          message: normalized.message || 'Unable to load members; serving offline data.',
+          metadata: { offline: true }
+        }
+      )
+    );
+  }
+};
+
+export const getClubActivity = async (req, res) => {
+  const { clubId } = req.params;
+  const limit = parseInt(req.query.limit) || 50;
+
+  if (!clubId) {
+    return res.status(400).json(
+      createApiResponse(null, {
+        success: false,
+        statusCode: 400,
+        message: 'clubId is required'
+      })
+    );
+  }
+
+  if (!adminSupabase) {
+    logger.warn('Supabase unavailable: returning empty activity feed', { clubId });
+    return res.status(200).json(
+      createApiResponse(
+        {
+          activities: [],
+          metadata: { offline: true }
+        },
+        {
+          message: 'Supabase unavailable; activity feed unavailable.',
+          metadata: { offline: true }
+        }
+      )
+    );
+  }
+
+  try {
+    // Check if club_activity table exists, if not return empty array
+    const { data: activities, error: activitiesError } = await adminSupabase
+      .from('club_activity')
+      .select('*')
+      .eq('club_id', clubId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (activitiesError) {
+      // If table doesn't exist, return empty array (graceful degradation)
+      if (activitiesError.code === '42P01') {
+        logger.warn('club_activity table does not exist', { clubId });
+        return res.status(200).json(
+          createApiResponse(
+            {
+              activities: [],
+              metadata: { offline: false }
+            },
+            'Activity feed not yet configured'
+          )
+        );
+      }
+      throw activitiesError;
+    }
+
+    logger.info('Club activity retrieved successfully', { clubId, count: activities?.length || 0 });
+    return res.status(200).json(
+      createApiResponse(
+        {
+          activities: activities || [],
+          count: activities?.length || 0,
+          metadata: { offline: false }
+        },
+        'Activity feed retrieved successfully'
+      )
+    );
+  } catch (error) {
+    const normalized = handleSupabaseError(error, { clubId, scope: 'clubs:getActivity' });
+    logger.error('Failed to get club activity', normalized);
+    return res.status(500).json(
+      createApiResponse(
+        {
+          activities: [],
+          metadata: { offline: true }
+        },
+        {
+          success: false,
+          statusCode: 500,
+          message: normalized.message || 'Failed to retrieve activity feed'
+        }
+      )
+    );
+  }
+};
+

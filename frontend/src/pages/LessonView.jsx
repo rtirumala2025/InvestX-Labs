@@ -21,12 +21,28 @@ const LessonView = () => {
   const [hasMarked, setHasMarked] = useState(false);
   const [quizState, setQuizState] = useState({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
   const flattenedLessons = useMemo(() => Object.values(lessons).flat(), [lessons]);
   const lesson = useMemo(
     () => flattenedLessons.find((item) => String(item.id) === String(lessonId)),
     [flattenedLessons, lessonId]
   );
+
+  // Find previous and next lessons
+  const { prevLesson, nextLesson } = useMemo(() => {
+    if (!lesson || !moduleRecord) return { prevLesson: null, nextLesson: null };
+    
+    const moduleLessons = (lessons[moduleRecord.id] || []).sort((a, b) => 
+      (a.order_index || 0) - (b.order_index || 0)
+    );
+    const currentIndex = moduleLessons.findIndex(l => String(l.id) === String(lessonId));
+    
+    return {
+      prevLesson: currentIndex > 0 ? moduleLessons[currentIndex - 1] : null,
+      nextLesson: currentIndex < moduleLessons.length - 1 ? moduleLessons[currentIndex + 1] : null
+    };
+  }, [lesson, lessonId, moduleRecord, lessons]);
 
   const moduleRecord = useMemo(() => {
     if (!lesson) return null;
@@ -42,10 +58,26 @@ const LessonView = () => {
   useEffect(() => {
     if (lesson) {
       setHasMarked(progress[lesson.id] === 'completed');
+      // Load bookmark status from localStorage
+      const bookmarks = JSON.parse(localStorage.getItem('lessonBookmarks') || '[]');
+      setIsBookmarked(bookmarks.includes(String(lesson.id)));
     } else {
       setHasMarked(false);
+      setIsBookmarked(false);
     }
   }, [lesson, progress]);
+
+  const toggleBookmark = useCallback(() => {
+    if (!lesson) return;
+    const bookmarks = JSON.parse(localStorage.getItem('lessonBookmarks') || '[]');
+    const lessonIdStr = String(lesson.id);
+    const newBookmarks = isBookmarked
+      ? bookmarks.filter(id => id !== lessonIdStr)
+      : [...bookmarks, lessonIdStr];
+    localStorage.setItem('lessonBookmarks', JSON.stringify(newBookmarks));
+    setIsBookmarked(!isBookmarked);
+    queueToast(isBookmarked ? 'Bookmark removed' : 'Lesson bookmarked', 'success');
+  }, [lesson, isBookmarked, queueToast]);
 
   const handleCompletion = useCallback(async () => {
     if (!lesson || hasMarked) return;
@@ -177,9 +209,19 @@ const LessonView = () => {
               <GlassButton as={Link} to="/education" variant="glass" size="small">
                 ← Back to Education
               </GlassButton>
-              {completedStatus && (
-                <span className="px-3 py-1 bg-green-500/20 text-green-200 text-xs rounded-full">Completed</span>
-              )}
+              <div className="flex items-center gap-3">
+                <GlassButton
+                  variant="glass"
+                  size="small"
+                  onClick={toggleBookmark}
+                  className={isBookmarked ? 'text-yellow-400' : ''}
+                >
+                  {isBookmarked ? '🔖 Bookmarked' : '🔖 Bookmark'}
+                </GlassButton>
+                {completedStatus && (
+                  <span className="px-3 py-1 bg-green-500/20 text-green-200 text-xs rounded-full">Completed</span>
+                )}
+              </div>
             </div>
 
             <div>
@@ -211,9 +253,33 @@ const LessonView = () => {
                 <GlassButton variant="primary" onClick={handleCompletion} disabled={hasMarked}>
                   {hasMarked ? 'Lesson Completed' : 'Mark Lesson Complete'}
                 </GlassButton>
-                <GlassButton as={Link} to="/education" variant="glass">
-                  Browse Other Lessons
-                </GlassButton>
+                <div className="flex gap-3">
+                  {prevLesson && (
+                    <GlassButton
+                      as={Link}
+                      to={`/education/lessons/${prevLesson.id}`}
+                      variant="glass"
+                      size="default"
+                    >
+                      ← Previous
+                    </GlassButton>
+                  )}
+                  {nextLesson && (
+                    <GlassButton
+                      as={Link}
+                      to={`/education/lessons/${nextLesson.id}`}
+                      variant="primary"
+                      size="default"
+                    >
+                      Next →
+                    </GlassButton>
+                  )}
+                  {!prevLesson && !nextLesson && (
+                    <GlassButton as={Link} to="/education" variant="glass">
+                      Browse Other Lessons
+                    </GlassButton>
+                  )}
+                </div>
               </div>
             </GlassCard>
 

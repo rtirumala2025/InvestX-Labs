@@ -6,6 +6,7 @@ import GlassButton from '../components/ui/GlassButton';
 import Modal from '../components/ui/Modal';
 import SuggestionsList from '../components/ai-suggestions/SuggestionsList';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { SkeletonSuggestion, SkeletonGrid } from '../components/common/SkeletonLoader';
 import { useAISuggestions } from '../hooks/useAISuggestions';
 import { getMarketInsights } from '../services/api/aiService';
 
@@ -261,16 +262,20 @@ const SuggestionsPage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3 space-y-8">
-            <SuggestionsList
-              suggestions={suggestions}
-              loading={loading}
-              error={error}
-              onDismiss={handleDismiss}
-              onRefresh={refresh}
-              onViewDetails={handleOpenSuggestion}
-              onAdjustConfidence={handleConfidenceChange}
-              onRecordInteraction={recordInteraction}
-            />
+            {loading && suggestions.length === 0 ? (
+              <SkeletonGrid count={3} Component={SkeletonSuggestion} />
+            ) : (
+              <SuggestionsList
+                suggestions={suggestions}
+                loading={loading}
+                error={error}
+                onDismiss={handleDismiss}
+                onRefresh={refresh}
+                onViewDetails={handleOpenSuggestion}
+                onAdjustConfidence={handleConfidenceChange}
+                onRecordInteraction={recordInteraction}
+              />
+            )}
           </div>
 
           <div className="space-y-8">

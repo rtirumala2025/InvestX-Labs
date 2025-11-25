@@ -51,6 +51,7 @@ const EducationPage = () => {
   const [selectedModuleId, setSelectedModuleId] = useState(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationData, setCelebrationData] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const { queueToast } = useApp();
   
   // Calculate achievements count first
@@ -83,9 +84,40 @@ const EducationPage = () => {
   }, [courses]);
 
   const filteredCourses = useMemo(() => {
-    if (selectedCategory === 'all') return courses;
-    return courses.filter((course) => course.category === selectedCategory);
-  }, [courses, selectedCategory]);
+    let filtered = courses;
+    
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter((course) => course.category === selectedCategory);
+    }
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((course) => {
+        const matchesTitle = course.title?.toLowerCase().includes(query);
+        const matchesDescription = course.description?.toLowerCase().includes(query);
+        const matchesCategory = course.category?.toLowerCase().includes(query);
+        
+        // Also check modules and lessons
+        const courseModules = modules[course.id] || [];
+        const matchesModule = courseModules.some((module) => 
+          module.title?.toLowerCase().includes(query) ||
+          module.summary?.toLowerCase().includes(query)
+        );
+        
+        const courseLessons = courseModules.flatMap((module) => lessons[module.id] || []);
+        const matchesLesson = courseLessons.some((lesson) =>
+          lesson.title?.toLowerCase().includes(query) ||
+          lesson.summary?.toLowerCase().includes(query)
+        );
+        
+        return matchesTitle || matchesDescription || matchesCategory || matchesModule || matchesLesson;
+      });
+    }
+    
+    return filtered;
+  }, [courses, selectedCategory, searchQuery, modules, lessons]);
 
   useEffect(() => {
     if (!filteredCourses.length) {
@@ -313,28 +345,51 @@ const EducationPage = () => {
           <div className="lg:col-span-3 space-y-8">
             <motion.div variants={fadeIn} initial="hidden" animate="visible">
               <GlassCard variant="default" padding="large">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                <div className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-white mb-3">Filter by Category</h3>
-                    <div className="flex flex-wrap gap-3">
-                      {categories.map((category) => (
+                    <h3 className="text-lg font-semibold text-white mb-3">Search Content</h3>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search courses, modules, lessons..."
+                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50"
+                      />
+                      {searchQuery && (
                         <button
-                          key={category}
-                          onClick={() => setSelectedCategory(category)}
-                          className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
-                            selectedCategory === category
-                              ? 'bg-blue-500/30 text-white border border-blue-400/30'
-                              : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
-                          }`}
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
                         >
-                          <span>{category === 'all' ? '🧭' : '🏷️'}</span>
-                          <span className="text-sm font-medium">{formatLabel(category)}</span>
+                          ✕
                         </button>
-                      ))}
+                      )}
                     </div>
                   </div>
-                  <div className="text-sm text-white/60">
-                    Showing {filteredCourseCount} course{filteredCourseCount === 1 ? '' : 's'}
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-3">Filter by Category</h3>
+                      <div className="flex flex-wrap gap-3">
+                        {categories.map((category) => (
+                          <button
+                            key={category}
+                            onClick={() => setSelectedCategory(category)}
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                              selectedCategory === category
+                                ? 'bg-blue-500/30 text-white border border-blue-400/30'
+                                : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                            }`}
+                          >
+                            <span>{category === 'all' ? '🧭' : '🏷️'}</span>
+                            <span className="text-sm font-medium">{formatLabel(category)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="text-sm text-white/60">
+                      Showing {filteredCourseCount} course{filteredCourseCount === 1 ? '' : 's'}
+                      {searchQuery && ` matching "${searchQuery}"`}
+                    </div>
                   </div>
                 </div>
               </GlassCard>

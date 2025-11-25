@@ -34,6 +34,14 @@ const PortfolioTracker = () => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [selectedTimeframe, setSelectedTimeframe] = useState('1M');
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'upload'
+  
+  // Task 16 & 17: CSV Export and Advanced Filtering
+  const [filters, setFilters] = useState({
+    dateRange: { start: null, end: null },
+    symbol: '',
+    type: 'all' // 'all', 'buy', 'sell'
+  });
+  const [showFilters, setShowFilters] = useState(false);
 
   const fadeIn = {
     hidden: { opacity: 0, y: 16 },
@@ -131,6 +139,66 @@ const PortfolioTracker = () => {
   ];
 
   const timeframes = ['1D', '1W', '1M', '3M', '1Y', 'ALL'];
+
+  // Task 16: CSV Export
+  const handleExportCSV = () => {
+    const csvRows = [
+      ['Symbol', 'Shares', 'Purchase Price', 'Current Price', 'Value', 'Gain/Loss', 'Gain/Loss %', 'Purchase Date']
+    ];
+    
+    holdings.forEach(holding => {
+      const value = (holding.shares || 0) * (holding.current_price || holding.currentPrice || 0);
+      const costBasis = (holding.shares || 0) * (holding.purchase_price || holding.purchasePrice || 0);
+      const gainLoss = value - costBasis;
+      const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
+      
+      csvRows.push([
+        holding.symbol || '',
+        (holding.shares || 0).toFixed(4),
+        (holding.purchase_price || holding.purchasePrice || 0).toFixed(2),
+        (holding.current_price || holding.currentPrice || 0).toFixed(2),
+        value.toFixed(2),
+        gainLoss.toFixed(2),
+        gainLossPercent.toFixed(2) + '%',
+        holding.purchase_date || holding.purchaseDate || ''
+      ]);
+    });
+    
+    const csv = csvRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `portfolio-export-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Task 17: Advanced Filtering
+  const filteredTransactions = React.useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    
+    return transactions.filter(t => {
+      if (filters.symbol && t.symbol?.toUpperCase() !== filters.symbol.toUpperCase()) return false;
+      if (filters.type !== 'all' && t.transaction_type?.toLowerCase() !== filters.type.toLowerCase()) return false;
+      
+      if (filters.dateRange.start) {
+        const transactionDate = new Date(t.transaction_date || t.created_at);
+        if (transactionDate < filters.dateRange.start) return false;
+      }
+      
+      if (filters.dateRange.end) {
+        const transactionDate = new Date(t.transaction_date || t.created_at);
+        const endDate = new Date(filters.dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        if (transactionDate > endDate) return false;
+      }
+      
+      return true;
+    });
+  }, [transactions, filters]);
 
   const loading = portfolioLoading || marketLoading;
   const errorState = portfolioError || marketError;
@@ -338,18 +406,89 @@ const PortfolioTracker = () => {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white/90">Your Holdings</h3>
-                <div className="flex space-x-2">
-                  <button className="px-3 py-1 text-sm bg-white/10 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-all">
-                    Value
-                  </button>
-                  <button className="px-3 py-1 text-sm bg-blue-500/30 rounded-lg text-white">
-                    Performance
-                  </button>
-                  <button className="px-3 py-1 text-sm bg-white/10 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-all">
-                    Allocation
-                  </button>
-                </div>
-              </div>
+                    <div className="flex space-x-2">
+                      <GlassButton
+                        variant="glass"
+                        size="small"
+                        onClick={handleExportCSV}
+                        disabled={!holdings || holdings.length === 0}
+                      >
+                        📥 Export CSV
+                      </GlassButton>
+                      <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`px-3 py-1 text-sm rounded-lg transition-all ${
+                          showFilters
+                            ? 'bg-blue-500/30 text-white border border-blue-400/30'
+                            : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                        }`}
+                      >
+                        🔍 Filters
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Task 17: Advanced Filters */}
+                  {showFilters && (
+                    <div className="mb-4 p-4 bg-white/5 border border-white/10 rounded-lg space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs text-white/70 mb-1">Symbol</label>
+                          <input
+                            type="text"
+                            value={filters.symbol}
+                            onChange={(e) => setFilters(prev => ({ ...prev, symbol: e.target.value }))}
+                            placeholder="Filter by symbol..."
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-white/70 mb-1">Transaction Type</label>
+                          <select
+                            value={filters.type}
+                            onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                          >
+                            <option value="all">All Types</option>
+                            <option value="buy">Buy</option>
+                            <option value="sell">Sell</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-white/70 mb-1">Date Range</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="date"
+                              value={filters.dateRange.start || ''}
+                              onChange={(e) => setFilters(prev => ({
+                                ...prev,
+                                dateRange: { ...prev.dateRange, start: e.target.value ? new Date(e.target.value) : null }
+                              }))}
+                              className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            />
+                            <input
+                              type="date"
+                              value={filters.dateRange.end || ''}
+                              onChange={(e) => setFilters(prev => ({
+                                ...prev,
+                                dateRange: { ...prev.dateRange, end: e.target.value ? new Date(e.target.value) : null }
+                              }))}
+                              className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <GlassButton
+                          variant="glass"
+                          size="small"
+                          onClick={() => setFilters({ dateRange: { start: null, end: null }, symbol: '', type: 'all' })}
+                        >
+                          Clear Filters
+                        </GlassButton>
+                      </div>
+                    </div>
+                  )}
               <HoldingsList 
                 portfolio={portfolio} 
                 liveMetrics={liveMetrics}

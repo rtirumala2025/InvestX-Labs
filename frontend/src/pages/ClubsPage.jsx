@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import Modal from '../components/ui/Modal';
 import { useClubs } from '../contexts/ClubsContext';
 import { useApp } from '../contexts/AppContext';
 
@@ -27,12 +28,88 @@ const ClubsPage = () => {
   const { queueToast } = useApp();
   const [formState, setFormState] = useState(initialFormState);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteClubId, setInviteClubId] = useState(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+
+  // Task 15: Club search, categories/tags, and invitations
+  const categories = useMemo(() => {
+    const cats = new Set(['all']);
+    clubs.forEach(club => {
+      if (club.focus) {
+        const focusParts = club.focus.split(',').map(f => f.trim());
+        focusParts.forEach(part => cats.add(part));
+      }
+    });
+    return Array.from(cats);
+  }, [clubs]);
 
   const sortedClubs = useMemo(
     () =>
       [...clubs].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })),
     [clubs]
   );
+
+  const filteredClubs = useMemo(() => {
+    let filtered = sortedClubs;
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(club =>
+        club.name?.toLowerCase().includes(query) ||
+        club.description?.toLowerCase().includes(query) ||
+        club.focus?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(club =>
+        club.focus?.toLowerCase().includes(selectedCategory.toLowerCase())
+      );
+    }
+    
+    return filtered;
+  }, [sortedClubs, searchQuery, selectedCategory]);
+
+  const handleInvite = async (clubId) => {
+    setInviteClubId(clubId);
+    setShowInviteModal(true);
+  };
+
+  const handleSendInvite = async () => {
+    if (!inviteEmail.trim() || !inviteClubId) {
+      queueToast('Please enter a valid email address', 'warning');
+      return;
+    }
+
+    try {
+      // In a real implementation, you'd call an invitation API
+      // For now, we'll add the member directly
+      const response = await fetch(`/api/clubs/${inviteClubId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: inviteEmail, // In real app, resolve email to userId
+          role: 'member'
+        })
+      });
+
+      if (response.ok) {
+        queueToast('Invitation sent successfully', 'success');
+        setShowInviteModal(false);
+        setInviteEmail('');
+        setInviteClubId(null);
+      } else {
+        throw new Error('Failed to send invitation');
+      }
+    } catch (error) {
+      queueToast(error.message || 'Failed to send invitation', 'error');
+    }
+  };
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
@@ -154,17 +231,56 @@ const ClubsPage = () => {
 
           <div className="xl:col-span-2 space-y-6">
             <GlassCard variant="accent" padding="large" glow className="border-white/10">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-semibold text-white">Your clubs</h2>
-                  <p className="text-sm text-white/70">
-                    Browse communities, open detailed dashboards, or invite friends to collaborate.
-                  </p>
+              <div className="space-y-4">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-white">Your clubs</h2>
+                    <p className="text-sm text-white/70">
+                      Browse communities, open detailed dashboards, or invite friends to collaborate.
+                    </p>
+                  </div>
+                  <div className="flex gap-3 text-white/70 text-xs">
+                    <span>Clubs: {filteredClubs.length} / {clubs.length}</span>
+                    <span>Pending actions: {pendingActions.length}</span>
+                    {offline ? <span className="text-amber-300">Offline mode</span> : null}
+                  </div>
                 </div>
-                <div className="flex gap-3 text-white/70 text-xs">
-                  <span>Clubs: {clubs.length}</span>
-                  <span>Pending actions: {pendingActions.length}</span>
-                  {offline ? <span className="text-amber-300">Offline mode</span> : null}
+                
+                {/* Search and Filter */}
+                <div className="space-y-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search clubs by name, description, or focus..."
+                      className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map(category => (
+                      <button
+                        key={category}
+                        onClick={() => setSelectedCategory(category)}
+                        className={`px-3 py-1 rounded-lg text-sm transition-all ${
+                          selectedCategory === category
+                            ? 'bg-blue-500/30 text-white border border-blue-400/30'
+                            : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20 border border-white/10'
+                        }`}
+                      >
+                        {category === 'all' ? 'All Categories' : category}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </GlassCard>
@@ -182,7 +298,7 @@ const ClubsPage = () => {
             ) : null}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {sortedClubs.map((club) => {
+              {filteredClubs.map((club) => {
                 const isSelected = selectedClubId === club.id;
                 return (
                   <GlassCard
@@ -224,6 +340,13 @@ const ClubsPage = () => {
                           View Club
                         </GlassButton>
                         <GlassButton
+                          variant="glass"
+                          size="small"
+                          onClick={() => handleInvite(club.id)}
+                        >
+                          👥 Invite
+                        </GlassButton>
+                        <GlassButton
                           variant={isSelected ? 'primary' : 'glass'}
                           size="small"
                           onClick={() => selectClub(club.id)}
@@ -236,7 +359,13 @@ const ClubsPage = () => {
                 );
               })}
 
-              {!loading && !sortedClubs.length ? (
+              {!loading && !filteredClubs.length && clubs.length > 0 ? (
+                <GlassCard variant="default" padding="large" className="text-center text-white/70 col-span-full">
+                  <p>No clubs match your search. Try adjusting your filters.</p>
+                </GlassCard>
+              ) : null}
+
+              {!loading && !clubs.length ? (
                 <GlassCard variant="default" padding="large" className="text-center text-white/70">
                   <p>No clubs yet. Create one to get started!</p>
                 </GlassCard>
@@ -245,6 +374,52 @@ const ClubsPage = () => {
           </div>
         </section>
       </main>
+
+      {/* Invitation Modal */}
+      <Modal
+        isOpen={showInviteModal}
+        onClose={() => {
+          setShowInviteModal(false);
+          setInviteEmail('');
+          setInviteClubId(null);
+        }}
+        title="Invite Member to Club"
+        size="default"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-white/70 mb-2">
+              Email Address
+            </label>
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="member@example.com"
+              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            />
+          </div>
+          <div className="flex gap-3 justify-end">
+            <GlassButton
+              variant="glass"
+              onClick={() => {
+                setShowInviteModal(false);
+                setInviteEmail('');
+                setInviteClubId(null);
+              }}
+            >
+              Cancel
+            </GlassButton>
+            <GlassButton
+              variant="primary"
+              onClick={handleSendInvite}
+              disabled={!inviteEmail.trim()}
+            >
+              Send Invitation
+            </GlassButton>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

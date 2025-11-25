@@ -96,6 +96,7 @@ export const ChatProvider = ({ children }) => {
   const userId = currentUser?.id;
   const [state, dispatch] = useReducer(chatReducer, initialState);
   const subscriptionRef = useRef(null);
+  const reconnectStatusRef = useRef({ connected: false, reconnecting: false });
   const { isOnline, queueToast, registerContext } = useApp();
 
   useEffect(() => {
@@ -140,10 +141,19 @@ export const ChatProvider = ({ children }) => {
       return undefined;
     }
 
+    const handleReconnectStatus = (status) => {
+      reconnectStatusRef.current = status;
+      if (status.reconnecting && !status.connected) {
+        queueToast(`Reconnecting to chat... (${status.attempt}/${status.maxAttempts})`, 'warning', { id: 'chat-reconnecting' });
+      } else if (status.connected && !status.reconnecting) {
+        queueToast('Chat reconnected successfully', 'success', { id: 'chat-reconnected' });
+      }
+    };
+
     const subscription = subscribeToMessages(userId, (message) => {
       if (!message) return;
       dispatch({ type: ACTIONS.UPSERT_MESSAGE, payload: message });
-    });
+    }, handleReconnectStatus);
 
     if (subscription.error) {
       dispatch({

@@ -109,11 +109,16 @@ export const getCourses = async () => {
     return { data: payload.courses, modules: payload.modules, lessons: payload.lessons, quizzes: payload.quizzes, offline: !!response.data?.data?.metadata?.offline };
   } catch (error) {
     handleServiceError('load content', error);
+    
+    // Only mark as offline if it's a network error, not just API unavailable
+    const isNetworkError = !error.response && (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error'));
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    
     const cached = loadCachedContentSnapshot();
     if (cached) {
-      return { data: cached.courses, modules: cached.modules, lessons: cached.lessons, quizzes: cached.quizzes, offline: true };
+      return { data: cached.courses, modules: cached.modules, lessons: cached.lessons, quizzes: cached.quizzes, offline: isOffline || isNetworkError };
     }
-    return { data: offlineEducation.courses, modules: offlineEducation.modules, lessons: offlineEducation.lessons, quizzes: offlineEducation.quizzes, offline: true, error };
+    return { data: offlineEducation.courses, modules: offlineEducation.modules, lessons: offlineEducation.lessons, quizzes: offlineEducation.quizzes, offline: isOffline || isNetworkError, error };
   }
 };
 
@@ -158,8 +163,13 @@ export const getUserProgress = async (userId) => {
     return { data: result.progress || [], offline: Boolean(result.offline), error: null };
   } catch (error) {
     handleServiceError('load user progress', error);
+    
+    // Only mark as offline if it's a network error, not just API unavailable
+    const isNetworkError = !error.response && (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error'));
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    
     const cached = loadCachedProgressSnapshot(userId);
-    return { data: cached, offline: true, error };
+    return { data: cached, offline: isOffline || isNetworkError, error };
   }
 };
 

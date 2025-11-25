@@ -70,7 +70,8 @@ export const EducationProvider = ({ children }) => {
       setLessons(lessonsMap || {});
       setQuizzes(quizzesMap || {});
       setOffline(Boolean(isOffline));
-      if (isOffline) {
+      // Only show warning if actually offline (not just API unavailable)
+      if (isOffline && !isOnline) {
         queueToast('Education content is in offline read-only mode.', 'warning', {
           id: 'education-offline'
         });
@@ -82,7 +83,10 @@ export const EducationProvider = ({ children }) => {
         if (progressError) {
           encounteredError = progressError;
           setProgress({});
-          queueToast(progressError?.message || 'Unable to load learning progress.', 'error');
+          // Only show error if actually offline, otherwise it's likely a backend issue
+          if (!isOnline) {
+            queueToast(progressError?.message || 'Unable to load learning progress.', 'error');
+          }
         } else {
           const progressMap = {};
           (progressData || []).forEach((row) => {
@@ -91,7 +95,8 @@ export const EducationProvider = ({ children }) => {
             }
           });
           setProgress(progressMap);
-          if (progressOffline) {
+          // Only show warning if actually offline
+          if (progressOffline && !isOnline) {
             queueToast('Learning progress updates will sync when you reconnect.', 'warning', {
               id: 'education-progress-offline'
             });
@@ -170,7 +175,8 @@ export const EducationProvider = ({ children }) => {
         return { success: false, error: progressError };
       }
 
-      if (queued || progressOffline) {
+      // Only show warning if actually offline
+      if ((queued || progressOffline) && !isOnline) {
         queueToast('Progress saved locally. We will sync it when you reconnect.', 'warning');
       }
 

@@ -82,17 +82,24 @@ export const ClubsProvider = ({ children }) => {
 
     const { clubs: clubList, offline: isOffline, reason } = await fetchClubs();
 
+    // Only show warnings if we're actually offline (not just API unavailable)
+    const actuallyOffline = !isOnline;
+
     if (!clubList?.length) {
       setClubs(offlineClubs.clubs.map(normalizeClub));
       setOffline(true);
       setError(reason || 'Unable to load clubs.');
-      queueToast(reason || 'Clubs are in offline mode. Showing cached data.', 'warning', {
-        id: 'clubs-offline'
-      });
+      // Only show toast if actually offline, not just API unavailable
+      if (actuallyOffline) {
+        queueToast(reason || 'Clubs are in offline mode. Showing cached data.', 'warning', {
+          id: 'clubs-offline'
+        });
+      }
     } else {
       setClubs(clubList.map(normalizeClub));
       setOffline(Boolean(isOffline));
-      if (isOffline) {
+      // Only show warning if actually offline
+      if (isOffline && actuallyOffline) {
         queueToast('Clubs are in offline mode. Changes will sync later.', 'warning', {
           id: 'clubs-offline'
         });
@@ -100,7 +107,7 @@ export const ClubsProvider = ({ children }) => {
     }
 
     setLoading(false);
-  }, [queueToast]);
+  }, [queueToast, isOnline]);
 
   useEffect(() => {
     loadClubs();

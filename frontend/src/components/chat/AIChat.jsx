@@ -57,6 +57,8 @@ const AIChat = () => {
     useChat();
 
   const [inputMessage, setInputMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -116,6 +118,40 @@ const AIChat = () => {
 
   const showEmptyState = !loading && messages.length === 0;
 
+  // Task 13: Message search and export
+  const filteredMessages = React.useMemo(() => {
+    if (!searchQuery.trim()) return messages;
+    const query = searchQuery.toLowerCase();
+    return messages.filter(msg => 
+      msg.content?.toLowerCase().includes(query) ||
+      msg.role?.toLowerCase().includes(query)
+    );
+  }, [messages, searchQuery]);
+
+  const handleExportChat = () => {
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      messageCount: messages.length,
+      messages: messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.created_at || msg.timestamp,
+        id: msg.id
+      }))
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-export-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    analytics.logInteraction('chat_exported', 'button', { messageCount: messages.length });
+  };
+
   return (
     <div className="h-full bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -132,19 +168,56 @@ const AIChat = () => {
 
       <div className="relative z-10 max-w-5xl mx-auto h-full flex flex-col">
         <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6 shadow-2xl">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
-              <Sparkles className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  InvestX Labs Assistant
+                </h1>
+                <p className="text-sm text-gray-400">
+                  Your personal AI investment assistant
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                InvestX Labs Assistant
-              </h1>
-              <p className="text-sm text-gray-400">
-                Your personal AI investment assistant
-              </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowSearch(!showSearch)}
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 transition-colors"
+                aria-label="Search messages"
+              >
+                🔍
+              </button>
+              {messages.length > 0 && (
+                <button
+                  onClick={handleExportChat}
+                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 transition-colors"
+                  aria-label="Export chat"
+                  title="Export chat history"
+                >
+                  📥
+                </button>
+              )}
             </div>
           </div>
+          {showSearch && (
+            <div className="mt-4">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search messages..."
+                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+              {searchQuery && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Found {filteredMessages.length} of {messages.length} messages
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
@@ -200,7 +273,7 @@ const AIChat = () => {
               </div>
             )}
 
-            {messages.map((message) => {
+            {filteredMessages.map((message) => {
               const isUser = message.role === "user";
               const timestamp = message.created_at || message.timestamp;
 

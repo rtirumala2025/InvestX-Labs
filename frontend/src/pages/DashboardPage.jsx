@@ -9,6 +9,7 @@ import { logVerificationComplete } from '../utils/verificationLogger';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { SkeletonCard, SkeletonGrid } from '../components/common/SkeletonLoader';
 import MarketTicker from '../components/market/MarketTicker';
 import { MarketProvider } from '../contexts/MarketContext';
 import PortfolioChart from '../components/portfolio/PortfolioChart';
@@ -229,14 +230,31 @@ function DashboardPageContent() {
     { title: 'Chat Support', description: 'Ask questions anytime', icon: '💬', link: '/chat', color: 'from-orange-500 to-red-500' }
   ];
 
+  // Task 19: Skeleton loaders instead of spinner
   if (loading) {
     console.log('🏠 [DashboardPage] ⏳ Showing loading state');
     return (
-      <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden flex items-center justify-center">
-        <div className="text-center">
-          <LoadingSpinner size="large" />
-          <p className="mt-4 text-gray-300">Loading your dashboard...</p>
-        </div>
+      <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
+        <main className="relative z-10 w-full max-w-[1920px] mx-auto px-3 lg:px-4 xl:px-6 py-4 lg:py-6">
+          <div className="mb-6">
+            <div className="h-10 bg-white/20 rounded w-64 mb-4 animate-pulse"></div>
+            <div className="h-4 bg-white/10 rounded w-96 animate-pulse"></div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <SkeletonCard className="h-64" />
+            </div>
+            <div>
+              <SkeletonCard className="h-64" />
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -290,7 +308,7 @@ function DashboardPageContent() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 mb-2">
-                Welcome back, {currentUser?.displayName?.split(' ')[0] || userProfile?.firstName || 'Investor'}! 👋
+                Welcome back, {userProfile?.full_name?.split(' ')[0] || currentUser?.user_metadata?.full_name?.split(' ')[0] || currentUser?.email?.split('@')[0] || 'Investor'}! 👋
               </h1>
               <p className="text-gray-300 text-base lg:text-lg">Here's your investment journey overview</p>
             </div>

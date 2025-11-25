@@ -14,7 +14,63 @@ import {
 import { supabase } from '../ai-system/supabaseClient.js';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const ALPHA_VANTAGE_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+
+// In-memory cache for AI requests (30 seconds TTL)
+const aiRequestCache = new Map();
+const AI_CACHE_TTL = 30 * 1000; // 30 seconds
+
+const getAICacheKey = (endpoint, params) => {
+  return `${endpoint}:${JSON.stringify(params)}`;
+};
+
+const getCachedAIResponse = (cacheKey) => {
+  const cached = aiRequestCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < AI_CACHE_TTL) {
+    return cached.data;
+  }
+  aiRequestCache.delete(cacheKey);
+  return null;
+};
+
+const setCachedAIResponse = (cacheKey, data) => {
+  aiRequestCache.set(cacheKey, {
+    data,
+    timestamp: Date.now()
+  });
+};
+
+// Clean up expired cache entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of aiRequestCache.entries()) {
+    if (now - value.timestamp >= AI_CACHE_TTL) {
+      aiRequestCache.delete(key);
+    }
+  }
+}, 30000); // Run cleanup every 30 seconds
+
+// Retry logic with exponential backoff
+const retryWithBackoff = async (fn, maxRetries = 3, initialDelay = 1000) => {
+  let lastError;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxRetries - 1) {
+        const delay = initialDelay * Math.pow(2, attempt);
+        logger.warn(`AI request failed, retrying in ${delay}ms`, {
+          attempt: attempt + 1,
+          maxRetries,
+          error: error.message
+        });
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+};
 
 const buildEducationalFallback = (message) => createApiResponse({
   suggestions: fallbackStrategies.map((strategy, index) => ({
@@ -58,30 +114,44 @@ export const healthCheck = (req, res) => {
     timestamp: new Date().toISOString(),
     requires: {
       OPENROUTER_API_KEY: Boolean(OPENROUTER_API_KEY),
-      ALPHA_VANTAGE_KEY: Boolean(ALPHA_VANTAGE_KEY)
+      ALPHA_VANTAGE_API_KEY: Boolean(ALPHA_VANTAGE_API_KEY)
     }
   });
 };
 
 export const generateSuggestions = async (req, res) => {
-  try {
-    const { userId, profile = {}, options = {} } = req.body || {};
+  const startTime = Date.now();
+  const { userId, profile = {}, options = {} } = req.body || {};
+  const cacheKey = getAICacheKey('suggestions', { userId, profile, options });
 
-    if (!userId) {
+  try {
+    // Input validation
+    if (!userId || typeof userId !== 'string') {
+      logger.warn('Invalid userId provided for suggestions', { userId, ip: req.ip });
       return res.status(400).json(createApiResponse(null, {
         success: false,
         statusCode: 400,
-        message: 'userId is required to generate AI suggestions'
+        message: 'userId is required and must be a valid string'
       }));
     }
 
-    const { suggestions } = await generateSuggestionsService({
-      userId,
-      profile,
-      requestedCount: options?.count
-    });
+    // Check cache first
+    const cachedResponse = getCachedAIResponse(cacheKey);
+    if (cachedResponse) {
+      logger.debug('Serving cached AI suggestions', { userId });
+      return res.json(cachedResponse);
+    }
 
-    return res.status(200).json(createApiResponse(
+    // Generate suggestions with retry logic
+    const { suggestions } = await retryWithBackoff(async () => {
+      return await generateSuggestionsService({
+        userId,
+        profile,
+        requestedCount: options?.count
+      });
+    }, 3, 1000);
+
+    const response = createApiResponse(
       {
         suggestions,
         count: suggestions.length
@@ -92,11 +162,23 @@ export const generateSuggestions = async (req, res) => {
           educational_disclaimer: 'The InvestX Labs AI provides educational insights, not financial advice.'
         }
       }
-    ));
+    );
+
+    // Cache the response
+    setCachedAIResponse(cacheKey, response);
+
+    const duration = Date.now() - startTime;
+    logger.info('AI suggestions generated successfully', { userId, count: suggestions.length, duration });
+
+    return res.status(200).json(response);
   } catch (error) {
+    const duration = Date.now() - startTime;
     logger.error('Failed to generate AI suggestions', {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      userId,
+      duration,
+      ip: req.ip
     });
 
     return res.status(503).json(buildEducationalFallback(
@@ -370,9 +452,12 @@ const fallbackChatResponse = (message) => ({
 });
 
 export const chat = async (req, res) => {
+  const startTime = Date.now();
   const { message, userProfile, userId } = req.body || {};
+  const cacheKey = getAICacheKey('chat', { message, userProfile, userId });
 
   if (!message || typeof message !== 'string') {
+    logger.warn('Invalid message provided for chat', { ip: req.ip });
     return res.status(400).json(createApiResponse(null, {
       success: false,
       statusCode: 400,
@@ -384,6 +469,13 @@ export const chat = async (req, res) => {
     return res.status(200).json(fallbackChatResponse(
       'Practice breaking your question into smaller pieces. Try writing what you know, what you are curious about, and how this knowledge helps your goals.'
     ));
+  }
+
+  // Check cache first (only for exact message matches)
+  const cachedResponse = getCachedAIResponse(cacheKey);
+  if (cachedResponse) {
+    logger.debug('Serving cached chat response', { userId });
+    return res.json(cachedResponse);
   }
 
   try {
@@ -416,20 +508,25 @@ export const chat = async (req, res) => {
       }
     }
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': process.env.APP_URL || 'http://localhost:3002',
-        'X-Title': 'InvestX Labs - InvestIQ Chatbot'
-      },
-      body: JSON.stringify({
-        model: 'meta-llama/llama-3.1-70b-instruct',
-        messages: [
-          {
-            role: 'system',
-            content: `You are InvestIQ, an AI financial education assistant for teenagers (ages 13-18).
+    // Make request with retry logic and timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    const response = await retryWithBackoff(async () => {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': process.env.APP_URL || 'http://localhost:3002',
+          'X-Title': 'InvestX Labs - InvestIQ Chatbot'
+        },
+        body: JSON.stringify({
+          model: 'meta-llama/llama-3.1-70b-instruct',
+          messages: [
+            {
+              role: 'system',
+              content: `You are InvestIQ, an AI financial education assistant for teenagers (ages 13-18).
 
 **User Profile:**
 - Age: ${userProfile?.age || 16}
@@ -459,34 +556,53 @@ export const chat = async (req, res) => {
 - Emphasize that this is educational information, not financial advice
 - Encourage learning before investing
 - Provide age-appropriate examples and platform recommendations`
-          },
-          { role: 'user', content: message }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
-      })
-    });
+            },
+            { role: 'user', content: message }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000
+        }),
+        signal: controller.signal
+      });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`AI API error: ${response.status} - ${errorData}`);
-    }
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`AI API error: ${response.status} - ${errorData}`);
+      }
+
+      return response;
+    }, 3, 1000);
+
+    clearTimeout(timeoutId);
 
     const data = await response.json();
     const reply = data?.choices?.[0]?.message?.content ||
       'Sorry, I could not generate a response right now. Please try again later.';
 
-    return res.status(200).json({
+    const chatResponse = {
       reply,
       structuredData: {
         model: data?.model,
         tokens: data?.usage
       }
-    });
+    };
+
+    // Cache the response
+    setCachedAIResponse(cacheKey, chatResponse);
+
+    const duration = Date.now() - startTime;
+    logger.info('Chat response generated successfully', { userId, duration });
+
+    return res.status(200).json(chatResponse);
   } catch (error) {
+    const duration = Date.now() - startTime;
     logger.error('AI chat failure', {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      userId,
+      duration,
+      ip: req.ip,
+      isTimeout: error.name === 'AbortError'
     });
 
     return res.status(200).json(fallbackChatResponse(

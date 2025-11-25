@@ -236,3 +236,123 @@ export const upsertUserProgress = async (req, res) => {
   }
 };
 
+// Task 8: Education Content Validation
+export const validateEducationContent = async (req, res) => {
+  if (!adminSupabase) {
+    return res.status(503).json(
+      createApiResponse(null, {
+        success: false,
+        statusCode: 503,
+        message: 'Supabase client unavailable'
+      })
+    );
+  }
+
+  try {
+    const validationResults = {
+      courses: { total: 0, valid: 0, invalid: 0, missing: [] },
+      modules: { total: 0, valid: 0, invalid: 0, missing: [], orphaned: [] },
+      lessons: { total: 0, valid: 0, invalid: 0, missing: [], orphaned: [] },
+      issues: []
+    };
+
+    // Check if tables exist
+    const { data: courses, error: coursesError } = await adminSupabase
+      .from('courses')
+      .select('id, title, category, description')
+      .order('title');
+
+    if (coursesError) {
+      validationResults.issues.push({
+        type: 'table_error',
+        table: 'courses',
+        message: coursesError.message
+      });
+    } else {
+      validationResults.courses.total = courses?.length || 0;
+      validationResults.courses.valid = courses?.filter(c => c.title && c.id).length || 0;
+      validationResults.courses.invalid = validationResults.courses.total - validationResults.courses.valid;
+    }
+
+    const { data: modules, error: modulesError } = await adminSupabase
+      .from('modules')
+      .select('id, title, course_id, order_index')
+      .order('order_index');
+
+    if (modulesError) {
+      validationResults.issues.push({
+        type: 'table_error',
+        table: 'modules',
+        message: modulesError.message
+      });
+    } else {
+      validationResults.modules.total = modules?.length || 0;
+      const validModules = modules?.filter(m => m.title && m.id && m.course_id) || [];
+      validationResults.modules.valid = validModules.length;
+      validationResults.modules.invalid = validationResults.modules.total - validationResults.modules.valid;
+
+      // Find orphaned modules (modules without valid course_id)
+      if (courses) {
+        const courseIds = new Set(courses.map(c => c.id));
+        validationResults.modules.orphaned = modules?.filter(m => !courseIds.has(m.course_id)) || [];
+      }
+    }
+
+    const { data: lessons, error: lessonsError } = await adminSupabase
+      .from('lessons')
+      .select('id, title, module_id, order_index')
+      .order('order_index');
+
+    if (lessonsError) {
+      validationResults.issues.push({
+        type: 'table_error',
+        table: 'lessons',
+        message: lessonsError.message
+      });
+    } else {
+      validationResults.lessons.total = lessons?.length || 0;
+      const validLessons = lessons?.filter(l => l.title && l.id && l.module_id) || [];
+      validationResults.lessons.valid = validLessons.length;
+      validationResults.lessons.invalid = validationResults.lessons.total - validationResults.lessons.valid;
+
+      // Find orphaned lessons (lessons without valid module_id)
+      if (modules) {
+        const moduleIds = new Set(modules.filter(m => m.id).map(m => m.id));
+        validationResults.lessons.orphaned = lessons?.filter(l => !moduleIds.has(l.module_id)) || [];
+      }
+    }
+
+    const hasIssues = validationResults.issues.length > 0 ||
+      validationResults.courses.invalid > 0 ||
+      validationResults.modules.invalid > 0 ||
+      validationResults.modules.orphaned.length > 0 ||
+      validationResults.lessons.invalid > 0 ||
+      validationResults.lessons.orphaned.length > 0;
+
+    return res.status(200).json(
+      createApiResponse(
+        validationResults,
+        {
+          message: hasIssues
+            ? 'Education content validation completed with issues found'
+            : 'Education content validation passed',
+          metadata: {
+            hasIssues,
+            overallStatus: hasIssues ? 'needs_attention' : 'healthy'
+          }
+        }
+      )
+    );
+  } catch (error) {
+    logger.error('Education content validation failed', { error: error.message, stack: error.stack });
+    return res.status(500).json(
+      createApiResponse(null, {
+        success: false,
+        statusCode: 500,
+        message: 'Failed to validate education content',
+        error: error.message
+      })
+    );
+  }
+};
+

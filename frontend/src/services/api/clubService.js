@@ -97,8 +97,19 @@ export const fetchClubs = async () => {
     cacheClubs(clubs);
     return { clubs, metadata: payload.metadata || {}, offline: Boolean(payload.metadata?.offline) };
   } catch (error) {
-    console.warn('🏛️ [ClubService] load clubs error:', error);
-    return fallbackList(error.message);
+    // Only mark as offline if it's a network error, not just API unavailable
+    const isNetworkError = !error.response && (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error'));
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    
+    // Only return offline: true if actually offline or network error
+    if (isOffline || isNetworkError) {
+      console.warn('🏛️ [ClubService] load clubs error (offline):', error);
+      return fallbackList(error.message);
+    }
+    
+    // API unavailable but online - return empty clubs without offline flag
+    console.warn('🏛️ [ClubService] load clubs error (API unavailable):', error);
+    return { clubs: [], metadata: {}, offline: false };
   }
 };
 

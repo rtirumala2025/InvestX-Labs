@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/supabase/config';
 import { useAchievements } from './AchievementsContext';
@@ -24,6 +24,10 @@ export function SimulationProvider({ children }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Task 18: Undo last trade (60s window)
+  const [undoStack, setUndoStack] = useState([]);
+  const undoTimeoutRef = useRef(null);
 
   /**
    * Load simulation portfolio
@@ -202,7 +206,7 @@ export function SimulationProvider({ children }) {
       }
 
       // Record transaction
-      const { error: transactionError } = await supabase
+      const { data: transactionData, error: transactionError } = await supabase
         .from('transactions')
         .insert({
           user_id: currentUser.id,
@@ -214,9 +218,36 @@ export function SimulationProvider({ children }) {
           total_amount: -totalWithFees,
           fees,
           transaction_date: new Date().toISOString()
-        });
+        })
+        .select()
+        .single();
 
       if (transactionError) throw transactionError;
+      
+      // Task 18: Add to undo stack
+      const tradeSnapshot = {
+        transactionId: transactionData.id,
+        holdingId: existingHolding?.id,
+        previousState: {
+          shares: existingHolding?.shares,
+          balance: virtualBalance,
+          holdingExists: !!existingHolding
+        },
+        action: 'buy',
+        symbol,
+        shares,
+        price,
+        timestamp: Date.now()
+      };
+      setUndoStack(prev => [...prev, tradeSnapshot]);
+      
+      // Clear undo stack after 60 seconds
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current);
+      }
+      undoTimeoutRef.current = setTimeout(() => {
+        setUndoStack([]);
+      }, 60000);
 
       const { error: logError } = await supabase
         .from('simulation_logs')
@@ -321,7 +352,7 @@ export function SimulationProvider({ children }) {
       }
 
       // Record transaction
-      const { error: transactionError } = await supabase
+      const { data: transactionData, error: transactionError } = await supabase
         .from('transactions')
         .insert({
           user_id: currentUser.id,
@@ -333,9 +364,36 @@ export function SimulationProvider({ children }) {
           total_amount: totalWithFees,
           fees,
           transaction_date: new Date().toISOString()
-        });
+        })
+        .select()
+        .single();
 
       if (transactionError) throw transactionError;
+      
+      // Task 18: Add to undo stack
+      const tradeSnapshot = {
+        transactionId: transactionData.id,
+        holdingId: holding.id,
+        previousState: {
+          shares: holding.shares,
+          balance: virtualBalance,
+          holdingExists: true
+        },
+        action: 'sell',
+        symbol,
+        shares,
+        price,
+        timestamp: Date.now()
+      };
+      setUndoStack(prev => [...prev, tradeSnapshot]);
+      
+      // Clear undo stack after 60 seconds
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current);
+      }
+      undoTimeoutRef.current = setTimeout(() => {
+        setUndoStack([]);
+      }, 60000);
 
       const gainLoss = (price - holding.purchase_price) * shares - fees;
       const { error: logError } = await supabase
@@ -470,6 +528,107 @@ export function SimulationProvider({ children }) {
   };
 
   /**
+   * Task 18: Undo last trade (60s window)
+   */
+  const undoLastTrade = useCallback(async () => {
+    if (!currentUser || !portfolio || undoStack.length === 0) {
+      queueToast('No trade to undo', 'warning');
+      return { success: false };
+    }
+
+    const lastTrade = undoStack[undoStack.length - 1];
+    const timeSinceTrade = Date.now() - lastTrade.timestamp;
+    
+    if (timeSinceTrade > 60000) {
+      queueToast('Undo window expired (60 seconds)', 'warning');
+      setUndoStack([]);
+      return { success: false };
+    }
+
+    setLoading(true);
+
+    try {
+      // Delete the transaction
+      const { error: deleteTransactionError } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', lastTrade.transactionId);
+
+      if (deleteTransactionError) throw deleteTransactionError;
+
+      // Revert holding state
+      if (lastTrade.action === 'buy') {
+        if (lastTrade.previousState.holdingExists && lastTrade.holdingId) {
+          // Restore previous shares
+          const { error: updateError } = await supabase
+            .from('holdings')
+            .update({
+              shares: lastTrade.previousState.shares,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', lastTrade.holdingId);
+
+          if (updateError) throw updateError;
+        } else {
+          // Delete the holding if it didn't exist before
+          const { error: deleteHoldingError } = await supabase
+            .from('holdings')
+            .delete()
+            .eq('symbol', lastTrade.symbol)
+            .eq('portfolio_id', portfolio.id)
+            .eq('user_id', currentUser.id);
+
+          if (deleteHoldingError) throw deleteHoldingError;
+        }
+      } else if (lastTrade.action === 'sell') {
+        // Restore holding shares
+        if (lastTrade.holdingId) {
+          const { error: updateError } = await supabase
+            .from('holdings')
+            .update({
+              shares: lastTrade.previousState.shares,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', lastTrade.holdingId);
+
+          if (updateError) throw updateError;
+        }
+      }
+
+      // Revert balance
+      const { error: balanceError } = await supabase
+        .from('portfolios')
+        .update({
+          virtual_balance: lastTrade.previousState.balance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', portfolio.id)
+        .eq('user_id', currentUser.id);
+
+      if (balanceError) throw balanceError;
+
+      setVirtualBalance(lastTrade.previousState.balance);
+      setUndoStack(prev => prev.slice(0, -1));
+      
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current);
+      }
+
+      // Reload data
+      await loadSimulationPortfolio();
+      await updateLeaderboard();
+
+      queueToast('Trade undone successfully', 'success');
+      return { success: true };
+    } catch (err) {
+      queueToast(err.message || 'Failed to undo trade', 'error');
+      return { success: false, error: err.message };
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUser, portfolio, undoStack, loadSimulationPortfolio, updateLeaderboard, queueToast]);
+
+  /**
    * Reset simulation
    */
   const resetSimulation = useCallback(async () => {
@@ -532,7 +691,10 @@ export function SimulationProvider({ children }) {
     buyStock,
     sellStock,
     resetSimulation,
-    loadSimulationPortfolio
+    loadSimulationPortfolio,
+    undoLastTrade,
+    undoStack,
+    canUndo: undoStack.length > 0 && (Date.now() - (undoStack[undoStack.length - 1]?.timestamp || 0)) < 60000
   };
 
   useEffect(() => {
