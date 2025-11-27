@@ -140,10 +140,13 @@ const OnboardingFlow = () => {
             <div className="flex items-center space-x-3">
               <span className="text-2xl">{steps[currentStep]?.icon || '📝'}</span>
               <div>
-                <span className="text-sm font-medium text-white/90">
+                <span 
+                  id={`step-title-${currentStep}`}
+                  className="text-sm font-medium text-white/90"
+                >
                   Step {currentStep + 1} of {steps.length}: {steps[currentStep]?.title}
                 </span>
-                <span className="text-sm text-white/60 ml-2">
+                <span className="text-sm text-white/60 ml-2" aria-live="polite">
                   {Math.round(progress)}% Complete
                 </span>
               </div>
@@ -165,6 +168,9 @@ const OnboardingFlow = () => {
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.3 }}
           className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-8"
+          role="region"
+          aria-labelledby={`step-title-${currentStep}`}
+          aria-live="polite"
         >
           {error && (
             <motion.div
@@ -202,6 +208,22 @@ const OnboardingFlow = () => {
                     : 'bg-white/30'
                 }`}
                 title={step.title}
+                aria-label={`Step ${index + 1}: ${step.title}${index === currentStep ? ' (current)' : index < currentStep ? ' (completed)' : ' (pending)'}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  if (index < currentStep) {
+                    setCurrentStep(index);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (index < currentStep) {
+                      setCurrentStep(index);
+                    }
+                  }
+                }}
               />
             ))}
           </div>
@@ -210,7 +232,8 @@ const OnboardingFlow = () => {
             {currentStep > 0 && (
               <button
                 onClick={handleBack}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white/90 transition-all"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white/90 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label={`Go back to ${steps[currentStep - 1]?.title || 'previous step'}`}
               >
                 ← Back
               </button>
@@ -218,7 +241,8 @@ const OnboardingFlow = () => {
             {currentStep < steps.length - 1 && (
               <button
                 onClick={handleNext}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white transition-all"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label={`Continue to ${steps[currentStep + 1]?.title || 'next step'}`}
               >
                 Next →
               </button>

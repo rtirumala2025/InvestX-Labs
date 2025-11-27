@@ -45,6 +45,7 @@ const Header = () => {
   return (
     <>
       <header
+        role="banner"
         className={`
         sticky top-0 z-50 transition-all duration-300 ease-out
         ${
@@ -66,64 +67,74 @@ const Header = () => {
             </div>
 
             {/* Desktop Navigation - Spread across full width */}
-            <nav className="hidden lg:flex items-center justify-center flex-1 gap-6 xl:gap-8 2xl:gap-12 px-8">
+            <nav role="navigation" aria-label="Main navigation" className="hidden lg:flex items-center justify-center flex-1 gap-6 xl:gap-8 2xl:gap-12 px-8">
               <Link
                 to="/dashboard"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label="Navigate to Dashboard"
               >
                 Dashboard
               </Link>
               <Link
                 to="/portfolio"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label="Navigate to Portfolio"
               >
                 Portfolio
               </Link>
               <Link
                 to="/suggestions"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label="Navigate to AI Suggestions"
               >
                 AI Suggestions
               </Link>
               <Link
                 to="/education"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label="Navigate to Education"
               >
                 Education
               </Link>
               <Link
                 to="/clubs"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label="Navigate to Investment Clubs"
               >
                 🏛️ Clubs
               </Link>
               <Link
                 to="/chat"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label="Navigate to Chat"
               >
                 💬 Chat
               </Link>
               <Link
                 to="/simulation"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label="Navigate to Trading Simulation"
               >
                 🎮 Simulation
               </Link>
               <Link
                 to="/leaderboard"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label="Navigate to Leaderboard"
               >
                 🏆 Leaderboard
               </Link>
               <Link
                 to="/achievements"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label="Navigate to Achievements"
               >
                 🏅 Achievements
               </Link>
               <Link
                 to="/privacy"
                 className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                aria-label="Navigate to Privacy Settings"
               >
                 Privacy
               </Link>
@@ -139,6 +150,7 @@ const Header = () => {
                   <button
                     onClick={handleLogout}
                     className="bg-white/85 hover:bg-white/95 text-neutral-700 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border border-white/25 hover:border-white/35 backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+                    aria-label="Sign out of your account"
                     title="Sign out of your account"
                   >
                     Logout
@@ -196,7 +208,7 @@ const Header = () => {
           {/* Mobile Navigation - Always visible when open */}
           {isMobileMenuOpen && (
             <div className="lg:hidden border-t border-white/20 py-4">
-              <nav className="flex flex-col space-y-3">
+              <nav role="navigation" aria-label="Mobile navigation" className="flex flex-col space-y-3">
                 <Link
                   to="/dashboard"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"

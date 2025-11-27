@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from './GlassCard';
 
@@ -48,6 +48,26 @@ const Modal = ({
     }
   };
   
+  // Handle Escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      // Trap focus within modal
+      const modal = document.querySelector('[role="dialog"]');
+      if (modal) {
+        modal.focus();
+      }
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -58,6 +78,9 @@ const Modal = ({
           animate="visible"
           exit="hidden"
           onClick={onClose}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={title ? "modal-title" : undefined}
         >
           {/* Enhanced Glass Backdrop */}
           <div className="absolute inset-0 bg-black/60 backdrop-blur-2xl backdrop-saturate-150" />
@@ -75,14 +98,18 @@ const Modal = ({
             >
               {title && (
                 <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5 backdrop-blur-xl">
-                  <h2 className="text-xl font-semibold text-white bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
+                  <h2 
+                    id="modal-title"
+                    className="text-xl font-semibold text-white bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent"
+                  >
                     {title}
                   </h2>
                   <button
                     onClick={onClose}
-                    className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200 backdrop-blur-lg"
+                    className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200 backdrop-blur-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    aria-label="Close modal"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>

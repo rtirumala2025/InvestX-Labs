@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,8 +11,35 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    return localStorage.getItem('remember_me') === 'true';
+  });
+  const [rateLimitRemaining, setRateLimitRemaining] = useState(null);
+  const [sessionExpiryWarning, setSessionExpiryWarning] = useState(null);
   const { signIn: login, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
+
+  // Task 24: Session expiration check
+  useEffect(() => {
+    const checkSession = setInterval(() => {
+      // Check if there's a session expiry time stored
+      const expiryTime = localStorage.getItem('session_expiry');
+      if (expiryTime) {
+        const timeUntilExpiry = new Date(expiryTime) - new Date();
+        const minutesUntilExpiry = Math.floor(timeUntilExpiry / 60000);
+        
+        if (minutesUntilExpiry > 0 && minutesUntilExpiry <= 5) {
+          setSessionExpiryWarning(minutesUntilExpiry);
+        } else if (minutesUntilExpiry <= 0) {
+          setSessionExpiryWarning(0);
+        } else {
+          setSessionExpiryWarning(null);
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(checkSession);
+  }, []);
 
   const fadeIn = {
     hidden: { opacity: 0, y: 16 },
@@ -27,9 +54,41 @@ const LoginPage = () => {
     try {
       const result = await login(email, password);
       if (result.success) {
+        // Task 24: Store remember me preference
+        if (rememberMe) {
+          localStorage.setItem('remember_me', 'true');
+          localStorage.setItem('remembered_email', email);
+        } else {
+          localStorage.removeItem('remember_me');
+          localStorage.removeItem('remembered_email');
+        }
+        
+        // Set session expiry (default 30 minutes, extend if remember me)
+        const expiryTime = new Date();
+        expiryTime.setMinutes(expiryTime.getMinutes() + (rememberMe ? 60 * 24 : 30));
+        localStorage.setItem('session_expiry', expiryTime.toISOString());
+        
         navigate('/dashboard');
       } else {
-        setError(result.error || 'Failed to log in. Please check your credentials.');
+        // Task 24: Check for rate limit error
+        if (result.error?.includes('rate limit') || result.error?.includes('too many')) {
+          const retryAfter = result.retryAfter || 60;
+          setRateLimitRemaining(retryAfter);
+          setError(`Too many login attempts. Please try again in ${retryAfter} seconds.`);
+          
+          // Countdown timer
+          const interval = setInterval(() => {
+            setRateLimitRemaining(prev => {
+              if (prev <= 1) {
+                clearInterval(interval);
+                return null;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        } else {
+          setError(result.error || 'Failed to log in. Please check your credentials.');
+        }
       }
     } catch (error) {
       setError('An unexpected error occurred. Please try again.');
@@ -182,6 +241,23 @@ const LoginPage = () => {
                   className="p-4 rounded-xl bg-red-500/20 border border-red-500/30 backdrop-blur-sm"
                 >
                   <p className="text-red-300 text-sm">{error}</p>
+                  {rateLimitRemaining !== null && (
+                    <p className="text-red-200 text-xs mt-2">
+                      Retry in: {rateLimitRemaining} seconds
+                    </p>
+                  )}
+                </motion.div>
+              )}
+
+              {sessionExpiryWarning !== null && sessionExpiryWarning > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 rounded-xl bg-yellow-500/20 border border-yellow-500/30 backdrop-blur-sm"
+                >
+                  <p className="text-yellow-300 text-sm">
+                    ⚠️ Your session will expire in {sessionExpiryWarning} minute{sessionExpiryWarning !== 1 ? 's' : ''}. Please save your work.
+                  </p>
                 </motion.div>
               )}
 
@@ -189,6 +265,8 @@ const LoginPage = () => {
                 <label className="flex items-center text-gray-300">
                   <input
                     type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     className="w-4 h-4 rounded border-white/20 bg-white/10 text-blue-500 focus:ring-blue-500/50 focus:ring-2"
                   />
                   <span className="ml-2">Remember me</span>

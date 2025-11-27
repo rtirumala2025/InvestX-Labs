@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
+import Modal from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import { uploadAvatar } from '../services/supabase/storage';
+import { supabase } from '../services/supabase/config';
+import { updatePassword } from '../services/supabase/auth';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 16 },
@@ -12,8 +16,9 @@ const fadeIn = {
 };
 
 const ProfilePage = () => {
-  const { currentUser, updateProfile, loading } = useAuth();
+  const { currentUser, updateProfile, loading, signOut } = useAuth();
   const { queueToast } = useApp();
+  const navigate = useNavigate();
 
   const profile = currentUser?.profile || {};
 
@@ -34,6 +39,27 @@ const ProfilePage = () => {
   const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
   const fileInputRef = useRef(null);
+
+  // Task 25: Password/Email change, Account deletion, Privacy/Notification settings
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
+  const [newEmail, setNewEmail] = useState('');
+  const [privacySettings, setPrivacySettings] = useState({
+    showEmail: false,
+    showPortfolio: true,
+    showAchievements: true,
+    allowFriendRequests: true
+  });
+  const [notificationSettings, setNotificationSettings] = useState({
+    email: true,
+    push: false,
+    achievements: true,
+    suggestions: true,
+    marketUpdates: false
+  });
 
   useEffect(() => {
     setFormData({
@@ -108,6 +134,95 @@ const ProfilePage = () => {
       queueToast('Profile updated successfully.', 'success');
     } catch (submitError) {
       queueToast(submitError.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Task 25: Password change handler
+  const handlePasswordChange = async () => {
+    if (passwordForm.new !== passwordForm.confirm) {
+      queueToast('New passwords do not match', 'error');
+      return;
+    }
+    if (passwordForm.new.length < 6) {
+      queueToast('Password must be at least 6 characters', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updatePassword(passwordForm.new);
+      queueToast('Password updated successfully', 'success');
+      setShowPasswordModal(false);
+      setPasswordForm({ current: '', new: '', confirm: '' });
+    } catch (error) {
+      queueToast(error.message || 'Failed to update password', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Task 25: Email change handler
+  const handleEmailChange = async () => {
+    if (!newEmail || !newEmail.includes('@')) {
+      queueToast('Please enter a valid email address', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateProfile({ email: newEmail });
+      queueToast('Email update request sent. Please check your new email for verification.', 'success');
+      setShowEmailModal(false);
+      setNewEmail('');
+    } catch (error) {
+      queueToast(error.message || 'Failed to update email', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Task 25: Account deletion handler
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Delete user data from Supabase
+      const { error } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', currentUser.id);
+
+      if (error) throw error;
+
+      // Sign out and redirect
+      await signOut();
+      queueToast('Account deleted successfully', 'success');
+      navigate('/');
+    } catch (error) {
+      queueToast(error.message || 'Failed to delete account', 'error');
+    } finally {
+      setSaving(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  // Task 25: Save privacy/notification settings
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    try {
+      await updateProfile({
+        privacy_settings: privacySettings,
+        notification_settings: notificationSettings
+      });
+      queueToast('Settings saved successfully', 'success');
+      setShowSettingsModal(false);
+    } catch (error) {
+      queueToast(error.message || 'Failed to save settings', 'error');
     } finally {
       setSaving(false);
     }
@@ -341,9 +456,258 @@ const ProfilePage = () => {
                 <li>• Enable multi-factor authentication from your account settings once available.</li>
               </ul>
             </GlassCard>
+
+            {/* Task 25: Account Management */}
+            <GlassCard variant="default" padding="large">
+              <h3 className="text-xl font-semibold text-white mb-4">Account Management</h3>
+              <div className="space-y-3">
+                <GlassButton
+                  variant="glass"
+                  className="w-full justify-start"
+                  onClick={() => setShowPasswordModal(true)}
+                >
+                  🔒 Change Password
+                </GlassButton>
+                <GlassButton
+                  variant="glass"
+                  className="w-full justify-start"
+                  onClick={() => setShowEmailModal(true)}
+                >
+                  📧 Change Email
+                </GlassButton>
+                <GlassButton
+                  variant="glass"
+                  className="w-full justify-start"
+                  onClick={() => setShowSettingsModal(true)}
+                >
+                  ⚙️ Privacy & Notifications
+                </GlassButton>
+                <GlassButton
+                  variant="glass"
+                  className="w-full justify-start text-red-400 hover:text-red-300"
+                  onClick={() => setShowDeleteModal(true)}
+                >
+                  🗑️ Delete Account
+                </GlassButton>
+              </div>
+            </GlassCard>
           </div>
         </motion.div>
       </main>
+
+      {/* Task 25: Password Change Modal */}
+      <Modal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        title="Change Password"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-white/70 mb-2">Current Password</label>
+            <input
+              type="password"
+              value={passwordForm.current}
+              onChange={(e) => setPasswordForm(prev => ({ ...prev, current: e.target.value }))}
+              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-white/70 mb-2">New Password</label>
+            <input
+              type="password"
+              value={passwordForm.new}
+              onChange={(e) => setPasswordForm(prev => ({ ...prev, new: e.target.value }))}
+              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-white/70 mb-2">Confirm New Password</label>
+            <input
+              type="password"
+              value={passwordForm.confirm}
+              onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm: e.target.value }))}
+              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+            />
+          </div>
+          <div className="flex gap-3 justify-end">
+            <GlassButton variant="glass" onClick={() => setShowPasswordModal(false)}>
+              Cancel
+            </GlassButton>
+            <GlassButton variant="primary" onClick={handlePasswordChange} disabled={saving}>
+              {saving ? 'Updating...' : 'Update Password'}
+            </GlassButton>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Task 25: Email Change Modal */}
+      <Modal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        title="Change Email"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-white/70 mb-2">New Email Address</label>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white"
+              placeholder="newemail@example.com"
+            />
+          </div>
+          <p className="text-sm text-white/60">
+            A verification email will be sent to your new email address.
+          </p>
+          <div className="flex gap-3 justify-end">
+            <GlassButton variant="glass" onClick={() => setShowEmailModal(false)}>
+              Cancel
+            </GlassButton>
+            <GlassButton variant="primary" onClick={handleEmailChange} disabled={saving}>
+              {saving ? 'Updating...' : 'Update Email'}
+            </GlassButton>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Task 25: Privacy & Notification Settings Modal */}
+      <Modal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        title="Privacy & Notification Settings"
+        size="large"
+      >
+        <div className="space-y-6">
+          <div>
+            <h4 className="text-lg font-semibold text-white mb-4">Privacy Settings</h4>
+            <div className="space-y-3">
+              <label className="flex items-center justify-between">
+                <span className="text-white/80">Show Email to Others</span>
+                <input
+                  type="checkbox"
+                  checked={privacySettings.showEmail}
+                  onChange={(e) => setPrivacySettings(prev => ({ ...prev, showEmail: e.target.checked }))}
+                  className="w-5 h-5"
+                />
+              </label>
+              <label className="flex items-center justify-between">
+                <span className="text-white/80">Show Portfolio Stats</span>
+                <input
+                  type="checkbox"
+                  checked={privacySettings.showPortfolio}
+                  onChange={(e) => setPrivacySettings(prev => ({ ...prev, showPortfolio: e.target.checked }))}
+                  className="w-5 h-5"
+                />
+              </label>
+              <label className="flex items-center justify-between">
+                <span className="text-white/80">Show Achievements</span>
+                <input
+                  type="checkbox"
+                  checked={privacySettings.showAchievements}
+                  onChange={(e) => setPrivacySettings(prev => ({ ...prev, showAchievements: e.target.checked }))}
+                  className="w-5 h-5"
+                />
+              </label>
+              <label className="flex items-center justify-between">
+                <span className="text-white/80">Allow Friend Requests</span>
+                <input
+                  type="checkbox"
+                  checked={privacySettings.allowFriendRequests}
+                  onChange={(e) => setPrivacySettings(prev => ({ ...prev, allowFriendRequests: e.target.checked }))}
+                  className="w-5 h-5"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-lg font-semibold text-white mb-4">Notification Preferences</h4>
+            <div className="space-y-3">
+              <label className="flex items-center justify-between">
+                <span className="text-white/80">Email Notifications</span>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.email}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, email: e.target.checked }))}
+                  className="w-5 h-5"
+                />
+              </label>
+              <label className="flex items-center justify-between">
+                <span className="text-white/80">Push Notifications</span>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.push}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, push: e.target.checked }))}
+                  className="w-5 h-5"
+                />
+              </label>
+              <label className="flex items-center justify-between">
+                <span className="text-white/80">Achievement Notifications</span>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.achievements}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, achievements: e.target.checked }))}
+                  className="w-5 h-5"
+                />
+              </label>
+              <label className="flex items-center justify-between">
+                <span className="text-white/80">AI Suggestions</span>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.suggestions}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, suggestions: e.target.checked }))}
+                  className="w-5 h-5"
+                />
+              </label>
+              <label className="flex items-center justify-between">
+                <span className="text-white/80">Market Updates</span>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.marketUpdates}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, marketUpdates: e.target.checked }))}
+                  className="w-5 h-5"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="flex gap-3 justify-end">
+            <GlassButton variant="glass" onClick={() => setShowSettingsModal(false)}>
+              Cancel
+            </GlassButton>
+            <GlassButton variant="primary" onClick={handleSaveSettings} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Settings'}
+            </GlassButton>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Task 25: Delete Account Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Account"
+      >
+        <div className="space-y-4">
+          <p className="text-white/80">
+            Are you sure you want to delete your account? This action cannot be undone. All your data, including portfolios, achievements, and progress will be permanently deleted.
+          </p>
+          <div className="flex gap-3 justify-end">
+            <GlassButton variant="glass" onClick={() => setShowDeleteModal(false)}>
+              Cancel
+            </GlassButton>
+            <GlassButton
+              variant="primary"
+              onClick={handleDeleteAccount}
+              disabled={saving}
+              className="bg-red-500/20 hover:bg-red-500/30 text-red-300"
+            >
+              {saving ? 'Deleting...' : 'Delete Account'}
+            </GlassButton>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

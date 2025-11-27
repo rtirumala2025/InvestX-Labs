@@ -8,7 +8,8 @@ import SuggestionsList from '../components/ai-suggestions/SuggestionsList';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { SkeletonSuggestion, SkeletonGrid } from '../components/common/SkeletonLoader';
 import { useAISuggestions } from '../hooks/useAISuggestions';
-import { getMarketInsights } from '../services/api/aiService';
+import { getMarketInsights, fetchSuggestionLogs } from '../services/api/aiService';
+import { useAuth } from '../hooks/useAuth';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 16 },
@@ -36,6 +37,7 @@ const SuggestionsPage = () => {
     updateConfidence,
     recordInteraction,
   } = useAISuggestions();
+  const { currentUser } = useAuth();
 
   const [selectedSuggestion, setSelectedSuggestion] = useState(null);
   const [explanation, setExplanation] = useState(null);
@@ -44,6 +46,13 @@ const SuggestionsPage = () => {
   const [marketInsights, setMarketInsights] = useState([]);
   const [marketInsightsLoading, setMarketInsightsLoading] = useState(false);
   const [marketInsightsError, setMarketInsightsError] = useState(null);
+
+  // Task 14: History tab and comparison view
+  const [activeTab, setActiveTab] = useState('current');
+  const [suggestionHistory, setSuggestionHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedForComparison, setSelectedForComparison] = useState([]);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
 
   const averageConfidence = useMemo(() => {
     if (!suggestions.length) return null;
@@ -81,6 +90,24 @@ const SuggestionsPage = () => {
       changeIsPositive: Number(changePercent) >= 0
     };
   }, [selectedSuggestion?.marketContext]);
+
+  // Task 14: Load suggestion history
+  useEffect(() => {
+    if (activeTab === 'history' && currentUser?.id) {
+      const loadHistory = async () => {
+        setHistoryLoading(true);
+        try {
+          const logs = await fetchSuggestionLogs({ userId: currentUser.id, limit: 50 });
+          setSuggestionHistory(logs || []);
+        } catch (err) {
+          console.error('Error loading suggestion history:', err);
+        } finally {
+          setHistoryLoading(false);
+        }
+      };
+      loadHistory();
+    }
+  }, [activeTab, currentUser?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -262,19 +289,100 @@ const SuggestionsPage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3 space-y-8">
-            {loading && suggestions.length === 0 ? (
-              <SkeletonGrid count={3} Component={SkeletonSuggestion} />
+            {/* Task 14: Tab Navigation */}
+            <GlassCard variant="default" padding="medium">
+              <div className="flex space-x-2 border-b border-white/10 pb-2">
+                <button
+                  onClick={() => setActiveTab('current')}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                    activeTab === 'current'
+                      ? 'bg-blue-500/30 text-white border border-blue-400/30'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  Current Suggestions
+                </button>
+                <button
+                  onClick={() => setActiveTab('history')}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                    activeTab === 'history'
+                      ? 'bg-blue-500/30 text-white border border-blue-400/30'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  History
+                </button>
+                {selectedForComparison.length > 0 && (
+                  <button
+                    onClick={() => setShowComparisonModal(true)}
+                    className="ml-auto px-4 py-2 text-sm font-medium rounded-lg bg-purple-500/30 text-white border border-purple-400/30 hover:bg-purple-500/40"
+                  >
+                    Compare ({selectedForComparison.length})
+                  </button>
+                )}
+              </div>
+            </GlassCard>
+
+            {activeTab === 'current' ? (
+              <>
+                {loading && suggestions.length === 0 ? (
+                  <SkeletonGrid count={3} Component={SkeletonSuggestion} />
+                ) : (
+                  <SuggestionsList
+                    suggestions={suggestions}
+                    loading={loading}
+                    error={error}
+                    onDismiss={handleDismiss}
+                    onRefresh={refresh}
+                    onViewDetails={handleOpenSuggestion}
+                    onAdjustConfidence={handleConfidenceChange}
+                    onRecordInteraction={recordInteraction}
+                    selectedForComparison={selectedForComparison}
+                    onToggleComparison={(suggestionId) => {
+                      setSelectedForComparison(prev => {
+                        if (prev.includes(suggestionId)) {
+                          return prev.filter(id => id !== suggestionId);
+                        } else {
+                          return [...prev, suggestionId].slice(0, 3); // Max 3 for comparison
+                        }
+                      });
+                    }}
+                  />
+                )}
+              </>
             ) : (
-              <SuggestionsList
-                suggestions={suggestions}
-                loading={loading}
-                error={error}
-                onDismiss={handleDismiss}
-                onRefresh={refresh}
-                onViewDetails={handleOpenSuggestion}
-                onAdjustConfidence={handleConfidenceChange}
-                onRecordInteraction={recordInteraction}
-              />
+              <GlassCard variant="default" padding="large">
+                <h3 className="text-xl font-semibold text-white mb-4">Suggestion History</h3>
+                {historyLoading ? (
+                  <div className="flex justify-center py-8">
+                    <LoadingSpinner size="medium" />
+                  </div>
+                ) : suggestionHistory.length === 0 ? (
+                  <p className="text-white/60 text-center py-8">No suggestion history available yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {suggestionHistory.map((log, index) => (
+                      <div key={log.id || index} className="p-4 bg-white/5 rounded-lg border border-white/10">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-sm text-white/60">
+                              {log.created_at ? new Date(log.created_at).toLocaleString() : 'Recent'}
+                            </p>
+                            <p className="text-white mt-1">{log.request_type || 'AI Suggestion'}</p>
+                            {log.response_data && (
+                              <p className="text-sm text-white/70 mt-2">
+                                {typeof log.response_data === 'string' 
+                                  ? log.response_data.substring(0, 100) + '...'
+                                  : JSON.stringify(log.response_data).substring(0, 100) + '...'}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </GlassCard>
             )}
           </div>
 
@@ -382,6 +490,44 @@ const SuggestionsPage = () => {
           </div>
         </div>
       </main>
+
+      {/* Task 14: Comparison Modal */}
+      <Modal
+        isOpen={showComparisonModal}
+        onClose={() => setShowComparisonModal(false)}
+        size="large"
+        title="Compare Suggestions"
+      >
+        <div className="space-y-4">
+          {selectedForComparison.map(suggestionId => {
+            const suggestion = suggestions.find(s => s.id === suggestionId);
+            if (!suggestion) return null;
+            return (
+              <GlassCard key={suggestionId} variant="default" padding="large">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="text-lg font-semibold text-white">{suggestion.symbol || suggestion.title}</h4>
+                    <p className="text-sm text-white/70 mt-1">{suggestion.type}</p>
+                    <p className="text-sm text-white/60 mt-2">Confidence: {suggestion.confidence}%</p>
+                    {suggestion.reason && (
+                      <p className="text-sm text-white/70 mt-2">{suggestion.reason}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setSelectedForComparison(prev => prev.filter(id => id !== suggestionId))}
+                    className="text-white/60 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </GlassCard>
+            );
+          })}
+          {selectedForComparison.length === 0 && (
+            <p className="text-white/60 text-center py-8">Select suggestions to compare them side by side.</p>
+          )}
+        </div>
+      </Modal>
 
       <Modal
         isOpen={Boolean(selectedSuggestion)}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import Button from '../components/ui/Button';
@@ -6,8 +6,70 @@ import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import { useAuth } from '../contexts/AuthContext';
 
+// Task 23: Simple analytics tracking
+const analytics = {
+  trackPageView: (page) => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const views = JSON.parse(localStorage.getItem('page_views') || '{}');
+      views[page] = (views[page] || 0) + 1;
+      localStorage.setItem('page_views', JSON.stringify(views));
+    }
+  },
+  logInteraction: (type, target, data = {}) => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const interactions = JSON.parse(localStorage.getItem('interactions') || '[]');
+      interactions.push({
+        type,
+        target,
+        data,
+        timestamp: new Date().toISOString()
+      });
+      // Keep only last 100 interactions
+      const recent = interactions.slice(-100);
+      localStorage.setItem('interactions', JSON.stringify(recent));
+    }
+  }
+};
+
 export default function HomePage() {
   const { user } = useAuth();
+  
+  // Task 23: A/B test hero variant
+  const [heroVariant, setHeroVariant] = useState(() => {
+    const saved = localStorage.getItem('hero_variant');
+    if (saved) return saved;
+    const variant = Math.random() > 0.5 ? 'A' : 'B';
+    localStorage.setItem('hero_variant', variant);
+    return variant;
+  });
+
+  // Task 23: Testimonials
+  const testimonials = [
+    { 
+      name: 'Alex M.', 
+      text: 'Great learning platform! The simulations helped me understand investing without risking real money.',
+      role: 'Student'
+    },
+    { 
+      name: 'Sarah K.', 
+      text: 'The AI suggestions are spot-on. My portfolio has improved significantly since using InvestX Labs.',
+      role: 'Investor'
+    },
+    { 
+      name: 'Michael R.', 
+      text: 'Finally, a platform that explains finance in plain language. Highly recommend!',
+      role: 'Entrepreneur'
+    }
+  ];
+
+  // Task 23: Analytics tracking
+  useEffect(() => {
+    analytics.trackPageView('homepage');
+    analytics.logInteraction('page_view', 'homepage', {
+      timestamp: new Date().toISOString(),
+      heroVariant
+    });
+  }, [heroVariant]);
   // Static feature data - no need for Firestore dependency
   const features = [
     { 
@@ -114,9 +176,15 @@ export default function HomePage() {
         <h1 className="relative z-10 text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300">
           InvestX Labs
         </h1>
-        <p className="relative z-10 text-lg md:text-2xl max-w-2xl text-gray-300 leading-relaxed mb-10">
-          Learn. Practice. Grow. — A modern investing simulation app that makes finance approachable, interactive, and fun.
-        </p>
+        {heroVariant === 'A' ? (
+          <p className="relative z-10 text-lg md:text-2xl max-w-2xl text-gray-300 leading-relaxed mb-10">
+            Learn. Practice. Grow. — A modern investing simulation app that makes finance approachable, interactive, and fun.
+          </p>
+        ) : (
+          <p className="relative z-10 text-lg md:text-2xl max-w-2xl text-gray-300 leading-relaxed mb-10">
+            Master investing with confidence. Build real portfolios, learn from AI insights, and grow your wealth knowledge step by step.
+          </p>
+        )}
 
         <GlassButton
           as={Link}
@@ -342,6 +410,47 @@ export default function HomePage() {
               </div>
             </GlassCard>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Task 23: Testimonials Section */}
+      <section className="relative z-10 px-6 max-w-6xl mx-auto pb-20">
+        <motion.div
+          variants={fadeIn}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.15 }}
+          className="text-center mb-10"
+        >
+          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300">
+            What Our Users Say
+          </h2>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {testimonials.map((testimonial, index) => (
+            <motion.div
+              key={index}
+              variants={fadeIn}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.15 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <GlassCard variant="floating" padding="large" interactive={true}>
+                <div className="flex items-center mb-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500/80 to-purple-500/80 flex items-center justify-center text-white font-semibold text-lg">
+                    {testimonial.name.charAt(0)}
+                  </div>
+                  <div className="ml-4">
+                    <h4 className="text-white font-semibold">{testimonial.name}</h4>
+                    <p className="text-white/60 text-sm">{testimonial.role}</p>
+                  </div>
+                </div>
+                <p className="text-gray-300 leading-relaxed">"{testimonial.text}"</p>
+              </GlassCard>
+            </motion.div>
+          ))}
         </div>
       </section>
 

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
@@ -72,10 +72,75 @@ const AchievementsPage = () => {
   } = useAchievements();
   const { queueToast } = useApp();
 
+  // Task 27: Filters, search, sharing, progress indicators
+  const [filters, setFilters] = useState({
+    type: 'all',
+    date: 'all',
+    category: 'all'
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+
   const normalizedAchievements = useMemo(
     () => (achievements || []).map(normalizeAchievement),
     [achievements]
   );
+
+  // Task 27: Filtered and searched achievements
+  const filteredAchievements = useMemo(() => {
+    let filtered = normalizedAchievements;
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(a =>
+        a.badge_name?.toLowerCase().includes(query) ||
+        a.title?.toLowerCase().includes(query) ||
+        a.description?.toLowerCase().includes(query) ||
+        a.type?.toLowerCase().includes(query)
+      );
+    }
+
+    // Type filter
+    if (filters.type !== 'all') {
+      filtered = filtered.filter(a => a.type === filters.type);
+    }
+
+    // Date filter (would need date field in achievements)
+    // Category filter (would need category field)
+
+    return filtered;
+  }, [normalizedAchievements, searchQuery, filters]);
+
+  // Task 27: Calculate progress for achievements
+  const calculateProgress = (achievement) => {
+    if (!achievement.details) return null;
+    const current = achievement.details.progress || achievement.details.current || 0;
+    const target = achievement.details.target || achievement.details.threshold || 100;
+    return target > 0 ? Math.min((current / target) * 100, 100) : 0;
+  };
+
+  // Task 27: Share achievement
+  const handleShare = async (achievement) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `I earned ${achievement.title || achievement.badge_name}!`,
+          text: achievement.description || achievement.details?.description,
+          url: window.location.href
+        });
+        queueToast('Achievement shared successfully!', 'success');
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          queueToast('Failed to share achievement', 'error');
+        }
+      }
+    } else {
+      // Fallback: copy to clipboard
+      const text = `I earned ${achievement.title || achievement.badge_name}! ${achievement.description || ''}`;
+      navigator.clipboard.writeText(text);
+      queueToast('Achievement link copied to clipboard!', 'success');
+    }
+  };
 
   const totalXP = useMemo(
     () => normalizedAchievements.reduce((sum, item) => sum + (item.xp || 0), 0),
@@ -133,6 +198,54 @@ const AchievementsPage = () => {
           </div>
         </motion.div>
 
+        {/* Task 27: Search and Filters */}
+        <motion.div variants={fadeIn} initial="hidden" animate="visible" className="mb-6">
+          <GlassCard variant="default" padding="large">
+            <div className="space-y-4">
+              <div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search achievements..."
+                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={filters.type}
+                  onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                  className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                >
+                  <option value="all">All Types</option>
+                  <option value="onboarding_complete">Onboarding</option>
+                  <option value="first_trade">Trading</option>
+                  <option value="lesson_complete">Learning</option>
+                  <option value="simulation_champion">Simulation</option>
+                </select>
+                <select
+                  value={filters.date}
+                  onChange={(e) => setFilters(prev => ({ ...prev, date: e.target.value }))}
+                  className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                >
+                  <option value="all">All Dates</option>
+                  <option value="today">Today</option>
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                </select>
+              </div>
+            </div>
+          </GlassCard>
+        </motion.div>
+
+        <motion.div variants={fadeIn} initial="hidden" animate="visible" className="mb-6">
+          <div>
+            <p className="text-white/60 text-sm">
+              Showing {filteredAchievements.length} of {normalizedAchievements.length} achievements
+            </p>
+          </div>
+        </motion.div>
+
         {loading && !achievements.length ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner size="large" />
@@ -178,13 +291,19 @@ const AchievementsPage = () => {
                 </div>
               </div>
 
-              {normalizedAchievements.length === 0 ? (
+              {filteredAchievements.length === 0 ? (
                 <div className="py-10 text-center text-white/60">
-                  <p>No achievements yet. Start exploring lessons, trading, and simulations to earn your first badge.</p>
+                  <p>
+                    {normalizedAchievements.length === 0
+                      ? 'No achievements yet. Start exploring lessons, trading, and simulations to earn your first badge.'
+                      : 'No achievements match your search criteria.'}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {normalizedAchievements.map((achievement) => (
+                  {filteredAchievements.map((achievement) => {
+                    const progress = calculateProgress(achievement);
+                    return (
                     <motion.div
                       key={achievement.id}
                       variants={fadeIn}
@@ -214,17 +333,36 @@ const AchievementsPage = () => {
                               <span>🕒</span>
                               {formatDate(achievement.earned_at)}
                             </span>
-                            {achievement.details?.progress !== undefined ? (
+                            {progress !== null && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
                                 <span>📊</span>
-                                Progress: {achievement.details.progress}%
+                                Progress: {progress.toFixed(0)}%
                               </span>
-                            ) : null}
+                            )}
+                            <button
+                              onClick={() => handleShare(achievement)}
+                              className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 hover:bg-white/20 transition-colors"
+                            >
+                              <span>📤</span>
+                              Share
+                            </button>
                           </div>
+                          {/* Task 27: Progress Indicator */}
+                          {progress !== null && progress < 100 && (
+                            <div className="mt-3">
+                              <div className="w-full bg-white/20 rounded-full h-2">
+                                <div
+                                  className="bg-gradient-to-r from-blue-400 to-purple-500 h-2 rounded-full transition-all"
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </motion.div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </GlassCard>

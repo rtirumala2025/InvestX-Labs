@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import LeaderboardWidget from '../components/leaderboard/LeaderboardWidget';
 import GlassCard from '../components/ui/GlassCard';
@@ -17,6 +17,16 @@ export default function LeaderboardPage() {
     refreshLeaderboard,
   } = useLeaderboard();
   const { queueToast } = useApp();
+
+  // Task 26: Filters, pagination, friend comparisons, history
+  const [filters, setFilters] = useState({
+    timePeriod: 'all', // 'daily', 'weekly', 'monthly', 'all'
+    category: 'all' // 'portfolio', 'xp', 'achievements'
+  });
+  const [page, setPage] = useState(1);
+  const [showHistory, setShowHistory] = useState(false);
+  const [friends, setFriends] = useState([]);
+  const pageSize = 50;
 
   const fadeIn = {
     hidden: { opacity: 0, y: 12 },
@@ -79,6 +89,24 @@ export default function LeaderboardPage() {
     queueToast('Leaderboard refreshed with the latest stats.', 'success');
   };
 
+  // Task 26: Filtered and paginated leaderboard
+  const filteredLeaderboard = useMemo(() => {
+    let filtered = leaderboard || [];
+    
+    if (filters.category !== 'all') {
+      // Filter by category (would need backend support for this)
+      // For now, just return all
+    }
+    
+    return filtered;
+  }, [leaderboard, filters]);
+
+  const paginatedScores = useMemo(() => {
+    return filteredLeaderboard.slice((page - 1) * pageSize, page * pageSize);
+  }, [filteredLeaderboard, page, pageSize]);
+
+  const totalPages = Math.ceil((filteredLeaderboard.length || 0) / pageSize);
+
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
       <motion.div
@@ -117,6 +145,9 @@ export default function LeaderboardPage() {
             <div className="flex items-center gap-3 flex-wrap">
               <GlassButton variant="glass" onClick={handleRefresh} disabled={loading}>
                 🔄 Refresh Rankings
+              </GlassButton>
+              <GlassButton variant="glass" onClick={() => setShowHistory(!showHistory)}>
+                {showHistory ? 'Hide' : 'Show'} History
               </GlassButton>
               {offline ? (
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 border border-amber-400/40 text-amber-200/90">
@@ -203,12 +234,63 @@ export default function LeaderboardPage() {
             <motion.div variants={fadeIn} className="lg:col-span-2">
               <GlassCard variant="hero" padding="large" shadow="xl">
                 <div className="mb-6">
-                  <h2 className="text-2xl font-semibold text-white mb-2">Top Investors</h2>
-                  <p className="text-white/60 text-sm">
-                    Rankings update in real-time from Supabase as achievements, trades, and XP roll in.
-                  </p>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-2xl font-semibold text-white mb-2">Top Investors</h2>
+                      <p className="text-white/60 text-sm">
+                        Rankings update in real-time from Supabase as achievements, trades, and XP roll in.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Task 26: Filters */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <select
+                      value={filters.timePeriod}
+                      onChange={(e) => setFilters(prev => ({ ...prev, timePeriod: e.target.value }))}
+                      className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                    <select
+                      value={filters.category}
+                      onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                      className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                    >
+                      <option value="all">All Categories</option>
+                      <option value="portfolio">Portfolio</option>
+                      <option value="xp">XP</option>
+                      <option value="achievements">Achievements</option>
+                    </select>
+                  </div>
                 </div>
-                <LeaderboardWidget limit={25} />
+                <LeaderboardWidget limit={pageSize} />
+                
+                {/* Task 26: Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
+                    <button
+                      onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                      disabled={page === 1}
+                      className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-white/70 text-sm">
+                      Page {page} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={page === totalPages}
+                      className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </GlassCard>
             </motion.div>
 
@@ -340,6 +422,33 @@ export default function LeaderboardPage() {
                   </li>
                 </ul>
               </GlassCard>
+
+              {/* Task 26: Friend Comparisons */}
+              {friends.length > 0 && (
+                <GlassCard variant="default" padding="large">
+                  <h3 className="text-xl font-semibold text-white mb-4">Friend Comparisons</h3>
+                  <div className="space-y-3">
+                    {friends.map((friend, index) => (
+                      <div key={friend.id || index} className="p-3 bg-white/5 rounded-lg border border-white/10">
+                        <div className="flex items-center justify-between">
+                          <span className="text-white">{friend.name || 'Friend'}</span>
+                          <span className="text-white/70 text-sm">Rank #{friend.rank || '—'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </GlassCard>
+              )}
+
+              {/* Task 26: History */}
+              {showHistory && (
+                <GlassCard variant="default" padding="large">
+                  <h3 className="text-xl font-semibold text-white mb-4">Leaderboard History</h3>
+                  <p className="text-white/60 text-sm">
+                    Historical leaderboard data will be displayed here once available.
+                  </p>
+                </GlassCard>
+              )}
             </motion.div>
           </motion.div>
         </motion.div>

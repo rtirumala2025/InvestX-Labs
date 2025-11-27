@@ -101,14 +101,15 @@ const ChatInterface = () => {
               message.suggestions.length > 0 && (
                 <div className="suggestions">
                   {message.suggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      className="suggestion-button"
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      disabled={loading || sending}
-                    >
-                      {suggestion.title || suggestion}
-                    </button>
+              <button
+                key={index}
+                className="suggestion-button"
+                onClick={() => handleSuggestionClick(suggestion)}
+                disabled={loading || sending}
+                aria-label={`Select suggestion: ${suggestion.title || suggestion}`}
+              >
+                {suggestion.title || suggestion}
+              </button>
                   ))}
                 </div>
               )}
@@ -135,21 +136,22 @@ const ChatInterface = () => {
       <div className="conversation-starters">
         <h4>Try asking me:</h4>
         <div className="starter-buttons">
-          {[
-            "What's the difference between stocks and bonds?",
-            "How does compound interest work?",
-            "What are index funds?",
-            "How much should I invest each month?",
-          ].map((starter, index) => (
-            <button
-              key={index}
-              className="starter-button"
-              onClick={() => sendMessage(starter, "user")}
-              disabled={loading || sending}
-            >
-              {starter}
-            </button>
-          ))}
+            {[
+              "What's the difference between stocks and bonds?",
+              "How does compound interest work?",
+              "What are index funds?",
+              "How much should I invest each month?",
+            ].map((starter, index) => (
+              <button
+                key={index}
+                className="starter-button"
+                onClick={() => sendMessage(starter, "user")}
+                disabled={loading || sending}
+                aria-label={`Ask: ${starter}`}
+              >
+                {starter}
+              </button>
+            ))}
         </div>
       </div>
     </div>
@@ -247,6 +249,8 @@ const ChatInterface = () => {
                 placeholder="Ask Finley anything about investing..."
                 disabled={loading}
                 maxLength={1000}
+                aria-label="Chat message input"
+                aria-describedby="chat-input-hint"
               />
 
               <GlassButton
@@ -262,8 +266,8 @@ const ChatInterface = () => {
             </div>
 
             <div className="input-footer">
-              <span className="char-count">{inputMessage.length}/1000</span>
-              <span className="input-hint">
+              <span className="char-count" aria-live="polite">{inputMessage.length}/1000</span>
+              <span id="chat-input-hint" className="input-hint">
                 Press Enter to send, Shift+Enter for new line
               </span>
             </div>

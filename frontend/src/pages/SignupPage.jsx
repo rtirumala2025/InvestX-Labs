@@ -19,6 +19,22 @@ const SignupPage = () => {
   const { signup, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
+  // Task 24: Password strength calculator
+  const calculateStrength = (password) => {
+    if (!password) return 0;
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^A-Za-z0-9]/.test(password)) strength++;
+    return strength;
+  };
+
+  const passwordStrength = calculateStrength(formData.password);
+  const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+  const strengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-blue-500', 'bg-green-500'];
+
   const fadeIn = {
     hidden: { opacity: 0, y: 16 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
@@ -256,6 +272,30 @@ const SignupPage = () => {
                   value={formData.password}
                   onChange={handleChange}
                 />
+                {/* Task 24: Password Strength Meter */}
+                {formData.password && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-white/60">Strength:</span>
+                      <span className={`text-xs font-medium ${
+                        passwordStrength <= 1 ? 'text-red-400' :
+                        passwordStrength === 2 ? 'text-orange-400' :
+                        passwordStrength === 3 ? 'text-yellow-400' :
+                        passwordStrength === 4 ? 'text-blue-400' : 'text-green-400'
+                      }`}>
+                        {strengthLabels[passwordStrength - 1] || 'Very Weak'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all ${
+                          strengthColors[passwordStrength - 1] || 'bg-red-500'
+                        }`}
+                        style={{ width: `${(passwordStrength / 5) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

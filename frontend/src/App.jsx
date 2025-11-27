@@ -18,6 +18,7 @@ import Header from "./components/common/Header";
 import Footer from "./components/common/Footer";
 import ToastViewport from "./components/common/ToastViewport";
 import LoadingSpinner from "./components/common/LoadingSpinner";
+import SkipLink from "./components/common/SkipLink";
 
 // Critical pages - load immediately for better UX
 import HomePage from "./pages/HomePage";
@@ -58,12 +59,13 @@ function App() {
         <CssBaseline />
         <AppContextProvider>
           <div className="min-h-screen flex flex-col bg-gray-900 text-white">
+            <SkipLink />
             <ToastViewport />
             <GlobalErrorBanner />
             <NetworkStatus />
             <DisclaimerBanner />
             <Header />
-            <main className="flex-grow">
+            <main id="main-content" className="flex-grow" role="main">
               <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>

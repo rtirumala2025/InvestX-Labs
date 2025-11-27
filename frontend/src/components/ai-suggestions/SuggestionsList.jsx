@@ -12,6 +12,8 @@ const SuggestionsList = ({
   onViewDetails,
   onAdjustConfidence,
   onRecordInteraction,
+  selectedForComparison = [],
+  onToggleComparison,
 }) => {
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState("confidence");
@@ -170,14 +172,28 @@ const SuggestionsList = ({
       {sortedSuggestions.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {sortedSuggestions.map((suggestion) => (
-            <SuggestionCard
-              key={suggestion.id}
-              suggestion={suggestion}
-              onViewDetails={handleViewDetails}
-              onDismiss={handleDismiss}
-              onAdjustConfidence={onAdjustConfidence}
-              onRecordInteraction={onRecordInteraction}
-            />
+            <div key={suggestion.id} className="relative">
+              {onToggleComparison && (
+                <button
+                  onClick={() => onToggleComparison(suggestion.id)}
+                  className={`absolute top-2 right-2 z-10 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                    selectedForComparison.includes(suggestion.id)
+                      ? 'bg-blue-500 border-blue-400 text-white'
+                      : 'bg-white/10 border-white/30 text-white/60 hover:bg-white/20'
+                  }`}
+                  aria-label={selectedForComparison.includes(suggestion.id) ? 'Remove from comparison' : 'Add to comparison'}
+                >
+                  {selectedForComparison.includes(suggestion.id) ? '✓' : '+'}
+                </button>
+              )}
+              <SuggestionCard
+                suggestion={suggestion}
+                onViewDetails={handleViewDetails}
+                onDismiss={handleDismiss}
+                onAdjustConfidence={onAdjustConfidence}
+                onRecordInteraction={onRecordInteraction}
+              />
+            </div>
           ))}
         </div>
       ) : (
