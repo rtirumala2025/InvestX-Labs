@@ -1,19 +1,10 @@
 import React, { useMemo } from 'react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import { registerChartJS } from '../../utils/chartConfig';
 import LoadingSpinner from '../common/LoadingSpinner';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+// Ensure Chart.js is registered
+registerChartJS();
 
 const TIMEFRAME_WINDOWS = {
   '1D': 1,

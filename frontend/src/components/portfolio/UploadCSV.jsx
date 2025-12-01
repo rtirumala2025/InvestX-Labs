@@ -1,6 +1,5 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import * as XLSX from 'xlsx';
 import { useAuth } from '../../hooks/useAuth';
 import { useApp } from '../../contexts/AppContext';
 import { usePortfolioContext } from '../../contexts/PortfolioContext';
@@ -8,6 +7,12 @@ import { supabase } from '../../services/supabase/config';
 import GlassCard from '../ui/GlassCard';
 import GlassButton from '../ui/GlassButton';
 import { VALIDATION_RULES } from '../../utils/constants';
+
+// Lazy load xlsx only when needed
+const loadXLSX = async () => {
+  const xlsxModule = await import('xlsx');
+  return xlsxModule.default || xlsxModule;
+};
 
 const ACCEPTED_TYPES = ['.csv', '.xlsx', '.xls'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -83,7 +88,7 @@ const normalizeDate = (value) => {
   return null;
 };
 
-const parseWorksheet = (worksheet) => {
+const parseWorksheet = (worksheet, XLSX) => {
   const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
   if (!rows.length) {
     throw new Error('The file is empty.');
@@ -178,18 +183,20 @@ const parseUploadFile = async (file) => {
   const extension = file.name.split('.').pop().toLowerCase();
 
   if (extension === 'xlsx' || extension === 'xls') {
+    const XLSX = await loadXLSX();
     const arrayBuffer = await readFileAsArrayBuffer(file);
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = parseWorksheet(worksheet);
+    const rows = parseWorksheet(worksheet, XLSX);
     return transformRows(rows);
   }
 
   if (extension === 'csv') {
+    const XLSX = await loadXLSX();
     const text = await readFileAsText(file);
     const workbook = XLSX.read(text, { type: 'string' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = parseWorksheet(worksheet);
+    const rows = parseWorksheet(worksheet, XLSX);
     return transformRows(rows);
   }
 

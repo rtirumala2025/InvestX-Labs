@@ -145,12 +145,50 @@ export const usePortfolio = () => {
     try {
       console.log('📊 [usePortfolio] Loading holdings for portfolio:', portfolioId);
 
-      const { data: holdingsData, error: holdingsError } = await supabase
-        .from('holdings')
-        .select('*')
-        .eq('portfolio_id', portfolioId)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+      // Select holdings - handle case where purchase_price might not exist yet
+      // Try with purchase_price first, fallback to basic columns if it fails
+      let holdingsData, holdingsError;
+      
+      try {
+        const result = await supabase
+          .from('holdings')
+          .select('id,portfolio_id,symbol,shares,purchase_price,current_price,purchase_date,created_at,updated_at')
+          .eq('portfolio_id', portfolioId)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        
+        holdingsData = result.data;
+        holdingsError = result.error;
+        
+        // If error is about missing column, try without purchase_price
+        // Note: This is a temporary fallback for PostgREST schema cache issues
+        // The column exists in the database but PostgREST cache may take 1-2 minutes to refresh
+        if (holdingsError && holdingsError.code === '42703' && holdingsError.message?.includes('purchase_price')) {
+          console.debug('📊 [usePortfolio] PostgREST cache issue: purchase_price column exists but not yet visible to API. Using fallback query.');
+          const fallbackResult = await supabase
+            .from('holdings')
+            .select('id,portfolio_id,symbol,shares,current_price,purchase_date,created_at,updated_at')
+            .eq('portfolio_id', portfolioId)
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+          
+          holdingsData = fallbackResult.data;
+          holdingsError = fallbackResult.error;
+          
+          // Add purchase_price as current_price or 0 for compatibility
+          if (holdingsData) {
+            holdingsData = holdingsData.map(h => ({
+              ...h,
+              purchase_price: h.current_price || 0
+            }));
+          }
+        } else if (holdingsError) {
+          // Log other errors for debugging
+          console.error('📊 [usePortfolio] Holdings query error:', JSON.stringify(holdingsError, null, 2));
+        }
+      } catch (err) {
+        holdingsError = err;
+      }
 
       if (holdingsError) {
         console.error('📊 [usePortfolio] Error loading holdings:', holdingsError);
@@ -192,7 +230,7 @@ export const usePortfolio = () => {
 
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('transactions')
-        .select('*')
+        .select('id,portfolio_id,symbol,transaction_type,shares,price,total_amount,transaction_date,created_at')
         .eq('portfolio_id', portfolioId)
         .eq('user_id', userId)
         .order('transaction_date', { ascending: false, nullsFirst: false })
@@ -241,7 +279,7 @@ export const usePortfolio = () => {
       // Load portfolio (non-simulation portfolio)
       const { data: portfolioData, error: portfolioError } = await supabase
         .from('portfolios')
-        .select('*')
+        .select('id,user_id,name,description,virtual_balance,is_simulation,created_at,updated_at')
         .eq('user_id', userId)
         .eq('is_simulation', false)
         .maybeSingle();

@@ -107,23 +107,42 @@ export const signInWithGoogle = async () => {
   try {
     ensureAuthClient();
     console.log('🔐 [Auth] Initiating Google OAuth sign in');
+    
+    // Use the base origin for redirect - Supabase will handle the OAuth callback
+    // and then redirect to the specified URL. Using just the origin ensures
+    // it matches the Site URL configuration in Supabase dashboard.
+    const redirectTo = `${window.location.origin}/dashboard`;
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: redirectTo,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     });
     
     if (error) {
       console.error('🔐 [Auth] ❌ Google OAuth error:', error.message);
-      throw error;
+      return { data: null, error };
     }
     
-    console.log('🔐 [Auth] ✅ Google OAuth initiated, redirecting...');
-    return data;
+    // Supabase should automatically redirect, but if it doesn't, manually redirect
+    if (data?.url) {
+      console.log('🔐 [Auth] ✅ Google OAuth initiated, redirecting to:', data.url);
+      console.log('🔐 [Auth] Redirect will go to:', redirectTo);
+      // Redirect to the OAuth URL - Supabase will handle the callback
+      window.location.href = data.url;
+    } else {
+      console.log('🔐 [Auth] ✅ Google OAuth initiated, redirecting...');
+    }
+    
+    return { data, error: null };
   } catch (error) {
     console.warn('Supabase signInWithGoogle failed:', error);
-    throw error;
+    return { data: null, error };
   }
 };
 

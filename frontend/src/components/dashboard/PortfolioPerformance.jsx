@@ -1,26 +1,9 @@
 import React from "react";
 import { Line } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from "chart.js";
+import { registerChartJS } from "../../utils/chartConfig";
 
-// Register ChartJS components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-);
+// Ensure Chart.js is registered
+registerChartJS();
 
 const PortfolioPerformance = ({ performanceData }) => {
   // Default data if no performance data is provided

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,10 +10,12 @@ import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { SkeletonCard, SkeletonGrid } from '../components/common/SkeletonLoader';
-import MarketTicker from '../components/market/MarketTicker';
 import { MarketProvider } from '../contexts/MarketContext';
-import PortfolioChart from '../components/portfolio/PortfolioChart';
 import { useApp } from '../contexts/AppContext';
+
+// Lazy load heavy components
+const MarketTicker = lazy(() => import('../components/market/MarketTicker'));
+const PortfolioChart = lazy(() => import('../components/portfolio/PortfolioChart'));
 
 // Main DashboardPage component wrapped with MarketProvider
 export default function DashboardPage() {
@@ -345,14 +347,16 @@ function DashboardPageContent() {
           ))}
         </motion.div>
         
-        {/* Market Ticker */}
+        {/* Market Ticker - Lazy loaded */}
         <motion.div 
           variants={fadeIn}
           initial="hidden"
           animate="visible"
           className="mb-6"
         >
-          <MarketTicker />
+          <Suspense fallback={<div className="h-16 bg-white/5 rounded-lg animate-pulse" />}>
+            <MarketTicker />
+          </Suspense>
         </motion.div>
         
         {/* Empty State for No Portfolio */}
@@ -396,15 +400,21 @@ function DashboardPageContent() {
                       ))}
                     </div>
                   </div>
-                  <PortfolioChart
-                    portfolio={portfolio}
-                    holdings={holdings}
-                    transactions={transactions}
-                    marketData={marketData}
-                    timeframe={selectedChartTimeframe}
-                    loading={loading || marketLoading}
-                    error={error || marketError}
-                  />
+                  <Suspense fallback={
+                    <div className="h-80 flex items-center justify-center">
+                      <LoadingSpinner size="large" />
+                    </div>
+                  }>
+                    <PortfolioChart
+                      portfolio={portfolio}
+                      holdings={holdings}
+                      transactions={transactions}
+                      marketData={marketData}
+                      timeframe={selectedChartTimeframe}
+                      loading={loading || marketLoading}
+                      error={error || marketError}
+                    />
+                  </Suspense>
               </GlassCard>
             </motion.div>
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useErrorHandler } from 'react-error-boundary';
+import { throttle } from '../utils/debounce';
 import { 
   getHistoricalData, 
   searchStocks, 
@@ -31,7 +32,7 @@ export const useMarketData = (symbols = DEFAULT_SYMBOLS, options = {}) => {
   // Keep track of pending requests to avoid duplicate calls
   const pendingRequests = useRef(new Map());
   
-  // Fetch market data for all symbols
+  // Fetch market data for all symbols (throttled to 30 seconds)
   const fetchMarketData = useCallback(async (symbolsToFetch = symbols, options = {}) => {
     const { forceRefresh = false } = options;
     const cacheKey = symbolsToFetch.sort().join(',');
@@ -75,6 +76,15 @@ export const useMarketData = (symbols = DEFAULT_SYMBOLS, options = {}) => {
     pendingRequests.current.set(cacheKey, fetchPromise);
     return fetchPromise;
   }, [symbols, useCache, handleError]);
+
+  // Throttled version of fetchMarketData (30 seconds minimum between calls)
+  const throttledFetchMarketDataRef = useRef(null);
+  
+  useEffect(() => {
+    throttledFetchMarketDataRef.current = throttle((symbolsToFetch, options) => {
+      return fetchMarketData(symbolsToFetch, options);
+    }, 30000); // 30 seconds throttle
+  }, [fetchMarketData]);
   
   // Fetch historical data for a symbol
   const fetchHistoricalData = useCallback(async (symbol, options = {}) => {
@@ -224,11 +234,15 @@ export const useMarketData = (symbols = DEFAULT_SYMBOLS, options = {}) => {
   
   // Initial data fetch
   useEffect(() => {
-    if (autoFetch) {
-      fetchMarketData();
+    if (autoFetch && symbols.length > 0) {
+      if (throttledFetchMarketDataRef.current) {
+        throttledFetchMarketDataRef.current(symbols);
+      } else {
+        fetchMarketData(symbols);
+      }
       fetchMarketNews();
     }
-  }, [autoFetch, fetchMarketData, fetchMarketNews]);
+  }, [autoFetch, symbols.length, fetchMarketData, fetchMarketNews]);
   
   // Set up auto-refresh interval
   useEffect(() => {

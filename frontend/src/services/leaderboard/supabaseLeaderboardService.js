@@ -222,14 +222,42 @@ export const getUserRank = async (userId) => {
       return { data: null, offline: false, error: null };
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from(USER_PROFILES_TABLE)
-      .select('xp, net_worth, username, full_name, avatar_url')
-      .eq('id', userId)
-      .maybeSingle();
+    // Try to get profile with xp and net_worth, but handle missing columns gracefully
+    let profile = null;
+    let profileError = null;
+    
+    try {
+      const result = await supabase
+        .from(USER_PROFILES_TABLE)
+        .select('xp, net_worth, username, full_name, avatar_url')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      profile = result.data;
+      profileError = result.error;
+      
+      // If error is about missing columns (42703), try without xp and net_worth
+      if (profileError && profileError.code === '42703' && 
+          (profileError.message?.includes('xp') || profileError.message?.includes('net_worth'))) {
+        console.debug('🏆 [LeaderboardService] xp/net_worth columns not found, using fallback query');
+        const fallbackResult = await supabase
+          .from(USER_PROFILES_TABLE)
+          .select('username, full_name, avatar_url')
+          .eq('id', userId)
+          .maybeSingle();
+        
+        profile = fallbackResult.data;
+        profileError = fallbackResult.error;
+      }
+    } catch (err) {
+      profileError = err;
+    }
 
     if (profileError && profileError.code !== 'PGRST116') {
-      throw profileError;
+      // Only throw if it's not a "not found" error
+      if (profileError.code !== '42703') {
+        throw profileError;
+      }
     }
 
     const payload = {
@@ -364,17 +392,34 @@ export const updateUserStats = async (userId, deltaXP = 0, deltaNetWorth = 0) =>
 
     if (upsertError) throw upsertError;
 
-    const { error: profileError } = await supabase
-      .from(USER_PROFILES_TABLE)
-      .update({
-        xp: newXp,
-        net_worth: newNetWorth,
-        updated_at: updatedAt
-      })
-      .eq('id', userId);
+    // Try to update xp and net_worth, but handle missing columns gracefully
+    try {
+      const { error: profileError } = await supabase
+        .from(USER_PROFILES_TABLE)
+        .update({
+          xp: newXp,
+          net_worth: newNetWorth,
+          updated_at: updatedAt
+        })
+        .eq('id', userId);
 
-    if (profileError && profileError.code !== 'PGRST116') {
-      throw profileError;
+      // If error is about missing columns (42703), try updating only updated_at
+      if (profileError && profileError.code === '42703' && 
+          (profileError.message?.includes('xp') || profileError.message?.includes('net_worth'))) {
+        console.debug('🏆 [LeaderboardService] xp/net_worth columns not found, skipping profile update');
+        // Just update updated_at if columns don't exist
+        await supabase
+          .from(USER_PROFILES_TABLE)
+          .update({
+            updated_at: updatedAt
+          })
+          .eq('id', userId);
+      } else if (profileError && profileError.code !== 'PGRST116') {
+        throw profileError;
+      }
+    } catch (updateError) {
+      // Log but don't throw - leaderboard update should still succeed
+      console.debug('🏆 [LeaderboardService] Profile update error (non-fatal):', updateError);
     }
 
     return { data: updatedLeaderboard, offline: false, queued: false, error: null };

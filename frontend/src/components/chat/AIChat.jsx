@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, memo } from "react";
 import {
   Send,
   Loader2,
@@ -36,6 +36,54 @@ const quickPrompts = [
     color: "from-green-500 to-emerald-500",
   },
 ];
+
+// Memoized message item component to prevent re-renders
+const MessageItem = memo(({ message, isUser, timestamp }) => {
+  return (
+    <div
+      className={`flex ${isUser ? "justify-end" : "justify-start"} animate-fadeIn`}
+    >
+      <div
+        className={`max-w-[80%] rounded-2xl p-4 ${
+          isUser
+            ? "bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg"
+            : "backdrop-blur-xl bg-white/10 border border-white/10 text-gray-100 shadow-xl"
+        }`}
+      >
+        {!isUser && (
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-purple-600">
+              <Sparkles className="w-3 h-3 text-white" />
+            </div>
+            <span className="text-xs text-gray-400 font-medium">
+              InvestX Labs
+            </span>
+          </div>
+        )}
+        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+          {message.content}
+        </p>
+        {message.pending && (
+          <span className="text-xs mt-2 block text-blue-200">
+            Sending…
+          </span>
+        )}
+        {timestamp && (
+          <span
+            className={`text-xs mt-2 block ${isUser ? "text-blue-200" : "text-gray-500"}`}
+          >
+            {new Date(timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+});
+
+MessageItem.displayName = 'MessageItem';
 
 const validateAndSanitizeInput = (input) => {
   let sanitized = input.trim();
@@ -273,54 +321,14 @@ const AIChat = () => {
               </div>
             )}
 
-            {filteredMessages.map((message) => {
-              const isUser = message.role === "user";
-              const timestamp = message.created_at || message.timestamp;
-
-              return (
-                <div
-                  key={message.id}
-                  className={`flex ${isUser ? "justify-end" : "justify-start"} animate-fadeIn`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl p-4 ${
-                      isUser
-                        ? "bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-lg"
-                        : "backdrop-blur-xl bg-white/10 border border-white/10 text-gray-100 shadow-xl"
-                    }`}
-                  >
-                    {!isUser && (
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-purple-600">
-                          <Sparkles className="w-3 h-3 text-white" />
-                        </div>
-                        <span className="text-xs text-gray-400 font-medium">
-                          InvestX Labs
-                        </span>
-                      </div>
-                    )}
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {message.content}
-                    </p>
-                    {message.pending && (
-                      <span className="text-xs mt-2 block text-blue-200">
-                        Sending…
-                      </span>
-                    )}
-                    {timestamp && (
-                      <span
-                        className={`text-xs mt-2 block ${isUser ? "text-blue-200" : "text-gray-500"}`}
-                      >
-                        {new Date(timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {filteredMessages.map((message) => (
+              <MessageItem
+                key={message.id}
+                message={message}
+                isUser={message.role === "user"}
+                timestamp={message.created_at || message.timestamp}
+              />
+            ))}
 
             {sending && (
               <div className="flex justify-start animate-fadeIn">

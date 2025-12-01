@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useSimulation } from '../../contexts/SimulationContext';
 import { getQuote } from '../../services/market/marketService';
+import { debounce } from '../../utils/debounce';
 import GlassCard from '../ui/GlassCard';
 import GlassButton from '../ui/GlassButton';
 
@@ -17,21 +18,21 @@ const TradingInterface = ({ virtualBalance, holdings }) => {
   const [aiCoaching, setAiCoaching] = useState(null);
 
   /**
-   * Search for stock
+   * Search for stock (debounced)
    */
-  const handleSearch = async () => {
-    if (!symbol) return;
+  const handleSearchInternal = useCallback(async (searchSymbol) => {
+    if (!searchSymbol) return;
 
     setSearching(true);
     setMessage(null);
     setCurrentPrice(null);
 
     try {
-      const quote = await getQuote(symbol.toUpperCase());
+      const quote = await getQuote(searchSymbol.toUpperCase());
       
       if (quote && quote.price) {
         setCurrentPrice(quote.price);
-        generateAICoaching(symbol.toUpperCase(), quote.price);
+        generateAICoaching(searchSymbol.toUpperCase(), quote.price);
       } else {
         setMessage({ type: 'error', text: 'Stock not found. Please check the symbol and try again.' });
       }
@@ -41,7 +42,20 @@ const TradingInterface = ({ virtualBalance, holdings }) => {
     } finally {
       setSearching(false);
     }
-  };
+  }, []);
+
+  // Debounce search to avoid excessive API calls
+  const debouncedSearch = useRef(
+    debounce((searchSymbol) => {
+      handleSearchInternal(searchSymbol);
+    }, 500)
+  ).current;
+
+  const handleSearch = useCallback(() => {
+    if (symbol) {
+      debouncedSearch(symbol);
+    }
+  }, [symbol, debouncedSearch]);
 
   /**
    * Generate AI coaching

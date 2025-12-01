@@ -104,9 +104,10 @@ export function AuthProvider({ children }) {
       if (user) {
         try {
           // Get user profile from Supabase
+          // Note: email is in auth.users, not user_profiles
           const { data: profile } = await supabase
             .from('user_profiles')
-            .select('*')
+            .select('id,username,full_name,avatar_url,created_at,updated_at')
             .eq('id', user.id)
             .single();
           
@@ -114,12 +115,11 @@ export function AuthProvider({ children }) {
 
           if (!normalizedProfile) {
             // Create a new profile if it doesn't exist
+            // Only include columns that exist in the user_profiles table
             const newProfile = {
               id: user.id,
-              email: user.email,
               full_name: user.user_metadata?.full_name || user.email.split('@')[0],
               username: user.user_metadata?.username || user.email.split('@')[0],
-              profile_completed: false,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             };
@@ -128,9 +128,17 @@ export function AuthProvider({ children }) {
               .from('user_profiles')
               .insert([newProfile]);
             
-            if (insertError) throw insertError;
+            if (insertError) {
+              console.error('Error creating user profile:', insertError);
+              throw insertError;
+            }
 
             normalizedProfile = newProfile;
+          }
+          
+          // Add email from user object (it's in auth.users, not user_profiles)
+          if (normalizedProfile && user.email) {
+            normalizedProfile.email = user.email;
           }
 
           const enrichedUser = {
@@ -151,7 +159,25 @@ export function AuthProvider({ children }) {
             window.location.href = redirectUrl;
           }
         } catch (error) {
+          // Log error details for debugging, but don't break auth flow
           console.debug?.('AuthContext profile handling error', error);
+          // If it's a column error, it's likely a schema issue that will be fixed by migrations
+          if (error?.code === '42703') {
+            console.debug?.('AuthContext: Database schema issue detected - column may not exist yet');
+          }
+          // Still set user even if profile fetch fails - they can still use the app
+          if (user) {
+            setCurrentUser({
+              ...user,
+              profile: enrichProfile({
+                id: user.id,
+                username: user.user_metadata?.username || user.email?.split('@')[0] || 'User',
+                full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+                email: user.email,
+                avatar_url: user.user_metadata?.avatar_url
+              })
+            });
+          }
         }
       } else {
         setCurrentUser(null);

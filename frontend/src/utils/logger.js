@@ -1,55 +1,49 @@
-// Simple logger utility
-const logLevels = {
-  DEBUG: 'debug',
-  INFO: 'info',
-  WARN: 'warn',
-  ERROR: 'error'
-};
+/**
+ * Production-safe logger
+ * Removes console.logs in production builds
+ */
 
-const log = (level, message, ...args) => {
-  const timestamp = new Date().toISOString();
-  const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+export const logger = {
+  log: (...args) => {
+    if (isDevelopment) {
+      console.log(...args);
+    }
+  },
   
-  switch(level) {
-    case logLevels.ERROR:
-      console.error(logMessage, ...args);
-      break;
-    case logLevels.WARN:
-      console.warn(logMessage, ...args);
-      break;
-    case logLevels.INFO:
-      console.info(logMessage, ...args);
-      break;
-    case logLevels.DEBUG:
-    default:
-      console.debug(logMessage, ...args);
-  }
+  error: (...args) => {
+    // Always log errors, even in production
+    console.error(...args);
+  },
+  
+  warn: (...args) => {
+    if (isDevelopment) {
+      console.warn(...args);
+    }
+  },
+  
+  info: (...args) => {
+    if (isDevelopment) {
+      console.info(...args);
+    }
+  },
+  
+  debug: (...args) => {
+    if (isDevelopment) {
+      console.debug(...args);
+    }
+  },
 };
 
-export const logError = (message, error) => {
-  log(logLevels.ERROR, message, error || '');
+// Export convenience functions for backward compatibility
+export const logInfo = (...args) => {
+  logger.info(...args);
 };
 
-export const logInfo = (message, data) => {
-  log(logLevels.INFO, message, data || '');
+export const logError = (...args) => {
+  logger.error(...args);
 };
 
-export const logWarn = (message, data) => {
-  log(logLevels.WARN, message, data || '');
-};
-
-export const logDebug = (message, data) => {
-  if (process.env.NODE_ENV === 'development') {
-    log(logLevels.DEBUG, message, data || '');
-  }
-};
-
-const logger = {
-  logError,
-  logInfo,
-  logWarn,
-  logDebug,
-  levels: logLevels
-};
-
+// Export default logger
 export default logger;
