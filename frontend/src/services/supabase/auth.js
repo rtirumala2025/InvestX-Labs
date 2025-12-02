@@ -102,11 +102,32 @@ export const onAuthStateChange = (callback) => {
   return () => subscription?.unsubscribe();
 };
 
+/**
+ * Check if ad blockers or privacy extensions might be blocking requests
+ * This is a best-effort detection - not 100% reliable
+ */
+const detectBlockedRequests = () => {
+  // Check for common ad blocker indicators
+  const hasAdBlocker = 
+    window.navigator.webdriver === undefined && // Not automated
+    (window.adsbygoogle === undefined || // Google Ads blocked
+     document.getElementById('google_ads_iframe_1') === null); // Ad elements missing
+  
+  // Check console for ERR_BLOCKED_BY_CLIENT errors
+  // Note: We can't directly read console errors, but we can check for blocked resources
+  return hasAdBlocker;
+};
+
 // Sign in with Google
 export const signInWithGoogle = async () => {
   try {
     ensureAuthClient();
     console.log('🔐 [Auth] Initiating Google OAuth sign in');
+    
+    // Warn if ad blocker might be interfering
+    if (detectBlockedRequests()) {
+      console.warn('🔐 [Auth] ⚠️ Ad blocker detected. If sign-in fails, try disabling it temporarily.');
+    }
     
     // Use the base origin for redirect - Supabase will handle the OAuth callback
     // and then redirect to the specified URL. Using just the origin ensures
@@ -126,7 +147,22 @@ export const signInWithGoogle = async () => {
     
     if (error) {
       console.error('🔐 [Auth] ❌ Google OAuth error:', error.message);
-      return { data: null, error };
+      
+      // Provide helpful error message for common issues
+      let helpfulMessage = error.message;
+      if (error.message.includes('blocked') || error.message.includes('ERR_BLOCKED')) {
+        helpfulMessage = 'Sign-in may be blocked by an ad blocker or privacy extension. Please disable it temporarily or add exceptions for Google OAuth domains.';
+      } else if (error.message.includes('redirect_uri_mismatch')) {
+        helpfulMessage = 'OAuth redirect URI mismatch. Please verify Google Cloud Console configuration.';
+      } else if (error.message.includes('invalid_client')) {
+        helpfulMessage = 'Invalid OAuth client configuration. Please check Supabase dashboard settings.';
+      }
+      
+      const enhancedError = new Error(helpfulMessage);
+      enhancedError.originalError = error;
+      enhancedError.code = error.code || 'OAUTH_ERROR';
+      
+      return { data: null, error: enhancedError };
     }
     
     // Supabase should automatically redirect, but if it doesn't, manually redirect
@@ -142,6 +178,17 @@ export const signInWithGoogle = async () => {
     return { data, error: null };
   } catch (error) {
     console.warn('Supabase signInWithGoogle failed:', error);
+    
+    // Enhance error message for blocked requests
+    if (error.message && (error.message.includes('blocked') || error.message.includes('ERR_BLOCKED'))) {
+      const enhancedError = new Error(
+        'Google sign-in is being blocked. Please disable ad blockers or privacy extensions temporarily, or add exceptions for accounts.google.com and oauth2.googleapis.com'
+      );
+      enhancedError.originalError = error;
+      enhancedError.code = 'BLOCKED_BY_CLIENT';
+      return { data: null, error: enhancedError };
+    }
+    
     return { data: null, error };
   }
 };

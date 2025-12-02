@@ -38,26 +38,36 @@ const LoginForm = () => {
       console.error("Google sign-in error:", error);
 
       // Provide more specific error messages
-      if (error.message.includes("Popup blocked")) {
+      if (error.message && error.message.includes("blocked") || 
+          error.code === 'BLOCKED_BY_CLIENT' ||
+          error.message.includes("ERR_BLOCKED")) {
+        setError(
+          "Sign-in is being blocked by an ad blocker or privacy extension. Please disable it temporarily or add exceptions for accounts.google.com and oauth2.googleapis.com. See the troubleshooting guide for more help.",
+        );
+      } else if (error.message && error.message.includes("Popup blocked")) {
         setError(
           "Popup blocked. Please allow popups for this site and try again.",
         );
-      } else if (error.message.includes("cancelled")) {
+      } else if (error.message && error.message.includes("cancelled")) {
         setError("Sign-in cancelled. Please try again.");
       } else if (
-        error.message.includes("Firebase is not properly configured")
+        error.message && error.message.includes("Firebase is not properly configured")
       ) {
         setError(
           "Authentication service is not configured. Please contact support.",
         );
-      } else if (error.message.includes("account already exists")) {
+      } else if (error.message && error.message.includes("account already exists")) {
         setError(
           "An account already exists with this email using a different sign-in method.",
         );
-      } else if (error.message.includes("not enabled")) {
+      } else if (error.message && error.message.includes("not enabled")) {
         setError("Google sign-in is not enabled. Please contact support.");
+      } else if (error.message && error.message.includes("redirect_uri_mismatch")) {
+        setError("OAuth configuration error. Please contact support.");
+      } else if (error.message && error.message.includes("invalid_client")) {
+        setError("OAuth client configuration error. Please contact support.");
       } else {
-        setError("Failed to sign in with Google. Please try again.");
+        setError(error.message || "Failed to sign in with Google. Please try again.");
       }
     } finally {
       setLoading(false);
