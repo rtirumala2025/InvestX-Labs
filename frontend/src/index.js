@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
 import App from './App';
 import './index.css';
+import { initEmojiSanitizer } from './utils/domEmojiSanitizer';
 
 // Global error handler for unhandled promise rejections
 window.addEventListener('unhandledrejection', (event) => {
@@ -43,6 +44,15 @@ if (!rootElement) {
 
   root.render(<AppWithProviders />);
   console.log('App rendered with all providers');
+
+  // Initialize emoji sanitization for dynamic content
+  // This sanitizes any third-party widgets or dynamically injected content
+  // Runs in all environments to ensure consistent behavior
+  initEmojiSanitizer({
+    observeMutations: true,
+    sanitizeOnLoad: true,
+    debounceMs: 100,
+  });
 
   // Register service worker for offline support
   if ('serviceWorker' in navigator) {

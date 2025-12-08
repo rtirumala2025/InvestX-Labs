@@ -119,6 +119,33 @@ export const usePortfolio = () => {
   
   // Track subscribed portfolio ID to prevent duplicate subscriptions
   const subscribedPortfolioIdRef = useRef(null);
+  
+  // Check if Supabase is properly configured
+  const checkSupabaseConfig = useCallback(() => {
+    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      const configError = new Error('Supabase is not configured. Please check your environment variables (REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY).');
+      configError.code = 'SUPABASE_NOT_CONFIGURED';
+      return configError;
+    }
+    
+    // Check if URL and key look valid
+    if (!supabaseUrl.startsWith('http')) {
+      const configError = new Error('Invalid Supabase URL. Please check REACT_APP_SUPABASE_URL in your environment variables.');
+      configError.code = 'SUPABASE_INVALID_URL';
+      return configError;
+    }
+    
+    if (supabaseKey.length < 50) {
+      const configError = new Error('Invalid Supabase key. Please check REACT_APP_SUPABASE_ANON_KEY in your environment variables.');
+      configError.code = 'SUPABASE_INVALID_KEY';
+      return configError;
+    }
+    
+    return null;
+  }, []);
 
   const persistPending = useCallback((queue) => {
     setPendingOperations(queue);
@@ -204,6 +231,13 @@ export const usePortfolio = () => {
 
     } catch (err) {
       console.error('📊 [usePortfolio] ❌ Error loading holdings:', err);
+      
+      // Handle fetch errors with better messages
+      let errorMessage = err.message || 'Unknown error';
+      if (err.message === 'Failed to fetch' || err.message?.includes('fetch')) {
+        errorMessage = 'Network error: Unable to fetch holdings data.';
+      }
+      
       const cached = loadCachedHoldings(portfolioId);
       if (cached.length) {
         setHoldings(cached);
@@ -211,7 +245,7 @@ export const usePortfolio = () => {
         queueToast('Holdings are in offline mode. Data may be stale.', 'warning', { id: 'portfolio-holdings-offline' });
         return { data: cached, error: err };
       }
-      queueToast(`Failed to load holdings: ${err.message}`, 'error');
+      queueToast(`Failed to load holdings: ${errorMessage}`, 'error');
       return { data: [], error: err };
     }
   }, [queueToast, userId]);
@@ -247,6 +281,13 @@ export const usePortfolio = () => {
       return { data: transactionsData || [], error: null };
     } catch (err) {
       console.error('📊 [usePortfolio] ❌ Error loading transactions:', err);
+      
+      // Handle fetch errors with better messages
+      let errorMessage = err.message || 'Unknown error';
+      if (err.message === 'Failed to fetch' || err.message?.includes('fetch')) {
+        errorMessage = 'Network error: Unable to fetch transactions data.';
+      }
+      
       const cached = loadCachedTransactions(portfolioId);
       if (cached.length) {
         setTransactions(cached);
@@ -254,7 +295,7 @@ export const usePortfolio = () => {
         queueToast('Transactions are in offline mode. Data may be stale.', 'warning', { id: 'portfolio-transactions-offline' });
         return { data: cached, error: err };
       }
-      queueToast(`Failed to load transactions: ${err.message}`, 'error');
+      queueToast(`Failed to load transactions: ${errorMessage}`, 'error');
       return { data: [], error: err };
     }
   }, [queueToast, userId]);
@@ -267,6 +308,15 @@ export const usePortfolio = () => {
   const loadPortfolio = useCallback(async () => {
     if (!userId) {
       console.log('📊 [usePortfolio] No user ID, skipping portfolio load');
+      setLoading(false);
+      return;
+    }
+
+    // Check Supabase configuration first
+    const configError = checkSupabaseConfig();
+    if (configError) {
+      console.error('📊 [usePortfolio] Supabase configuration error:', configError);
+      setError(configError.message);
       setLoading(false);
       return;
     }
@@ -330,7 +380,22 @@ export const usePortfolio = () => {
 
     } catch (err) {
       console.error('📊 [usePortfolio] ❌ Error loading portfolio:', err);
-      setError(err.message);
+      
+      // Handle different error types with better messages
+      let errorMessage = err.message || 'Unknown error';
+      
+      // Check if it's a network/fetch error
+      if (err.message === 'Failed to fetch' || err.message?.includes('fetch')) {
+        errorMessage = 'Network error: Unable to connect to the server. Please check your internet connection and try again.';
+      } else if (err.code === 'SUPABASE_OFFLINE') {
+        errorMessage = 'Supabase is not configured. Please check your environment variables.';
+      } else if (err.message?.includes('CORS')) {
+        errorMessage = 'CORS error: Please check your Supabase configuration and allowed origins.';
+      } else if (err.message?.includes('NetworkError') || err.message?.includes('Network request failed')) {
+        errorMessage = 'Network error: Unable to reach the server. Please check your connection.';
+      }
+      
+      setError(errorMessage);
       const cachedPortfolio = loadCachedPortfolio(userId);
       if (cachedPortfolio) {
         setPortfolio(cachedPortfolio);
@@ -339,7 +404,7 @@ export const usePortfolio = () => {
         setOffline(true);
         queueToast('Portfolio is in offline mode. Showing cached data.', 'warning', { id: 'portfolio-offline' });
       } else {
-        queueToast(`Failed to load portfolio: ${err.message}`, 'error');
+        queueToast(`Failed to load portfolio: ${errorMessage}`, 'error');
       }
       // Ensure loading state is cleared even on error
       setLoading(false);

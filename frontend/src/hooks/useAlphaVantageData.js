@@ -76,7 +76,16 @@ export const useAlphaVantageData = (holdings = []) => {
 
     } catch (err) {
       console.error('🚀 [useAlphaVantageData] ❌ Error fetching market data:', err);
-      setError(err.message || 'Failed to fetch market data');
+      
+      // Provide better error messages for network errors
+      let errorMessage = err.message || 'Failed to fetch market data';
+      if (err.message === 'Failed to fetch' || err.message?.includes('fetch')) {
+        errorMessage = 'Network error: Unable to fetch market data. Using cached data if available.';
+      } else if (err.message?.includes('API key')) {
+        errorMessage = 'API key error: Please check your Alpha Vantage API key configuration.';
+      }
+      
+      setError(errorMessage);
 
       try {
         console.log('🚀 [useAlphaVantageData] 🔄 Attempting Supabase fallback for market data.');

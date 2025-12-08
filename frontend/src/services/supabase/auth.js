@@ -121,8 +121,20 @@ const detectBlockedRequests = () => {
 // Sign in with Google
 export const signInWithGoogle = async () => {
   try {
+    console.log('🔐 [Auth] ========== STARTING GOOGLE OAUTH ==========');
+    console.log('🔐 [Auth] Step 1: Checking Supabase client...');
+    
     ensureAuthClient();
-    console.log('🔐 [Auth] Initiating Google OAuth sign in');
+    
+    if (!supabase?.auth) {
+      const error = new Error('Supabase auth client is not available');
+      console.error('🔐 [Auth] ❌', error.message);
+      return { data: null, error };
+    }
+    
+    console.log('🔐 [Auth] ✅ Supabase client available');
+    console.log('🔐 [Auth] Step 2: Checking auth methods...');
+    console.log('🔐 [Auth] signInWithOAuth available:', typeof supabase.auth.signInWithOAuth === 'function');
     
     // Warn if ad blocker might be interfering
     if (detectBlockedRequests()) {
@@ -130,10 +142,10 @@ export const signInWithGoogle = async () => {
     }
     
     // Use the base origin for redirect - Supabase will handle the OAuth callback
-    // and then redirect to the specified URL. Using just the origin ensures
-    // it matches the Site URL configuration in Supabase dashboard.
     const redirectTo = `${window.location.origin}/dashboard`;
+    console.log('🔐 [Auth] Step 3: Setting redirect URL:', redirectTo);
     
+    console.log('🔐 [Auth] Step 4: Calling signInWithOAuth...');
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -145,17 +157,28 @@ export const signInWithGoogle = async () => {
       },
     });
     
+    console.log('🔐 [Auth] Step 5: OAuth response received');
+    console.log('🔐 [Auth] Response data:', data);
+    console.log('🔐 [Auth] Response error:', error);
+    
     if (error) {
-      console.error('🔐 [Auth] ❌ Google OAuth error:', error.message);
+      console.error('🔐 [Auth] ❌ Google OAuth error:', error);
+      console.error('🔐 [Auth] Error message:', error.message);
+      console.error('🔐 [Auth] Error code:', error.code);
+      console.error('🔐 [Auth] Full error:', JSON.stringify(error, null, 2));
       
       // Provide helpful error message for common issues
-      let helpfulMessage = error.message;
-      if (error.message.includes('blocked') || error.message.includes('ERR_BLOCKED')) {
+      let helpfulMessage = error.message || 'Unknown OAuth error';
+      
+      if (error.message?.includes('Unsupported provider') || error.message?.includes('provider not enabled') || error.message?.includes('not enabled')) {
+        helpfulMessage = 'Google OAuth provider is not enabled in Supabase. Please enable it in the Supabase dashboard: Authentication → Providers → Google → Enable.';
+        console.error('🔐 [Auth] ❌ PROVIDER NOT ENABLED - Enable in Supabase Dashboard!');
+      } else if (error.message?.includes('blocked') || error.message?.includes('ERR_BLOCKED')) {
         helpfulMessage = 'Sign-in may be blocked by an ad blocker or privacy extension. Please disable it temporarily or add exceptions for Google OAuth domains.';
-      } else if (error.message.includes('redirect_uri_mismatch')) {
-        helpfulMessage = 'OAuth redirect URI mismatch. Please verify Google Cloud Console configuration.';
-      } else if (error.message.includes('invalid_client')) {
-        helpfulMessage = 'Invalid OAuth client configuration. Please check Supabase dashboard settings.';
+      } else if (error.message?.includes('redirect_uri_mismatch') || error.message?.includes('redirect')) {
+        helpfulMessage = 'OAuth redirect URI mismatch. Please verify Google Cloud Console configuration and Supabase URL Configuration.';
+      } else if (error.message?.includes('invalid_client') || error.message?.includes('Client ID')) {
+        helpfulMessage = 'Invalid OAuth client configuration. Please check Supabase dashboard settings: Authentication → Providers → Google → Client ID and Secret.';
       }
       
       const enhancedError = new Error(helpfulMessage);
@@ -167,17 +190,29 @@ export const signInWithGoogle = async () => {
     
     // Supabase should automatically redirect, but if it doesn't, manually redirect
     if (data?.url) {
-      console.log('🔐 [Auth] ✅ Google OAuth initiated, redirecting to:', data.url);
+      console.log('🔐 [Auth] ✅ Google OAuth URL generated successfully!');
+      console.log('🔐 [Auth] OAuth URL:', data.url);
       console.log('🔐 [Auth] Redirect will go to:', redirectTo);
-      // Redirect to the OAuth URL - Supabase will handle the callback
-      window.location.href = data.url;
+      console.log('🔐 [Auth] Step 6: Redirecting to Google OAuth...');
+      
+      // Small delay to ensure logs are visible
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 100);
     } else {
-      console.log('🔐 [Auth] ✅ Google OAuth initiated, redirecting...');
+      console.error('🔐 [Auth] ❌ No OAuth URL in response!');
+      console.error('🔐 [Auth] Response data:', data);
+      return { 
+        data: null, 
+        error: new Error('OAuth URL was not generated. Please check Supabase configuration.') 
+      };
     }
     
     return { data, error: null };
   } catch (error) {
-    console.warn('Supabase signInWithGoogle failed:', error);
+    console.error('🔐 [Auth] ❌ Exception in signInWithGoogle:', error);
+    console.error('🔐 [Auth] Error stack:', error.stack);
+    console.error('🔐 [Auth] Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     // Enhance error message for blocked requests
     if (error.message && (error.message.includes('blocked') || error.message.includes('ERR_BLOCKED'))) {

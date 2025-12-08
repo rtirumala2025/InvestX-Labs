@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { signInWithGoogle as signInWithGoogleService } from '../services/supabase/auth';
+import { supabase } from '../services/supabase/config';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -18,6 +20,38 @@ const LoginPage = () => {
   const [sessionExpiryWarning, setSessionExpiryWarning] = useState(null);
   const { signIn: login, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
+
+  // Debug: Log when component mounts and clear stale sessions
+  useEffect(() => {
+    // Clear stale cached session that's causing "Offline read-only mode"
+    const cachedSessionKey = 'investx.cachedSession';
+    const staleSession = localStorage.getItem(cachedSessionKey);
+    if (staleSession) {
+      console.log('🔐 [LoginPage] Clearing stale cached session');
+      localStorage.removeItem(cachedSessionKey);
+    }
+    
+    console.log('🔐 [LoginPage] Component mounted', {
+      loading,
+      hasSignInWithGoogle: typeof signInWithGoogle === 'function',
+      hasSignInWithGoogleService: typeof signInWithGoogleService === 'function',
+      hasSupabase: !!supabase,
+      supabaseAuth: !!supabase?.auth
+    });
+    
+    // Test if button exists in DOM after mount
+    setTimeout(() => {
+      const googleButtons = document.querySelectorAll('button[type="button"]');
+      console.log('🔐 [LoginPage] Buttons found in DOM:', googleButtons.length);
+      googleButtons.forEach((btn, idx) => {
+        console.log(`🔐 [LoginPage] Button ${idx}:`, {
+          text: btn.textContent?.trim(),
+          disabled: btn.disabled,
+          hasOnClick: btn.onclick !== null
+        });
+      });
+    }, 1000);
+  }, []);
 
   // Task 24: Session expiration check
   useEffect(() => {
@@ -98,24 +132,60 @@ const LoginPage = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    console.log('🔐 [LoginPage] ========== handleGoogleSignIn CALLED ==========');
+    console.log('🔐 [LoginPage] Google sign-in button clicked', { e, loading });
     setError('');
     setLoading(true);
     
     try {
-      const result = await signInWithGoogle();
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to sign in with Google');
+      // Verify Supabase client is available
+      if (!supabase || !supabase.auth) {
+        throw new Error('Supabase client is not available. Please refresh the page.');
       }
       
-      // If we're not redirecting, navigate to dashboard
-      if (!result.redirecting) {
-        navigate('/dashboard');
+      // Call the service function directly
+      console.log('🔐 [LoginPage] Calling signInWithGoogleService directly');
+      const result = await signInWithGoogleService();
+      console.log('🔐 [LoginPage] signInWithGoogleService result:', result);
+      
+      // Service function returns { data, error }
+      if (result.error) {
+        console.error('🔐 [LoginPage] OAuth error received:', result.error);
+        throw result.error;
       }
-      // If redirecting, the redirect flow will handle the navigation
+      
+      // If we have a URL, redirect is happening
+      if (result.data?.url) {
+        console.log('🔐 [LoginPage] OAuth redirect URL received:', result.data.url);
+        // The service function already redirects via window.location.href
+        // Don't set loading to false as we're redirecting
+        return;
+      }
+      
+      // If no redirect URL, navigate manually (shouldn't happen with OAuth)
+      console.log('🔐 [LoginPage] No redirect URL, navigating manually');
+      navigate('/dashboard');
     } catch (error) {
-      setError(error.message);
-      console.error('Google sign-in error:', error);
+      console.error('🔐 [LoginPage] Google sign-in error:', error);
+      
+      // Provide helpful error messages
+      let errorMessage = error.message || 'Failed to sign in with Google';
+      
+      if (errorMessage.includes('provider') || errorMessage.includes('not enabled')) {
+        errorMessage = 'Google sign-in is not enabled in Supabase. Please enable it in the Supabase dashboard under Authentication → Providers → Google.';
+      } else if (errorMessage.includes('redirect') || errorMessage.includes('URI')) {
+        errorMessage = 'OAuth redirect URL mismatch. Please check Supabase URL Configuration and Google Cloud Console settings.';
+      } else if (errorMessage.includes('client') || errorMessage.includes('invalid')) {
+        errorMessage = 'Google OAuth client is not configured. Please add Client ID and Client Secret in Supabase dashboard.';
+      }
+      
+      setError(errorMessage);
       setLoading(false);
     }
   };
@@ -296,13 +366,43 @@ const LoginPage = () => {
                 </div>
               </div>
 
-              <GlassButton
+              {/* Test button to verify clicks work */}
+              <button
                 type="button"
-                onClick={handleGoogleSignIn}
+                onClick={() => {
+                  alert('Test button works! Now try Google sign-in.');
+                  console.log('🔐 [LoginPage] Test button clicked');
+                }}
+                className="w-full mb-2 px-4 py-2 bg-red-500 text-white rounded"
+              >
+                TEST: Click me first
+              </button>
+
+              <button
+                type="button"
+                id="google-signin-button"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  console.log('🔐 [LoginPage] ========== BUTTON CLICKED ==========');
+                  console.log('🔐 [LoginPage] Button clicked!', {
+                    event: e,
+                    loading,
+                    disabled: loading,
+                    timestamp: Date.now()
+                  });
+                  
+                  // Call the handler immediately
+                  handleGoogleSignIn(e).catch((error) => {
+                    console.error('🔐 [LoginPage] Error in handleGoogleSignIn:', error);
+                    setError(error.message || 'Failed to sign in with Google');
+                    setLoading(false);
+                  });
+                }}
                 disabled={loading}
-                variant="glass"
-                size="large"
-                className="w-full"
+                className="w-full flex items-center justify-center px-6 py-4 text-lg font-medium rounded-xl border border-white/20 bg-white/8 hover:bg-white/15 text-white backdrop-blur-2xl backdrop-saturate-150 shadow-lg shadow-black/10 hover:shadow-xl hover:shadow-black/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ zIndex: 1000, position: 'relative' }}
               >
                 <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                   <path
@@ -323,7 +423,7 @@ const LoginPage = () => {
                   />
                 </svg>
                 {loading ? 'Signing in...' : 'Sign in with Google'}
-              </GlassButton>
+              </button>
             </form>
 
             <div className="mt-8 text-center">

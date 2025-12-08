@@ -263,15 +263,34 @@ function DashboardPageContent() {
 
   if (error) {
     console.log('🏠 [DashboardPage] ❌ Showing error state:', error);
+    const errorMessage = typeof error === 'string' ? error : error.message || 'An error occurred while loading your dashboard';
+    const isNetworkError = errorMessage.includes('Network') || errorMessage.includes('fetch') || errorMessage.includes('connection');
+    
     return (
       <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden flex items-center justify-center">
         <div className="text-center max-w-md px-4">
           <div className="text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold mb-2">Unable to Load Dashboard</h2>
-          <p className="text-gray-300 mb-6">{typeof error === 'string' ? error : error.message || 'An error occurred while loading your dashboard'}</p>
-          <GlassButton onClick={() => window.location.reload()} variant="primary">
-            Try Again
-          </GlassButton>
+          <p className="text-gray-300 mb-4">{errorMessage}</p>
+          {isNetworkError && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-4 text-left">
+              <p className="text-sm text-yellow-300 mb-2 font-semibold">Troubleshooting:</p>
+              <ul className="text-xs text-yellow-200/80 space-y-1 list-disc list-inside">
+                <li>Check your internet connection</li>
+                <li>Verify Supabase environment variables are set correctly</li>
+                <li>Check browser console for detailed error messages</li>
+                <li>Try refreshing the page</li>
+              </ul>
+            </div>
+          )}
+          <div className="flex gap-3 justify-center">
+            <GlassButton onClick={() => window.location.reload()} variant="primary">
+              Try Again
+            </GlassButton>
+            <GlassButton onClick={() => window.location.href = '/'} variant="glass">
+              Go Home
+            </GlassButton>
+          </div>
         </div>
       </div>
     );
