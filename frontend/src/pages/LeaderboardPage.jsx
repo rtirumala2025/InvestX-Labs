@@ -108,19 +108,24 @@ export default function LeaderboardPage() {
   const totalPages = Math.ceil((filteredLeaderboard.length || 0) / pageSize);
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden" style={{ 
+      background: 'var(--bg-base, #0a0f1a)',
+      backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+      backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+      backgroundAttachment: 'fixed'
+    }}>
       <motion.div
-        className="absolute -top-32 -left-28 w-80 h-80 bg-gradient-to-r from-blue-500/40 to-purple-500/30 rounded-full blur-3xl"
+        className="absolute -top-32 -left-28 w-80 h-80 bg-gradient-to-r from-accent-500/40 to-accent-600/30 rounded-full blur-3xl"
         animate={{ y: [0, 16, 0] }}
         transition={{ repeat: Infinity, duration: 14, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute -bottom-36 -right-24 w-[24rem] h-[24rem] bg-gradient-to-r from-orange-400/30 to-pink-400/20 rounded-full blur-3xl"
+        className="absolute -bottom-36 -right-24 w-[24rem] h-[24rem] bg-gradient-to-r from-accent-500/30 to-accent-600/20 rounded-full blur-3xl"
         animate={{ y: [0, -22, 0] }}
         transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute top-1/2 left-1/4 w-64 h-64 bg-gradient-to-r from-green-400/20 to-blue-400/15 rounded-full blur-3xl"
+        className="absolute top-1/2 left-1/4 w-64 h-64 bg-gradient-to-r from-primary-400/20 to-primary-500/15 rounded-full blur-3xl"
         animate={{ y: [0, 15, 0], x: [0, 20, 0] }}
         transition={{ repeat: Infinity, duration: 20, ease: 'easeInOut', delay: 5 }}
       />
@@ -135,10 +140,10 @@ export default function LeaderboardPage() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-white/60 mb-2">Global Rankings</p>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 mb-2">
+              <h1 className="text-3xl md:text-4xl font-display font-normal tracking-tight text-gradient-hero mb-2">
                 🏆 Leaderboard
               </h1>
-              <p className="text-gray-300 text-base lg:text-lg">
+              <p className="text-neutral-300 text-base lg:text-lg font-sans">
                 Compete with other investors, unlock achievements, and climb the ranks in real time.
               </p>
             </div>

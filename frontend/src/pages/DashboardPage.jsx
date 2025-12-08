@@ -227,16 +227,21 @@ function DashboardPageContent() {
 
   const quickActions = [
     { title: 'Add Investment', description: 'Buy stocks or ETFs', icon: '📈', link: '/portfolio', color: 'from-green-500 to-emerald-600' },
-    { title: 'Learn More', description: 'Continue your education', icon: '📚', link: '/education', color: 'from-blue-500 to-cyan-600' },
-    { title: 'AI Insights', description: 'Get personalized suggestions', icon: '🤖', link: '/suggestions', color: 'from-purple-500 to-violet-600' },
-    { title: 'Chat Support', description: 'Ask questions anytime', icon: '💬', link: '/chat', color: 'from-orange-500 to-red-500' }
+    { title: 'Learn More', description: 'Continue your education', icon: '📚', link: '/education', color: 'from-primary-500 to-primary-600' },
+    { title: 'AI Insights', description: 'Get personalized suggestions', icon: '🤖', link: '/suggestions', color: 'from-accent-500 to-accent-600' },
+    { title: 'Chat Support', description: 'Ask questions anytime', icon: '💬', link: '/chat', color: 'from-primary-500 to-primary-600' }
   ];
 
   // Task 19: Skeleton loaders instead of spinner
   if (loading) {
     console.log('🏠 [DashboardPage] ⏳ Showing loading state');
     return (
-      <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
+      <div className="relative min-h-screen overflow-hidden" style={{ 
+        background: 'var(--bg-base, #0a0f1a)',
+        backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+        backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+        backgroundAttachment: 'fixed'
+      }}>
         <main className="relative z-10 w-full max-w-[1920px] mx-auto px-3 lg:px-4 xl:px-6 py-4 lg:py-6">
           <div className="mb-6">
             <div className="h-10 bg-white/20 rounded w-64 mb-4 animate-pulse"></div>
@@ -300,20 +305,25 @@ function DashboardPageContent() {
   const hasNoData = !loading && !error && (!portfolio || !holdings || holdings.length === 0);
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
-      {/* Enhanced Background Orbs */}
+    <div className="relative min-h-screen overflow-hidden" style={{ 
+      background: 'var(--bg-base, #0a0f1a)',
+      backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+      backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+      backgroundAttachment: 'fixed'
+    }}>
+      {/* Enhanced Background Orbs - Growth themed */}
       <motion.div
-        className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-blue-500/30 to-purple-500/20 rounded-full blur-3xl"
+        className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-primary-500/30 to-primary-600/20 rounded-full blur-3xl"
         animate={{ y: [0, 20, 0], x: [0, 10, 0] }}
         transition={{ repeat: Infinity, duration: 15, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute -bottom-40 -right-32 w-[28rem] h-[28rem] bg-gradient-to-r from-orange-400/25 to-pink-400/15 rounded-full blur-3xl"
+        className="absolute -bottom-40 -right-32 w-[28rem] h-[28rem] bg-gradient-to-r from-accent-500/25 to-accent-600/15 rounded-full blur-3xl"
         animate={{ y: [0, -25, 0], x: [0, -15, 0] }}
         transition={{ repeat: Infinity, duration: 20, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute top-1/2 left-1/2 w-64 h-64 bg-gradient-to-r from-green-400/20 to-blue-400/15 rounded-full blur-3xl"
+        className="absolute top-1/2 left-1/2 w-64 h-64 bg-gradient-to-r from-primary-400/20 to-accent-400/15 rounded-full blur-3xl"
         animate={{ y: [0, 15, 0], x: [0, 20, 0] }}
         transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut', delay: 5 }}
       />
@@ -328,10 +338,10 @@ function DashboardPageContent() {
         >
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 mb-2">
+              <h1 className="text-3xl md:text-4xl font-display font-normal tracking-tight text-gradient-hero mb-2">
                 Welcome back, {userProfile?.full_name?.split(' ')[0] || currentUser?.user_metadata?.full_name?.split(' ')[0] || currentUser?.email?.split('@')[0] || 'Investor'}! 👋
               </h1>
-              <p className="text-gray-300 text-base lg:text-lg">Here's your investment journey overview</p>
+              <p className="text-neutral-300 text-base lg:text-lg font-sans">Here's your investment journey overview</p>
             </div>
             <div className="mt-4 md:mt-0">
               <GlassButton as={Link} to="/profile" variant="glass" size="default">
@@ -358,7 +368,7 @@ function DashboardPageContent() {
               >
                 <h3 className="text-sm font-medium text-white/70 mb-2">{stat.label}</h3>
                 <p className="text-2xl font-bold text-white mb-1">{stat.value}</p>
-                <p className={`text-sm ${stat.positive ? 'text-green-400' : 'text-red-400'}`}>
+                <p className={`text-sm font-mono ${stat.positive ? 'text-primary-400' : 'text-red-400'}`}>
                   {stat.change}
                 </p>
               </GlassCard>
@@ -383,8 +393,8 @@ function DashboardPageContent() {
           <motion.div variants={fadeIn} initial="hidden" animate="visible" className="flex justify-center py-20">
             <GlassCard variant="default" padding="large" className="max-w-md text-center">
               <div className="text-6xl mb-4">📊</div>
-              <h2 className="text-2xl font-bold text-white mb-3">Start Building Your Portfolio</h2>
-              <p className="text-white/70 mb-6">
+              <h2 className="text-2xl font-display font-normal text-white mb-3">Start Building Your Portfolio</h2>
+              <p className="text-white/70 mb-6 font-sans">
                 You haven't added any investments yet. Add your first holding to track your portfolio performance and see insights.
               </p>
               <GlassButton as={Link} to="/portfolio" variant="primary" size="default">
@@ -402,7 +412,7 @@ function DashboardPageContent() {
               <motion.div variants={fadeIn} initial="hidden" animate="visible">
                 <GlassCard variant="hero" padding="large" shadow="xl">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-                    <h2 className="text-2xl font-semibold text-white">Portfolio Performance</h2>
+                    <h2 className="text-2xl font-display font-normal text-white">Portfolio Performance</h2>
                     <div className="flex flex-wrap gap-2">
                       {['1D', '1W', '1M', '3M', '1Y', 'ALL'].map((period) => (
                         <button 
@@ -410,8 +420,8 @@ function DashboardPageContent() {
                           onClick={() => setSelectedChartTimeframe(period)}
                           className={`px-3 py-1 text-sm rounded-lg transition-all ${
                             period === selectedChartTimeframe 
-                              ? 'bg-blue-500/30 text-white' 
-                              : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                              ? 'bg-primary-500/30 text-white border border-primary-500/50' 
+                              : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20 border border-transparent'
                           }`}
                         >
                           {period}
@@ -440,16 +450,16 @@ function DashboardPageContent() {
             {/* Recent Activity */}
             <motion.div variants={fadeIn} initial="hidden" animate="visible">
               <GlassCard variant="default" padding="large" shadow="large">
-                <h2 className="text-2xl font-semibold text-white mb-6">Recent Activity</h2>
+                <h2 className="text-2xl font-display font-normal text-white mb-6">Recent Activity</h2>
                 <div className="space-y-4">
                   {recentActivity.map((activity, index) => (
                     <div key={index} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300">
                       <div className="flex items-center">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                          activity.type === 'investment' ? 'bg-green-500/20 text-green-400' :
-                          activity.type === 'learning' ? 'bg-blue-500/20 text-blue-400' :
-                          activity.type === 'suggestion' ? 'bg-purple-500/20 text-purple-400' :
-                          'bg-orange-500/20 text-orange-400'
+                          activity.type === 'investment' ? 'bg-primary-500/20 text-primary-400' :
+                          activity.type === 'learning' ? 'bg-primary-500/20 text-primary-400' :
+                          activity.type === 'suggestion' ? 'bg-accent-500/20 text-accent-400' :
+                          'bg-accent-500/20 text-accent-400'
                         }`}>
                           {activity.type === 'investment' ? '💰' :
                            activity.type === 'learning' ? '📚' :
@@ -461,8 +471,8 @@ function DashboardPageContent() {
                         </div>
                       </div>
                       <span className={`font-medium ${
-                        activity.positive === true ? 'text-green-400' :
-                        activity.positive === false ? 'text-red-400' : 'text-blue-400'
+                        activity.positive === true ? 'text-primary-400' :
+                        activity.positive === false ? 'text-red-400' : 'text-accent-400'
                       }`}>
                         {activity.amount}
                       </span>
@@ -486,7 +496,7 @@ function DashboardPageContent() {
                   </div>
                   <div className="w-full bg-white/20 rounded-full h-3">
                     <div 
-                      className="bg-gradient-to-r from-blue-400 to-purple-500 h-3 rounded-full transition-all duration-1000"
+                      className="bg-gradient-to-r from-primary-400 to-accent-500 h-3 rounded-full transition-all duration-1000"
                       style={{ width: `${learningProgress}%` }}
                     />
                   </div>
@@ -549,13 +559,13 @@ function DashboardPageContent() {
                   {holdings && holdings.length > 0 ? (
                     <>
                       {portfolioMetrics.diversificationScore < 50 && (
-                        <div className="p-3 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg border border-purple-500/20">
+                        <div className="p-3 bg-gradient-to-r from-accent-500/10 to-primary-500/10 rounded-lg border border-accent-500/20">
                           <h4 className="text-sm font-medium text-white mb-1">Diversification Opportunity</h4>
                           <p className="text-xs text-white/70">Consider adding more sectors to reduce risk</p>
                         </div>
                       )}
                       {portfolioMetrics.sectorAllocation && Object.values(portfolioMetrics.sectorAllocation).some(allocation => allocation > 60) && (
-                        <div className="p-3 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-lg border border-orange-500/20">
+                        <div className="p-3 bg-gradient-to-r from-primary-500/10 to-primary-600/10 rounded-lg border border-primary-500/20">
                           <h4 className="text-sm font-medium text-white mb-1">Concentration Risk</h4>
                           <p className="text-xs text-white/70">One sector represents over 60% of your portfolio</p>
                         </div>
@@ -568,7 +578,7 @@ function DashboardPageContent() {
                       )}
                     </>
                   ) : (
-                    <div className="p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20">
+                    <div className="p-3 bg-gradient-to-r from-primary-500/10 to-accent-500/10 rounded-lg border border-primary-500/20">
                       <h4 className="text-sm font-medium text-white mb-1">Get Started</h4>
                       <p className="text-xs text-white/70">Add your first investment to receive personalized insights</p>
                     </div>

@@ -95,16 +95,21 @@ export default function HomePage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden font-sans">
+    <div className="relative min-h-screen overflow-hidden" style={{ 
+      background: 'var(--bg-base, #0a0f1a)',
+      backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+      backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+      backgroundAttachment: 'fixed'
+    }}>
 
-      {/* Floating gradient orbs */}
+      {/* Floating gradient orbs - Growth & Wealth themed */}
       <motion.div
-        className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-blue-500/40 to-purple-500/30 rounded-full blur-3xl"
+        className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-primary-500/30 to-primary-600/20 rounded-full blur-3xl"
         animate={{ y: [0, 20, 0] }}
         transition={{ repeat: Infinity, duration: 12, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute -bottom-40 right-0 w-[28rem] h-[28rem] bg-gradient-to-r from-orange-400/30 to-pink-400/20 rounded-full blur-3xl"
+        className="absolute -bottom-40 right-0 w-[28rem] h-[28rem] bg-gradient-to-r from-accent-500/25 to-accent-600/15 rounded-full blur-3xl"
         animate={{ y: [0, -30, 0] }}
         transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut' }}
       />
@@ -116,9 +121,9 @@ export default function HomePage() {
         animate="visible"
         className="relative z-10 flex flex-col items-center justify-center min-h-[70vh] text-center px-6"
       >
-        {/* Additional Moving Gradient Orbs */}
+        {/* Additional Moving Gradient Orbs - Growth themed */}
         <motion.div
-          className="absolute w-64 h-64 bg-gradient-to-r from-green-400/20 to-blue-400/15 rounded-full blur-3xl"
+          className="absolute w-64 h-64 bg-gradient-to-r from-primary-400/20 to-primary-500/15 rounded-full blur-3xl"
           animate={{
             x: [0, 150, -100, 80, 0],
             y: [0, -120, 80, -60, 0],
@@ -131,7 +136,7 @@ export default function HomePage() {
           style={{ right: '10%', top: '20%' }}
         />
         <motion.div
-          className="absolute w-80 h-80 bg-gradient-to-r from-purple-400/25 to-pink-400/20 rounded-full blur-3xl"
+          className="absolute w-80 h-80 bg-gradient-to-r from-accent-400/20 to-accent-500/15 rounded-full blur-3xl"
           animate={{
             x: [0, -120, 100, -80, 0],
             y: [0, 100, -80, 60, 0],
@@ -145,7 +150,7 @@ export default function HomePage() {
           style={{ left: '5%', bottom: '10%' }}
         />
         <motion.div
-          className="absolute w-56 h-56 bg-gradient-to-r from-yellow-400/15 to-orange-400/20 rounded-full blur-3xl"
+          className="absolute w-56 h-56 bg-gradient-to-r from-primary-300/15 to-accent-400/20 rounded-full blur-3xl"
           animate={{
             x: [0, 80, -150, 120, 0],
             y: [0, -80, 120, -100, 0],
@@ -159,7 +164,7 @@ export default function HomePage() {
           style={{ right: '20%', bottom: '15%' }}
         />
         <motion.div
-          className="absolute w-72 h-72 bg-gradient-to-r from-cyan-400/20 to-blue-500/15 rounded-full blur-3xl"
+          className="absolute w-72 h-72 bg-gradient-to-r from-primary-500/20 to-accent-500/15 rounded-full blur-3xl"
           animate={{
             x: [0, -100, 120, -90, 0],
             y: [0, 90, -110, 70, 0],
@@ -173,15 +178,15 @@ export default function HomePage() {
           style={{ left: '60%', top: '30%' }}
         />
 
-        <h1 className="relative z-10 text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300">
+        <h1 className="relative z-10 text-5xl md:text-7xl font-display font-normal tracking-tight mb-6 text-gradient-hero">
           InvestX Labs
         </h1>
         {heroVariant === 'A' ? (
-          <p className="relative z-10 text-lg md:text-2xl max-w-2xl text-gray-300 leading-relaxed mb-10">
+          <p className="relative z-10 text-lg md:text-2xl max-w-2xl text-neutral-300 leading-relaxed mb-10 font-sans">
             Learn. Practice. Grow. — A modern investing simulation app that makes finance approachable, interactive, and fun.
           </p>
         ) : (
-          <p className="relative z-10 text-lg md:text-2xl max-w-2xl text-gray-300 leading-relaxed mb-10">
+          <p className="relative z-10 text-lg md:text-2xl max-w-2xl text-neutral-300 leading-relaxed mb-10 font-sans">
             Master investing with confidence. Build real portfolios, learn from AI insights, and grow your wealth knowledge step by step.
           </p>
         )}
@@ -206,7 +211,7 @@ export default function HomePage() {
           viewport={{ once: true, amount: 0.15 }}
           className="text-center mb-8"
         >
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300">
+          <h2 className="text-3xl md:text-4xl font-display font-normal tracking-tight text-gradient-primary">
             Why Choose Our Platform?
           </h2>
         </motion.div>
@@ -288,7 +293,7 @@ export default function HomePage() {
           viewport={{ once: true, amount: 0.15 }}
           className="text-center mb-10"
         >
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300">
+          <h2 className="text-3xl md:text-4xl font-display font-normal tracking-tight text-gradient-primary">
             Our Services
           </h2>
         </motion.div>
@@ -311,7 +316,7 @@ export default function HomePage() {
               className="text-center h-full group"
             >
               <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-500/80 to-blue-600/80 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-lg border border-blue-400/30 shadow-lg shadow-blue-500/20 group-hover:shadow-xl group-hover:shadow-blue-500/30 transition-all duration-300">
+                <div className="w-16 h-16 bg-gradient-to-r from-primary-500/80 to-primary-600/80 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-lg border border-primary-400/30 shadow-lg shadow-primary-500/20 group-hover:shadow-xl group-hover:shadow-primary-500/30 transition-all duration-300">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
@@ -350,7 +355,7 @@ export default function HomePage() {
               className="text-center h-full group"
             >
               <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-r from-green-500/80 to-green-600/80 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-lg border border-green-400/30 shadow-lg shadow-green-500/20 group-hover:shadow-xl group-hover:shadow-green-500/30 transition-all duration-300">
+                <div className="w-16 h-16 bg-gradient-to-r from-primary-500/80 to-primary-600/80 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-lg border border-primary-400/30 shadow-lg shadow-primary-500/20 group-hover:shadow-xl group-hover:shadow-primary-500/30 transition-all duration-300">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
@@ -389,7 +394,7 @@ export default function HomePage() {
               className="text-center h-full group"
             >
               <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-r from-purple-500/80 to-purple-600/80 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-lg border border-purple-400/30 shadow-lg shadow-purple-500/20 group-hover:shadow-xl group-hover:shadow-purple-500/30 transition-all duration-300">
+                <div className="w-16 h-16 bg-gradient-to-r from-accent-500/80 to-accent-600/80 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-lg border border-accent-400/30 shadow-lg shadow-accent-500/20 group-hover:shadow-xl group-hover:shadow-accent-500/30 transition-all duration-300">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
@@ -422,7 +427,7 @@ export default function HomePage() {
           viewport={{ once: true, amount: 0.15 }}
           className="text-center mb-10"
         >
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300">
+          <h2 className="text-3xl md:text-4xl font-display font-normal tracking-tight text-gradient-primary">
             What Our Users Say
           </h2>
         </motion.div>
@@ -439,7 +444,7 @@ export default function HomePage() {
             >
               <GlassCard variant="floating" padding="large" interactive={true}>
                 <div className="flex items-center mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500/80 to-purple-500/80 flex items-center justify-center text-white font-semibold text-lg">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-primary-500/80 to-accent-500/80 flex items-center justify-center text-white font-semibold text-lg">
                     {testimonial.name.charAt(0)}
                   </div>
                   <div className="ml-4">

@@ -172,14 +172,19 @@ const LessonView = () => {
   const completedStatus = progress[lesson?.id] === 'completed';
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden" style={{ 
+      background: 'var(--bg-base, #0a0f1a)',
+      backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+      backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+      backgroundAttachment: 'fixed'
+    }}>
       <motion.div
-        className="absolute -top-24 -left-24 w-80 h-80 bg-gradient-to-r from-blue-500/30 to-purple-500/15 rounded-full blur-3xl"
+        className="absolute -top-24 -left-24 w-80 h-80 bg-gradient-to-r from-primary-500/30 to-primary-600/15 rounded-full blur-3xl"
         animate={{ y: [0, 18, 0], x: [0, 12, 0] }}
         transition={{ repeat: Infinity, duration: 16, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute -bottom-32 -right-24 w-[22rem] h-[22rem] bg-gradient-to-r from-green-400/20 to-emerald-400/15 rounded-full blur-3xl"
+        className="absolute -bottom-32 -right-24 w-[22rem] h-[22rem] bg-gradient-to-r from-primary-400/20 to-primary-500/15 rounded-full blur-3xl"
         animate={{ y: [0, -20, 0], x: [0, -12, 0] }}
         transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut' }}
       />
@@ -193,8 +198,8 @@ const LessonView = () => {
 
         {!loading && !lesson ? (
           <GlassCard variant="default" padding="large" className="text-center">
-            <h2 className="text-2xl font-semibold text-white mb-2">Lesson not found</h2>
-            <p className="text-sm text-white/60 mb-6">
+            <h2 className="text-2xl font-display font-normal text-white mb-2">Lesson not found</h2>
+            <p className="text-sm text-white/60 mb-6 font-sans">
               We couldn’t find the lesson you were looking for. It may have been moved or archived.
             </p>
             <GlassButton as={Link} to="/education" variant="primary">

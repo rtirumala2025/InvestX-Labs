@@ -131,7 +131,12 @@ const SimulationPage = () => {
 
   if (loading && !portfolio) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+      <div className="min-h-screen flex items-center justify-center" style={{ 
+        background: 'var(--bg-base, #0a0f1a)',
+        backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+        backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+        backgroundAttachment: 'fixed'
+      }}>
         <LoadingSpinner size="large" />
       </div>
     );
@@ -144,7 +149,12 @@ const SimulationPage = () => {
   const dailyChangePercent = performance?.dailyChangePercent || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 py-4 lg:py-6">
+    <div className="min-h-screen py-4 lg:py-6" style={{ 
+      background: 'var(--bg-base, #0a0f1a)',
+      backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+      backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+      backgroundAttachment: 'fixed'
+    }}>
       <div className="w-full max-w-[1920px] mx-auto px-3 lg:px-4 xl:px-6">
         {/* Header with PRACTICE MODE badge */}
         <motion.div
@@ -156,10 +166,10 @@ const SimulationPage = () => {
           <div className="flex items-center justify-between mb-3 flex-wrap gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl md:text-4xl font-bold text-white">
+                <h1 className="text-3xl md:text-4xl font-display font-normal text-gradient-hero">
                   🎮 Simulation Mode
                 </h1>
-                <span className="px-3 py-1 bg-yellow-500/20 border border-yellow-400/30 rounded-lg text-yellow-300 text-sm font-semibold">
+                <span className="px-3 py-1 bg-accent-500/20 border border-accent-400/30 rounded-lg text-accent-300 text-sm font-semibold">
                   PRACTICE MODE
                 </span>
               </div>
@@ -195,7 +205,7 @@ const SimulationPage = () => {
                 <DollarSign className="w-4 h-4 text-white/60" />
                 <p className="text-white/70 text-sm">Cash</p>
               </div>
-              <p className="text-white text-2xl font-bold">
+              <p className="text-white text-2xl font-bold font-mono">
                 ${virtualBalance.toFixed(2)}
               </p>
             </GlassCard>
@@ -205,7 +215,7 @@ const SimulationPage = () => {
                 <BarChart3 className="w-4 h-4 text-white/60" />
                 <p className="text-white/70 text-sm">Portfolio</p>
               </div>
-              <p className="text-white text-2xl font-bold">
+              <p className="text-white text-2xl font-bold font-mono">
                 ${totalValue.toFixed(2)}
               </p>
             </GlassCard>
@@ -213,16 +223,16 @@ const SimulationPage = () => {
             <GlassCard variant="floating" padding="medium">
               <div className="flex items-center gap-2 mb-1">
                 {totalReturn >= 0 ? (
-                  <TrendingUp className="w-4 h-4 text-green-400" />
+                  <TrendingUp className="w-4 h-4 text-primary-400" />
                 ) : (
                   <TrendingDown className="w-4 h-4 text-red-400" />
                 )}
                 <p className="text-white/70 text-sm">Total Return</p>
               </div>
-              <p className={`text-2xl font-bold ${totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <p className={`text-2xl font-bold font-mono ${totalReturn >= 0 ? 'text-primary-400' : 'text-red-400'}`}>
                 {totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}
               </p>
-              <p className={`text-sm ${totalReturnPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <p className={`text-sm font-mono ${totalReturnPercent >= 0 ? 'text-primary-400' : 'text-red-400'}`}>
                 {totalReturnPercent >= 0 ? '+' : ''}{totalReturnPercent.toFixed(2)}%
               </p>
             </GlassCard>
@@ -230,16 +240,16 @@ const SimulationPage = () => {
             <GlassCard variant="floating" padding="medium">
               <div className="flex items-center gap-2 mb-1">
                 {dailyChange >= 0 ? (
-                  <TrendingUp className="w-4 h-4 text-green-400" />
+                  <TrendingUp className="w-4 h-4 text-primary-400" />
                 ) : (
                   <TrendingDown className="w-4 h-4 text-red-400" />
                 )}
                 <p className="text-white/70 text-sm">Today</p>
               </div>
-              <p className={`text-xl font-bold ${dailyChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <p className={`text-xl font-bold font-mono ${dailyChange >= 0 ? 'text-primary-400' : 'text-red-400'}`}>
                 {dailyChange >= 0 ? '+' : ''}${dailyChange.toFixed(2)}
               </p>
-              <p className={`text-xs ${dailyChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <p className={`text-xs font-mono ${dailyChangePercent >= 0 ? 'text-primary-400' : 'text-red-400'}`}>
                 {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(2)}%
               </p>
             </GlassCard>

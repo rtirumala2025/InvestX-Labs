@@ -206,7 +206,12 @@ const EducationPage = () => {
   const filteredCourseCount = filteredCourses.length;
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden" style={{ 
+      background: 'var(--bg-base, #0a0f1a)',
+      backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+      backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+      backgroundAttachment: 'fixed'
+    }}>
       {celebrationData && (
         <Celebration
           show={showCelebration}
@@ -222,17 +227,17 @@ const EducationPage = () => {
         />
       )}
       <motion.div
-        className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-blue-500/30 to-purple-500/20 rounded-full blur-3xl"
+        className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-primary-500/30 to-primary-600/20 rounded-full blur-3xl"
         animate={{ y: [0, 20, 0], x: [0, 10, 0] }}
         transition={{ repeat: Infinity, duration: 15, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute -bottom-40 -right-32 w-[28rem] h-[28rem] bg-gradient-to-r from-green-400/25 to-emerald-400/15 rounded-full blur-3xl"
+        className="absolute -bottom-40 -right-32 w-[28rem] h-[28rem] bg-gradient-to-r from-primary-400/25 to-primary-500/15 rounded-full blur-3xl"
         animate={{ y: [0, -25, 0], x: [0, -15, 0] }}
         transition={{ repeat: Infinity, duration: 20, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute top-1/4 right-1/4 w-64 h-64 bg-gradient-to-r from-orange-400/20 to-pink-400/15 rounded-full blur-3xl"
+        className="absolute top-1/4 right-1/4 w-64 h-64 bg-gradient-to-r from-accent-400/20 to-accent-500/15 rounded-full blur-3xl"
         animate={{ y: [0, 15, 0], x: [0, 20, 0] }}
         transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut', delay: 5 }}
       />
@@ -241,10 +246,10 @@ const EducationPage = () => {
         <motion.div variants={fadeIn} initial="hidden" animate="visible" className="mb-4 lg:mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-green-300 to-orange-300 mb-2">
+              <h1 className="text-3xl md:text-4xl font-display font-normal tracking-tight text-gradient-hero mb-2">
                 Investment Academy 📚
               </h1>
-              <p className="text-gray-300 text-base lg:text-lg max-w-2xl">
+              <p className="text-neutral-300 text-base lg:text-lg max-w-2xl font-sans">
                 Build real investing skills with courses, modular lessons, and interactive quizzes. Your progress syncs automatically with your InvestX profile.
               </p>
             </div>
@@ -272,15 +277,15 @@ const EducationPage = () => {
                 <div className="text-sm text-white/80">Overall Progress</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-400 mb-1">{completedLessons}</div>
+                <div className="text-3xl font-bold font-mono text-primary-400 mb-1">{completedLessons}</div>
                 <div className="text-sm text-white/80">Lessons Completed</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-green-400 mb-1">{totalLessons}</div>
+                <div className="text-3xl font-bold font-mono text-primary-400 mb-1">{totalLessons}</div>
                 <div className="text-sm text-white/80">Lessons Available</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-purple-400 mb-1">{achievementsCount}</div>
+                <div className="text-3xl font-bold font-mono text-accent-400 mb-1">{achievementsCount}</div>
                 <div className="text-sm text-white/80">Achievements Earned</div>
               </div>
             </div>
@@ -291,7 +296,7 @@ const EducationPage = () => {
                 showLabel={true}
                 showPercentage={true}
                 height="h-3"
-                color="from-blue-400 via-green-400 to-orange-400"
+                color="from-primary-400 via-primary-500 to-accent-400"
                 animated={true}
               />
             </div>

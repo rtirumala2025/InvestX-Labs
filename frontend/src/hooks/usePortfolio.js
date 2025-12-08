@@ -172,8 +172,8 @@ export const usePortfolio = () => {
     try {
       console.log('📊 [usePortfolio] Loading holdings for portfolio:', portfolioId);
 
-      // Select holdings - handle case where purchase_price might not exist yet
-      // Try with purchase_price first, fallback to basic columns if it fails
+      // Select holdings - handle case where purchase_price or current_price might not exist yet
+      // Try with both columns first, then fallback if columns are missing
       let holdingsData, holdingsError;
       
       try {
@@ -187,27 +187,74 @@ export const usePortfolio = () => {
         holdingsData = result.data;
         holdingsError = result.error;
         
-        // If error is about missing column, try without purchase_price
-        // Note: This is a temporary fallback for PostgREST schema cache issues
-        // The column exists in the database but PostgREST cache may take 1-2 minutes to refresh
-        if (holdingsError && holdingsError.code === '42703' && holdingsError.message?.includes('purchase_price')) {
-          console.debug('📊 [usePortfolio] PostgREST cache issue: purchase_price column exists but not yet visible to API. Using fallback query.');
-          const fallbackResult = await supabase
-            .from('holdings')
-            .select('id,portfolio_id,symbol,shares,current_price,purchase_date,created_at,updated_at')
-            .eq('portfolio_id', portfolioId)
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
+        // If error is about missing column (code 42703 = undefined column), try fallback queries
+        // Note: This handles both PostgREST schema cache issues and missing columns
+        if (holdingsError && holdingsError.code === '42703') {
+          const errorMsg = holdingsError.message || '';
+          console.debug('📊 [usePortfolio] Column missing or not yet visible to API:', errorMsg);
           
-          holdingsData = fallbackResult.data;
-          holdingsError = fallbackResult.error;
-          
-          // Add purchase_price as current_price or 0 for compatibility
-          if (holdingsData) {
-            holdingsData = holdingsData.map(h => ({
-              ...h,
-              purchase_price: h.current_price || 0
-            }));
+          // Try without current_price first (if current_price is missing)
+          if (errorMsg.includes('current_price')) {
+            console.debug('📊 [usePortfolio] Trying fallback query without current_price');
+            const fallbackResult = await supabase
+              .from('holdings')
+              .select('id,portfolio_id,symbol,shares,purchase_price,purchase_date,created_at,updated_at')
+              .eq('portfolio_id', portfolioId)
+              .eq('user_id', userId)
+              .order('created_at', { ascending: false });
+            
+            holdingsData = fallbackResult.data;
+            holdingsError = fallbackResult.error;
+            
+            // If still error about purchase_price, try minimal query
+            if (holdingsError && holdingsError.code === '42703' && holdingsError.message?.includes('purchase_price')) {
+              console.debug('📊 [usePortfolio] Trying minimal query without purchase_price or current_price');
+              const minimalResult = await supabase
+                .from('holdings')
+                .select('id,portfolio_id,symbol,shares,purchase_date,created_at,updated_at')
+                .eq('portfolio_id', portfolioId)
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+              
+              holdingsData = minimalResult.data;
+              holdingsError = minimalResult.error;
+              
+              // Add purchase_price and current_price defaults for compatibility
+              if (holdingsData) {
+                holdingsData = holdingsData.map(h => ({
+                  ...h,
+                  purchase_price: 0,
+                  current_price: 0
+                }));
+              }
+            } else if (holdingsData) {
+              // Add current_price as purchase_price or 0 for compatibility
+              holdingsData = holdingsData.map(h => ({
+                ...h,
+                current_price: h.purchase_price || 0
+              }));
+            }
+          } 
+          // Try without purchase_price (if purchase_price is missing)
+          else if (errorMsg.includes('purchase_price')) {
+            console.debug('📊 [usePortfolio] Trying fallback query without purchase_price');
+            const fallbackResult = await supabase
+              .from('holdings')
+              .select('id,portfolio_id,symbol,shares,current_price,purchase_date,created_at,updated_at')
+              .eq('portfolio_id', portfolioId)
+              .eq('user_id', userId)
+              .order('created_at', { ascending: false });
+            
+            holdingsData = fallbackResult.data;
+            holdingsError = fallbackResult.error;
+            
+            // Add purchase_price as current_price or 0 for compatibility
+            if (holdingsData) {
+              holdingsData = holdingsData.map(h => ({
+                ...h,
+                purchase_price: h.current_price || 0
+              }));
+            }
           }
         } else if (holdingsError) {
           // Log other errors for debugging

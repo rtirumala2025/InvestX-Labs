@@ -138,19 +138,24 @@ const ClubsPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden" style={{ 
+      background: 'var(--bg-base, #0a0f1a)',
+      backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+      backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+      backgroundAttachment: 'fixed'
+    }}>
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 -left-32 w-[28rem] h-[28rem] bg-gradient-to-r from-blue-500/25 to-cyan-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-48 -right-28 w-[30rem] h-[30rem] bg-gradient-to-r from-violet-500/20 to-purple-400/15 rounded-full blur-3xl animate-pulse delay-150" />
+        <div className="absolute -top-40 -left-32 w-[28rem] h-[28rem] bg-gradient-to-r from-primary-500/25 to-primary-600/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-48 -right-28 w-[30rem] h-[30rem] bg-gradient-to-r from-accent-500/20 to-accent-600/15 rounded-full blur-3xl animate-pulse delay-150" />
       </div>
 
       <main className="relative z-10 w-full max-w-6xl mx-auto px-4 lg:px-6 xl:px-8 py-6 lg:py-10 space-y-8">
         <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-200 via-teal-200 to-emerald-200 mb-2">
+            <h1 className="text-3xl lg:text-4xl font-display font-normal tracking-tight text-gradient-hero mb-2">
               Investment Clubs Hub
             </h1>
-            <p className="text-white/70 max-w-2xl">
+            <p className="text-white/70 max-w-2xl font-sans">
               Create clubs, collaborate with friends, and track your community investing journey. Every change syncs
               automatically—offline edits will queue until you reconnect.
             </p>

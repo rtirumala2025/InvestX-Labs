@@ -60,7 +60,7 @@ const Header = () => {
             {/* Logo - Always visible */}
             <div className="flex items-center flex-shrink-0">
               <Link to="/" className="group">
-                <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight bg-gradient-to-r from-blue-300 via-purple-300 to-orange-300 bg-clip-text text-transparent group-hover:from-blue-200 group-hover:via-purple-200 group-hover:to-orange-200 transition-all duration-300">
+                <h1 className="text-2xl lg:text-3xl font-display font-normal text-white tracking-tight text-gradient-hero group-hover:opacity-90 transition-all duration-300">
                   InvestX Labs
                 </h1>
               </Link>
@@ -70,70 +70,70 @@ const Header = () => {
             <nav role="navigation" aria-label="Main navigation" className="hidden lg:flex items-center justify-center flex-1 gap-6 xl:gap-8 2xl:gap-12 px-8">
               <Link
                 to="/dashboard"
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-primary-500/30 focus:outline-none focus:ring-2 focus:ring-primary-500/30 whitespace-nowrap"
                 aria-label="Navigate to Dashboard"
               >
                 Dashboard
               </Link>
               <Link
                 to="/portfolio"
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-primary-500/30 focus:outline-none focus:ring-2 focus:ring-primary-500/30 whitespace-nowrap"
                 aria-label="Navigate to Portfolio"
               >
                 Portfolio
               </Link>
               <Link
                 to="/suggestions"
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-primary-500/30 focus:outline-none focus:ring-2 focus:ring-primary-500/30 whitespace-nowrap"
                 aria-label="Navigate to AI Suggestions"
               >
                 AI Suggestions
               </Link>
               <Link
                 to="/education"
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-primary-500/30 focus:outline-none focus:ring-2 focus:ring-primary-500/30 whitespace-nowrap"
                 aria-label="Navigate to Education"
               >
                 Education
               </Link>
               <Link
                 to="/clubs"
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-primary-500/30 focus:outline-none focus:ring-2 focus:ring-primary-500/30 whitespace-nowrap"
                 aria-label="Navigate to Investment Clubs"
               >
-                🏛️ Clubs
+                Clubs
               </Link>
               <Link
                 to="/chat"
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-primary-500/30 focus:outline-none focus:ring-2 focus:ring-primary-500/30 whitespace-nowrap"
                 aria-label="Navigate to Chat"
               >
-                💬 Chat
+                Chat
               </Link>
               <Link
                 to="/simulation"
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-primary-500/30 focus:outline-none focus:ring-2 focus:ring-primary-500/30 whitespace-nowrap"
                 aria-label="Navigate to Trading Simulation"
               >
-                🎮 Simulation
+                Simulation
               </Link>
               <Link
                 to="/leaderboard"
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-primary-500/30 focus:outline-none focus:ring-2 focus:ring-primary-500/30 whitespace-nowrap"
                 aria-label="Navigate to Leaderboard"
               >
-                🏆 Leaderboard
+                Leaderboard
               </Link>
               <Link
                 to="/achievements"
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-primary-500/30 focus:outline-none focus:ring-2 focus:ring-primary-500/30 whitespace-nowrap"
                 aria-label="Navigate to Achievements"
               >
-                🏅 Achievements
+                Achievements
               </Link>
               <Link
                 to="/privacy"
-                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="text-white/90 hover:text-white px-3 py-2 text-sm font-semibold transition-all duration-200 hover:bg-white/10 rounded-xl backdrop-blur-lg border border-transparent hover:border-primary-500/30 focus:outline-none focus:ring-2 focus:ring-primary-500/30 whitespace-nowrap"
                 aria-label="Navigate to Privacy Settings"
               >
                 Privacy
@@ -160,7 +160,7 @@ const Header = () => {
                 <>
                   <Link
                     to="/login"
-                    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:scale-[0.98]"
+                    className="bg-gradient-primary text-white px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 active:scale-[0.98]"
                   >
                     Login
                   </Link>
@@ -249,28 +249,28 @@ const Header = () => {
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  💬 Chat
+                  Chat
                 </Link>
                 <Link
                   to="/simulation"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  🎮 Simulation
+                  Simulation
                 </Link>
                 <Link
                   to="/leaderboard"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  🏆 Leaderboard
+                  Leaderboard
                 </Link>
                 <Link
                   to="/achievements"
                   className="text-white/90 hover:text-white px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-white/10 rounded-lg"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  🏅 Achievements
+                  Achievements
                 </Link>
                 <Link
                   to="/privacy"

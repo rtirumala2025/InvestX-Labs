@@ -21,19 +21,33 @@ module.exports = {
           900: '#171717',
           950: '#0a0a0a',
         },
-        // Elegant accent color (soft blue)
+        // Primary: Deep Forest Green - Growth & Prosperity
+        primary: {
+          50: '#f0fdf4',
+          100: '#dcfce7',
+          200: '#bbf7d0',
+          300: '#86efac',
+          400: '#4ade80',
+          500: '#22c55e',
+          600: '#16a34a',
+          700: '#15803d',
+          800: '#166534',
+          900: '#14532d',
+          950: '#052e16',
+        },
+        // Accent: Rich Gold - Wealth & Achievement
         accent: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
+          50: '#fffbeb',
+          100: '#fef3c7',
+          200: '#fde68a',
+          300: '#fcd34d',
+          400: '#fbbf24',
+          500: '#f59e0b',
+          600: '#d97706',
+          700: '#b45309',
+          800: '#92400e',
+          900: '#78350f',
+          950: '#451a03',
         },
         // Enhanced Apple-like glass system
         glass: {
@@ -55,19 +69,6 @@ module.exports = {
           }
         },
         
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
-        },
         secondary: {
           50: '#f8fafc',
           100: '#f1f5f9',
@@ -135,20 +136,23 @@ module.exports = {
         }
       },
       fontFamily: {
+        display: [
+          'DM Serif Display',
+          'Georgia',
+          'Times New Roman',
+          'serif'
+        ],
         sans: [
-          'SF Pro Display',
+          'Space Grotesk',
           '-apple-system',
           'BlinkMacSystemFont',
-          'Inter',
-          'Helvetica Neue',
-          'Arial',
           'sans-serif'
         ],
         mono: [
+          'JetBrains Mono',
           'SF Mono',
           'Monaco',
-          'Inconsolata',
-          'Roboto Mono',
+          'Courier New',
           'monospace'
         ]
       },
@@ -261,11 +265,11 @@ module.exports = {
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
-        'gradient-primary': 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-        'gradient-secondary': 'linear-gradient(135deg, #64748b 0%, #94a3b8 100%)',
-        'gradient-success': 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-        'gradient-warning': 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-        'gradient-error': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+        'gradient-primary': 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+        'gradient-accent': 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        'gradient-hero': 'linear-gradient(135deg, #86efac 0%, #fbbf24 50%, #22c55e 100%)',
+        'gradient-bg': 'linear-gradient(135deg, #0a0f1a 0%, #1a2332 50%, #0f172a 100%)',
+        'gradient-overlay': 'radial-gradient(ellipse at top, rgba(34, 197, 94, 0.15) 0%, transparent 70%)'
       },
       screens: {
         'xs': '475px',

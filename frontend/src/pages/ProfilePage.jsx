@@ -229,14 +229,19 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden" style={{ 
+      background: 'var(--bg-base, #0a0f1a)',
+      backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+      backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+      backgroundAttachment: 'fixed'
+    }}>
       <motion.div
-        className="absolute -top-24 -left-28 w-80 h-80 bg-gradient-to-r from-sky-500/35 to-purple-500/25 rounded-full blur-3xl"
+        className="absolute -top-24 -left-28 w-80 h-80 bg-gradient-to-r from-primary-500/35 to-primary-600/25 rounded-full blur-3xl"
         animate={{ y: [0, 20, 0], x: [0, 12, 0] }}
         transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute -bottom-40 -right-32 w-[26rem] h-[26rem] bg-gradient-to-r from-emerald-400/25 to-teal-400/15 rounded-full blur-3xl"
+        className="absolute -bottom-40 -right-32 w-[26rem] h-[26rem] bg-gradient-to-r from-primary-400/25 to-primary-500/15 rounded-full blur-3xl"
         animate={{ y: [0, -18, 0], x: [0, -16, 0] }}
         transition={{ repeat: Infinity, duration: 22, ease: 'easeInOut', delay: 6 }}
       />
@@ -246,10 +251,10 @@ const ProfilePage = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-white/60 mb-2">Account</p>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-200 via-purple-200 to-emerald-200">
+              <h1 className="text-3xl md:text-4xl font-display font-normal tracking-tight text-gradient-hero">
                 👤 Profile & Preferences
               </h1>
-              <p className="text-sm md:text-base text-white/65 mt-2">
+              <p className="text-sm md:text-base text-white/65 mt-2 font-sans">
                 Manage your InvestX Labs identity, update contact details, and keep your account information current.
               </p>
             </div>

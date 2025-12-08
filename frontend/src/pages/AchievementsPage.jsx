@@ -158,19 +158,24 @@ const AchievementsPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden" style={{ 
+      background: 'var(--bg-base, #0a0f1a)',
+      backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+      backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+      backgroundAttachment: 'fixed'
+    }}>
       <motion.div
-        className="absolute -top-24 -left-24 w-80 h-80 bg-gradient-to-r from-purple-500/30 to-blue-500/15 rounded-full blur-3xl"
+        className="absolute -top-24 -left-24 w-80 h-80 bg-gradient-to-r from-accent-500/30 to-accent-600/15 rounded-full blur-3xl"
         animate={{ y: [0, 20, 0], x: [0, 10, 0] }}
         transition={{ repeat: Infinity, duration: 16, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute -bottom-32 -right-24 w-[22rem] h-[22rem] bg-gradient-to-r from-emerald-400/30 to-teal-400/15 rounded-full blur-3xl"
+        className="absolute -bottom-32 -right-24 w-[22rem] h-[22rem] bg-gradient-to-r from-primary-400/30 to-primary-500/15 rounded-full blur-3xl"
         animate={{ y: [0, -18, 0], x: [0, -8, 0] }}
         transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut', delay: 4 }}
       />
       <motion.div
-        className="absolute top-1/2 left-1/4 w-64 h-64 bg-gradient-to-r from-amber-400/20 to-pink-400/10 rounded-full blur-3xl"
+        className="absolute top-1/2 left-1/4 w-64 h-64 bg-gradient-to-r from-accent-400/20 to-accent-500/10 rounded-full blur-3xl"
         animate={{ y: [0, 14, 0], x: [0, 18, 0] }}
         transition={{ repeat: Infinity, duration: 20, ease: 'easeInOut', delay: 6 }}
       />
@@ -182,10 +187,10 @@ const AchievementsPage = () => {
               <p className="text-xs uppercase tracking-[0.35em] text-white/60 mb-2">
                 Achievement Hub
               </p>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-amber-200 via-blue-200 to-purple-200">
+              <h1 className="text-3xl md:text-4xl font-display font-normal tracking-tight text-gradient-hero">
                 🏅 Your Achievements
               </h1>
-              <p className="text-sm md:text-base text-white/65 mt-2 max-w-xl">
+              <p className="text-sm md:text-base text-white/65 mt-2 max-w-xl font-sans">
                 Track every milestone you unlock across investing, education, and simulation. Earn XP,
                 grow your profile, and watch your progress update in real time.
               </p>
@@ -352,7 +357,7 @@ const AchievementsPage = () => {
                             <div className="mt-3">
                               <div className="w-full bg-white/20 rounded-full h-2">
                                 <div
-                                  className="bg-gradient-to-r from-blue-400 to-purple-500 h-2 rounded-full transition-all"
+                                  className="bg-gradient-to-r from-primary-400 to-accent-500 h-2 rounded-full transition-all"
                                   style={{ width: `${progress}%` }}
                                 />
                               </div>

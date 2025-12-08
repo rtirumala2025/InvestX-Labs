@@ -218,19 +218,24 @@ const SuggestionsPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden" style={{ 
+      background: 'var(--bg-base, #0a0f1a)',
+      backgroundImage: 'var(--bg-gradient-primary), var(--bg-pattern-grid), var(--bg-pattern-noise)',
+      backgroundSize: '100% 100%, 60px 60px, 400px 400px',
+      backgroundAttachment: 'fixed'
+    }}>
       <motion.div
-        className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-purple-500/30 to-blue-500/20 rounded-full blur-3xl"
+        className="absolute -top-32 -left-32 w-96 h-96 bg-gradient-to-r from-accent-500/30 to-accent-600/20 rounded-full blur-3xl"
         animate={{ y: [0, 20, 0], x: [0, 10, 0] }}
         transition={{ repeat: Infinity, duration: 15, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute -bottom-40 -right-32 w-[28rem] h-[28rem] bg-gradient-to-r from-orange-400/25 to-pink-400/15 rounded-full blur-3xl"
+        className="absolute -bottom-40 -right-32 w-[28rem] h-[28rem] bg-gradient-to-r from-accent-500/25 to-accent-600/15 rounded-full blur-3xl"
         animate={{ y: [0, -25, 0], x: [0, -15, 0] }}
         transition={{ repeat: Infinity, duration: 20, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute top-1/3 left-1/4 w-64 h-64 bg-gradient-to-r from-green-400/20 to-emerald-400/15 rounded-full blur-3xl"
+        className="absolute top-1/3 left-1/4 w-64 h-64 bg-gradient-to-r from-primary-400/20 to-primary-500/15 rounded-full blur-3xl"
         animate={{ y: [0, 15, 0], x: [0, 20, 0] }}
         transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut', delay: 5 }}
       />
@@ -244,10 +249,10 @@ const SuggestionsPage = () => {
         >
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-300 via-blue-300 to-orange-300 mb-2">
+              <h1 className="text-3xl md:text-4xl font-display font-normal tracking-tight text-gradient-hero mb-2">
                 AI Investment Advisor 🤖
               </h1>
-              <p className="text-gray-300 text-base lg:text-lg">
+              <p className="text-neutral-300 text-base lg:text-lg font-sans">
                 Personalized recommendations powered by your Supabase portfolio data
               </p>
             </div>
@@ -452,7 +457,7 @@ const SuggestionsPage = () => {
                     </div>
                     <div className="w-full bg-white/20 rounded-full h-2">
                       <div
-                        className="bg-gradient-to-r from-blue-400 to-purple-500 h-2 rounded-full"
+                        className="bg-gradient-to-r from-primary-400 to-accent-500 h-2 rounded-full"
                         style={{ width: suggestions.length ? `${Math.min(100, suggestions.length * 20)}%` : '0%' }}
                       />
                     </div>
