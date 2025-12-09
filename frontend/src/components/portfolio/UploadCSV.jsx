@@ -24,6 +24,14 @@ const HEADER_ALIASES = {
   price: ['price', 'cost', 'rate', 'fill price']
 };
 
+// Spending analysis header aliases
+const SPENDING_HEADER_ALIASES = {
+  date: ['date', 'transaction date', 'transaction_date'],
+  amount: ['amount', 'value', 'total', 'sum'],
+  category: ['category', 'type', 'description', 'merchant'],
+  type: ['type', 'transaction type', 'transaction_type', 'flow']
+};
+
 const fadeVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' } }
@@ -35,6 +43,17 @@ const normalizeHeader = (headerRow = []) =>
 const detectColumns = (headerRow = []) => {
   const normalized = normalizeHeader(headerRow);
   return Object.entries(HEADER_ALIASES).reduce((acc, [key, aliases]) => {
+    acc[key] =
+      normalized.findIndex((cell) =>
+        aliases.some((alias) => cell.includes(alias))
+      );
+    return acc;
+  }, {});
+};
+
+const detectSpendingColumns = (headerRow = []) => {
+  const normalized = normalizeHeader(headerRow);
+  return Object.entries(SPENDING_HEADER_ALIASES).reduce((acc, [key, aliases]) => {
     acc[key] =
       normalized.findIndex((cell) =>
         aliases.some((alias) => cell.includes(alias))
@@ -135,6 +154,24 @@ const validateRow = (row) => {
   return errors;
 };
 
+const validateSpendingRow = (row) => {
+  const errors = {};
+
+  if (!row.date) {
+    errors.date = 'Invalid or missing date';
+  }
+
+  if (!Number.isFinite(row.amount) || row.amount === 0) {
+    errors.amount = 'Amount must be a non-zero number';
+  }
+
+  if (!row.category || !String(row.category).trim()) {
+    errors.category = 'Category is required';
+  }
+
+  return errors;
+};
+
 const transformRows = (tableRows) => {
   const header = tableRows[0];
   const dataRows = tableRows.slice(1);
@@ -179,31 +216,151 @@ const transformRows = (tableRows) => {
     .filter(Boolean);
 };
 
-const parseUploadFile = async (file) => {
+const transformSpendingRows = (tableRows) => {
+  const header = tableRows[0];
+  const dataRows = tableRows.slice(1);
+  const columnMap = detectSpendingColumns(header);
+
+  const missingColumns = Object.entries(columnMap)
+    .filter(([, index]) => index === -1)
+    .map(([key]) => key);
+
+  if (missingColumns.length) {
+    throw new Error(
+      `Missing required columns: ${missingColumns
+        .map((col) => col.toUpperCase())
+        .join(', ')}`
+    );
+  }
+
+  return dataRows
+    .map((row, idx) => {
+      if (!row || row.length === 0 || row.every((cell) => !String(cell).trim())) {
+        return null;
+      }
+
+      const dateRaw = row[columnMap.date];
+      const amountRaw = row[columnMap.amount];
+      const categoryRaw = row[columnMap.category];
+      const typeRaw = row[columnMap.type] || 'expense';
+
+      const parsedRow = {
+        id: idx + 1,
+        data: {
+          date: normalizeDate(dateRaw),
+          amount: Number(amountRaw),
+          category: String(categoryRaw || '').trim(),
+          type: String(typeRaw || 'expense').trim().toLowerCase()
+        }
+      };
+
+      parsedRow.errors = validateSpendingRow(parsedRow.data);
+      return parsedRow;
+    })
+    .filter(Boolean);
+};
+
+// Calculate spending analysis from parsed rows
+const calculateSpendingAnalysis = (validRows) => {
+  if (!validRows || validRows.length === 0) {
+    return null;
+  }
+
+  let totalIncome = 0;
+  let totalExpenses = 0;
+  const categories = {};
+
+  // Group by month and calculate totals
+  const monthlyData = {};
+
+  validRows.forEach(({ data }) => {
+    if (!data.date) return;
+
+    const date = new Date(data.date);
+    const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+    if (!monthlyData[monthYear]) {
+      monthlyData[monthYear] = {
+        income: 0,
+        expenses: 0,
+        categories: {}
+      };
+    }
+
+    const amount = Math.abs(data.amount);
+    const typeLower = String(data.type || 'expense').toLowerCase();
+    // Income types: 'income', 'credit', 'deposit', 'salary', 'wage'
+    // Expense types: 'expense', 'debit', 'payment', 'purchase', or anything else
+    const isIncome = ['income', 'credit', 'deposit', 'salary', 'wage', 'revenue'].includes(typeLower);
+
+    if (isIncome) {
+      monthlyData[monthYear].income += amount;
+      totalIncome += amount;
+    } else {
+      monthlyData[monthYear].expenses += amount;
+      totalExpenses += amount;
+      
+      const category = data.category || 'Uncategorized';
+      if (!monthlyData[monthYear].categories[category]) {
+        monthlyData[monthYear].categories[category] = 0;
+      }
+      monthlyData[monthYear].categories[category] += amount;
+
+      if (!categories[category]) {
+        categories[category] = 0;
+      }
+      categories[category] += amount;
+    }
+  });
+
+  const netSavings = totalIncome - totalExpenses;
+  const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
+  const discretionarySpending = Object.entries(categories)
+    .filter(([cat]) => !['rent', 'mortgage', 'utilities', 'insurance', 'groceries'].includes(cat.toLowerCase()))
+    .reduce((sum, [, amount]) => sum + amount, 0);
+  const investmentCapacity = Math.max(0, netSavings * 0.7); // 70% of net savings
+
+  return {
+    totalIncome,
+    totalExpenses,
+    netSavings,
+    savingsRate: Number(savingsRate.toFixed(2)),
+    discretionarySpending: Number(discretionarySpending.toFixed(2)),
+    investmentCapacity: Number(investmentCapacity.toFixed(2)),
+    categories,
+    monthlyData
+  };
+};
+
+const parseUploadFile = async (file, mode = 'transactions') => {
   const extension = file.name.split('.').pop().toLowerCase();
 
+  let rows;
   if (extension === 'xlsx' || extension === 'xls') {
     const XLSX = await loadXLSX();
     const arrayBuffer = await readFileAsArrayBuffer(file);
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = parseWorksheet(worksheet, XLSX);
-    return transformRows(rows);
-  }
-
-  if (extension === 'csv') {
+    rows = parseWorksheet(worksheet, XLSX);
+  } else if (extension === 'csv') {
     const XLSX = await loadXLSX();
     const text = await readFileAsText(file);
     const workbook = XLSX.read(text, { type: 'string' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = parseWorksheet(worksheet, XLSX);
-    return transformRows(rows);
+    rows = parseWorksheet(worksheet, XLSX);
+  } else {
+    throw new Error('Unsupported file type.');
   }
 
-  throw new Error('Unsupported file type.');
+  // Transform based on mode
+  if (mode === 'spending') {
+    return transformSpendingRows(rows);
+  } else {
+    return transformRows(rows);
+  }
 };
 
-const UploadCSV = ({ onUploadComplete }) => {
+const UploadCSV = ({ onUploadComplete, mode = 'transactions' }) => {
   const { currentUser } = useAuth();
   const { queueToast } = useApp();
   const { portfolio, reloadPortfolio, updatePortfolioMetrics } = usePortfolioContext();
@@ -214,6 +371,8 @@ const UploadCSV = ({ onUploadComplete }) => {
   const [parsedRows, setParsedRows] = useState([]);
   const [error, setError] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [uploadMode, setUploadMode] = useState(mode); // 'transactions' or 'spending'
+  const [spendingAnalysis, setSpendingAnalysis] = useState(null);
   const fileInputRef = useRef(null);
 
   const validationSummary = useMemo(() => {
@@ -245,6 +404,7 @@ const UploadCSV = ({ onUploadComplete }) => {
     setError(null);
     setIsParsing(false);
     setIsImporting(false);
+    setSpendingAnalysis(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -273,7 +433,7 @@ const UploadCSV = ({ onUploadComplete }) => {
   const handleFileSelection = useCallback(
     async (incomingFile) => {
       if (!currentUser) {
-        queueToast('You must be signed in to upload transactions.', 'error');
+        queueToast('You must be signed in to upload files.', 'error');
         return;
       }
 
@@ -282,13 +442,22 @@ const UploadCSV = ({ onUploadComplete }) => {
       setIsParsing(true);
       setError(null);
       setFile(incomingFile);
+      setSpendingAnalysis(null);
 
       try {
-        const rows = await parseUploadFile(incomingFile);
+        const rows = await parseUploadFile(incomingFile, uploadMode);
         setParsedRows(rows);
+        
         if (!rows.length) {
           setError('No valid rows found in the file.');
           queueToast('No valid rows found in the file.', 'warning');
+        } else if (uploadMode === 'spending') {
+          // Calculate spending analysis
+          const validRows = rows.filter((row) => Object.keys(row.errors).length === 0);
+          if (validRows.length > 0) {
+            const analysis = calculateSpendingAnalysis(validRows);
+            setSpendingAnalysis(analysis);
+          }
         }
       } catch (err) {
         console.error('CSV parse error', err);
@@ -300,7 +469,7 @@ const UploadCSV = ({ onUploadComplete }) => {
         setIsParsing(false);
       }
     },
-    [currentUser, queueToast]
+    [currentUser, queueToast, uploadMode]
   );
 
   const handleFileInputChange = (event) => {
@@ -334,8 +503,8 @@ const UploadCSV = ({ onUploadComplete }) => {
   };
 
   const handleImport = async () => {
-    if (!currentUser || !portfolio?.id) {
-      queueToast('Portfolio not ready yet. Please try again.', 'error');
+    if (!currentUser) {
+      queueToast('You must be signed in to import data.', 'error');
       return;
     }
 
@@ -346,48 +515,122 @@ const UploadCSV = ({ onUploadComplete }) => {
 
     setIsImporting(true);
     try {
-      const payload = validationSummary.validRows.map(({ data }) => {
-        const transactionType = data.shares >= 0 ? 'buy' : 'sell';
-        const shares = Math.abs(data.shares);
-        const price = Math.abs(data.price);
+      if (uploadMode === 'spending') {
+        // Import spending analysis
+        if (!spendingAnalysis) {
+          throw new Error('Spending analysis not calculated. Please re-upload the file.');
+        }
 
-        return {
-          user_id: currentUser.id,
-          portfolio_id: portfolio.id,
-          symbol: data.symbol,
-          transaction_type: transactionType,
-          shares,
-          price,
-          total_amount: Number((shares * price).toFixed(2)),
-          fees: 0,
-          transaction_date: data.date,
-          notes: 'Imported via CSV uploader',
-          metadata: {
-            source: 'csv_upload',
-            originalShares: data.shares,
-            originalPrice: data.price
+        // Get the most recent month from the data
+        const monthYears = Object.keys(spendingAnalysis.monthlyData);
+        if (monthYears.length === 0) {
+          throw new Error('No valid monthly data found.');
+        }
+
+        // Process each month
+        const insertPromises = monthYears.map(async (monthYear) => {
+          const monthData = spendingAnalysis.monthlyData[monthYear];
+          const netSavings = monthData.income - monthData.expenses;
+          const savingsRate = monthData.income > 0 ? (netSavings / monthData.income) * 100 : 0;
+          const discretionarySpending = Object.entries(monthData.categories)
+            .filter(([cat]) => !['rent', 'mortgage', 'utilities', 'insurance', 'groceries'].includes(cat.toLowerCase()))
+            .reduce((sum, [, amount]) => sum + amount, 0);
+          const investmentCapacity = Math.max(0, netSavings * 0.7);
+
+          const payload = {
+            user_id: currentUser.id,
+            month_year: monthYear,
+            total_income: Number(monthData.income.toFixed(2)),
+            total_expenses: Number(monthData.expenses.toFixed(2)),
+            savings_rate: Number(savingsRate.toFixed(2)),
+            discretionary_spending: Number(discretionarySpending.toFixed(2)),
+            investment_capacity: Number(investmentCapacity.toFixed(2)),
+            categories: monthData.categories
+          };
+
+          // Use upsert to handle updates
+          const { error: upsertError } = await supabase
+            .from('spending_analysis')
+            .upsert(payload, { onConflict: 'user_id,month_year' });
+
+          if (upsertError) {
+            throw upsertError;
           }
-        };
-      });
 
-      const { error: insertError } = await supabase.from('transactions').insert(payload);
-      if (insertError) {
-        throw insertError;
-      }
+          return payload;
+        });
 
-      queueToast(`Imported ${payload.length} transactions successfully.`, 'success');
+        const results = await Promise.all(insertPromises);
 
-      await reloadPortfolio?.();
-      await updatePortfolioMetrics?.({ notify: false, showLoader: false });
+        queueToast(`Analyzed ${results.length} month(s) of spending data successfully.`, 'success');
 
-      if (onUploadComplete) {
-        onUploadComplete(payload);
+        // Update user profile with latest investment capacity
+        const latestMonth = monthYears.sort().pop();
+        const latestData = spendingAnalysis.monthlyData[latestMonth];
+        const latestInvestmentCapacity = Math.max(0, (latestData.income - latestData.expenses) * 0.7);
+
+        await supabase
+          .from('profiles')
+          .update({
+            monthly_income: latestData.income,
+            investment_capacity: latestInvestmentCapacity,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentUser.id);
+
+        if (onUploadComplete) {
+          onUploadComplete(results);
+        }
+      } else {
+        // Import transactions (existing logic)
+        if (!portfolio?.id) {
+          queueToast('Portfolio not ready yet. Please try again.', 'error');
+          return;
+        }
+
+        const payload = validationSummary.validRows.map(({ data }) => {
+          const transactionType = data.shares >= 0 ? 'buy' : 'sell';
+          const shares = Math.abs(data.shares);
+          const price = Math.abs(data.price);
+
+          return {
+            user_id: currentUser.id,
+            portfolio_id: portfolio.id,
+            symbol: data.symbol,
+            transaction_type: transactionType,
+            shares,
+            price,
+            total_amount: Number((shares * price).toFixed(2)),
+            fees: 0,
+            transaction_date: data.date,
+            notes: 'Imported via CSV uploader',
+            metadata: {
+              source: 'csv_upload',
+              originalShares: data.shares,
+              originalPrice: data.price
+            }
+          };
+        });
+
+        const { error: insertError } = await supabase.from('transactions').insert(payload);
+        if (insertError) {
+          throw insertError;
+        }
+
+        queueToast(`Imported ${payload.length} transactions successfully.`, 'success');
+
+        await reloadPortfolio?.();
+        await updatePortfolioMetrics?.({ notify: false, showLoader: false });
+
+        if (onUploadComplete) {
+          onUploadComplete(payload);
+        }
       }
 
       resetState();
     } catch (err) {
       console.error('Import error', err);
-      queueToast(err.message || 'Unable to import transactions.', 'error');
+      queueToast(err.message || `Unable to import ${uploadMode === 'spending' ? 'spending data' : 'transactions'}.`, 'error');
     } finally {
       setIsImporting(false);
     }
@@ -397,11 +640,47 @@ const UploadCSV = ({ onUploadComplete }) => {
     <GlassCard variant="floating" padding="large" shadow="xl">
       <div className="space-y-6">
         <div>
-          <h3 className="text-xl font-semibold text-white mb-2">Import Portfolio Transactions</h3>
-          <p className="text-white/70 text-sm">
-            Upload a CSV or Excel file containing your trades. We&apos;ll validate each row,
-            highlight any issues, and import the valid transactions directly into your Supabase-backed portfolio.
+          <h3 className="text-xl font-semibold text-white mb-2">
+            {uploadMode === 'spending' ? 'Upload Spending Analysis' : 'Import Portfolio Transactions'}
+          </h3>
+          <p className="text-white/70 text-sm mb-4">
+            {uploadMode === 'spending' 
+              ? 'Upload a CSV or Excel file containing your income and expenses. We\'ll analyze your spending patterns, calculate savings rate, and determine your investment capacity.'
+              : 'Upload a CSV or Excel file containing your trades. We\'ll validate each row, highlight any issues, and import the valid transactions directly into your Supabase-backed portfolio.'}
           </p>
+          
+          {/* Mode Selector */}
+          <div className="flex items-center space-x-4 mb-4">
+            <span className="text-white/70 text-sm">Upload Type:</span>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => {
+                  setUploadMode('transactions');
+                  resetState();
+                }}
+                className={`px-4 py-2 text-sm rounded-lg transition-all ${
+                  uploadMode === 'transactions'
+                    ? 'bg-blue-500/30 text-white border border-blue-400/30'
+                    : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                }`}
+              >
+                Portfolio Transactions
+              </button>
+              <button
+                onClick={() => {
+                  setUploadMode('spending');
+                  resetState();
+                }}
+                className={`px-4 py-2 text-sm rounded-lg transition-all ${
+                  uploadMode === 'spending'
+                    ? 'bg-blue-500/30 text-white border border-blue-400/30'
+                    : 'bg-white/10 text-white/70 hover:text-white hover:bg-white/20'
+                }`}
+              >
+                Spending Analysis
+              </button>
+            </div>
+          </div>
         </div>
 
         <div
@@ -439,7 +718,10 @@ const UploadCSV = ({ onUploadComplete }) => {
               </GlassButton>
             </div>
             <p className="text-white/50 text-xs">
-              Supported: CSV, XLSX, XLS • Max 5MB • Required columns: symbol, date, shares, price
+              Supported: CSV, XLSX, XLS • Max 5MB • 
+              {uploadMode === 'spending' 
+                ? ' Required columns: date, amount, category, type (income/expense)'
+                : ' Required columns: symbol, date, shares, price'}
             </p>
           </div>
         </div>
@@ -503,15 +785,70 @@ const UploadCSV = ({ onUploadComplete }) => {
                 </div>
               </div>
 
+              {uploadMode === 'spending' && spendingAnalysis && (
+                <motion.div
+                  variants={fadeVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-6 space-y-4"
+                >
+                  <h4 className="text-lg font-semibold text-white mb-4">Spending Analysis Preview</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-white/60 text-xs uppercase tracking-wide mb-1">Total Income</p>
+                      <p className="text-lg font-semibold text-green-300">${spendingAnalysis.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div>
+                      <p className="text-white/60 text-xs uppercase tracking-wide mb-1">Total Expenses</p>
+                      <p className="text-lg font-semibold text-red-300">${spendingAnalysis.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div>
+                      <p className="text-white/60 text-xs uppercase tracking-wide mb-1">Savings Rate</p>
+                      <p className="text-lg font-semibold text-blue-300">{spendingAnalysis.savingsRate.toFixed(1)}%</p>
+                    </div>
+                    <div>
+                      <p className="text-white/60 text-xs uppercase tracking-wide mb-1">Investment Capacity</p>
+                      <p className="text-lg font-semibold text-purple-300">${spendingAnalysis.investmentCapacity.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  </div>
+                  {Object.keys(spendingAnalysis.categories).length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-white/70 text-sm mb-2">Top Categories:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(spendingAnalysis.categories)
+                          .sort(([, a], [, b]) => b - a)
+                          .slice(0, 5)
+                          .map(([category, amount]) => (
+                            <span key={category} className="px-3 py-1 bg-white/10 rounded-lg text-white text-xs">
+                              {category}: ${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
               <div className="overflow-x-auto border border-white/10 rounded-xl">
                 <table className="min-w-full divide-y divide-white/10 text-sm">
                   <thead className="bg-white/10 text-white/70">
                     <tr>
                       <th className="px-4 py-2 text-left font-medium">#</th>
-                      <th className="px-4 py-2 text-left font-medium">Symbol</th>
-                      <th className="px-4 py-2 text-left font-medium">Date</th>
-                      <th className="px-4 py-2 text-left font-medium">Shares</th>
-                      <th className="px-4 py-2 text-left font-medium">Price</th>
+                      {uploadMode === 'spending' ? (
+                        <>
+                          <th className="px-4 py-2 text-left font-medium">Date</th>
+                          <th className="px-4 py-2 text-left font-medium">Amount</th>
+                          <th className="px-4 py-2 text-left font-medium">Category</th>
+                          <th className="px-4 py-2 text-left font-medium">Type</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="px-4 py-2 text-left font-medium">Symbol</th>
+                          <th className="px-4 py-2 text-left font-medium">Date</th>
+                          <th className="px-4 py-2 text-left font-medium">Shares</th>
+                          <th className="px-4 py-2 text-left font-medium">Price</th>
+                        </>
+                      )}
                       <th className="px-4 py-2 text-left font-medium">Status</th>
                     </tr>
                   </thead>
@@ -521,26 +858,41 @@ const UploadCSV = ({ onUploadComplete }) => {
                       return (
                         <tr key={row.id} className={hasErrors ? 'bg-red-500/5' : 'bg-white/5'}>
                           <td className="px-4 py-2 text-white/70">{row.id}</td>
-                          <td
-                            className={`px-4 py-2 ${row.errors.symbol ? 'text-red-300' : 'text-white'}`}
-                          >
-                            {row.data.symbol || '—'}
-                          </td>
-                          <td
-                            className={`px-4 py-2 ${row.errors.date ? 'text-red-300' : 'text-white'}`}
-                          >
-                            {row.data.date || '—'}
-                          </td>
-                          <td
-                            className={`px-4 py-2 ${row.errors.shares ? 'text-red-300' : 'text-white'}`}
-                          >
-                            {Number.isFinite(row.data.shares) ? row.data.shares : '—'}
-                          </td>
-                          <td
-                            className={`px-4 py-2 ${row.errors.price ? 'text-red-300' : 'text-white'}`}
-                          >
-                            {Number.isFinite(row.data.price) ? row.data.price : '—'}
-                          </td>
+                          {uploadMode === 'spending' ? (
+                            <>
+                              <td className={`px-4 py-2 ${row.errors.date ? 'text-red-300' : 'text-white'}`}>
+                                {row.data.date || '—'}
+                              </td>
+                              <td className={`px-4 py-2 ${row.errors.amount ? 'text-red-300' : 'text-white'}`}>
+                                {Number.isFinite(row.data.amount) ? `$${row.data.amount.toFixed(2)}` : '—'}
+                              </td>
+                              <td className={`px-4 py-2 ${row.errors.category ? 'text-red-300' : 'text-white'}`}>
+                                {row.data.category || '—'}
+                              </td>
+                              <td className="px-4 py-2 text-white/70">
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                  row.data.type === 'income' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
+                                }`}>
+                                  {row.data.type || 'expense'}
+                                </span>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className={`px-4 py-2 ${row.errors.symbol ? 'text-red-300' : 'text-white'}`}>
+                                {row.data.symbol || '—'}
+                              </td>
+                              <td className={`px-4 py-2 ${row.errors.date ? 'text-red-300' : 'text-white'}`}>
+                                {row.data.date || '—'}
+                              </td>
+                              <td className={`px-4 py-2 ${row.errors.shares ? 'text-red-300' : 'text-white'}`}>
+                                {Number.isFinite(row.data.shares) ? row.data.shares : '—'}
+                              </td>
+                              <td className={`px-4 py-2 ${row.errors.price ? 'text-red-300' : 'text-white'}`}>
+                                {Number.isFinite(row.data.price) ? row.data.price : '—'}
+                              </td>
+                            </>
+                          )}
                           <td className="px-4 py-2 text-white/70">
                             {hasErrors ? (
                               <div className="space-y-1 text-xs text-red-300">
@@ -590,7 +942,9 @@ const UploadCSV = ({ onUploadComplete }) => {
                   }
                   loading={isImporting}
                 >
-                  Import {validationSummary.validRows.length || ''} Transactions
+                  {uploadMode === 'spending' 
+                    ? `Analyze & Save ${validationSummary.validRows.length || ''} Transaction(s)`
+                    : `Import ${validationSummary.validRows.length || ''} Transaction(s)`}
                 </GlassButton>
               </div>
             </motion.div>

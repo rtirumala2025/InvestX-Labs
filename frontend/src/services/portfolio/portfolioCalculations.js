@@ -11,7 +11,9 @@ export const calculateTotalValue = (holdings) => {
   if (!holdings || holdings.length === 0) return 0;
   
   return holdings.reduce((total, holding) => {
-    return total + (holding.shares * holding.currentPrice);
+    const shares = Number(holding.shares) || 0;
+    const currentPrice = Number(holding.currentPrice || holding.current_price || 0);
+    return total + (shares * currentPrice);
   }, 0);
 };
 
@@ -24,7 +26,9 @@ export const calculateTotalCostBasis = (holdings) => {
   if (!holdings || holdings.length === 0) return 0;
   
   return holdings.reduce((total, holding) => {
-    return total + (holding.shares * holding.purchasePrice);
+    const shares = Number(holding.shares) || 0;
+    const purchasePrice = Number(holding.purchasePrice || holding.purchase_price || 0);
+    return total + (shares * purchasePrice);
   }, 0);
 };
 
@@ -66,7 +70,9 @@ export const calculateSectorAllocation = (holdings) => {
   
   holdings.forEach(holding => {
     const sector = holding.sector || 'Unknown';
-    const value = holding.shares * holding.currentPrice;
+    const shares = Number(holding.shares) || 0;
+    const currentPrice = Number(holding.currentPrice || holding.current_price || 0);
+    const value = shares * currentPrice;
     
     if (sectorValues[sector]) {
       sectorValues[sector] += value;
@@ -95,8 +101,10 @@ export const calculateAssetTypeAllocation = (holdings) => {
   const assetTypeValues = {};
   
   holdings.forEach(holding => {
-    const assetType = holding.assetType || 'Stock';
-    const value = holding.shares * holding.currentPrice;
+    const assetType = holding.assetType || holding.asset_type || 'Stock';
+    const shares = Number(holding.shares) || 0;
+    const currentPrice = Number(holding.currentPrice || holding.current_price || 0);
+    const value = shares * currentPrice;
     
     if (assetTypeValues[assetType]) {
       assetTypeValues[assetType] += value;
@@ -126,7 +134,9 @@ export const calculatePortfolioBeta = (holdings, marketData) => {
   let weightedBeta = 0;
   
   holdings.forEach(holding => {
-    const weight = (holding.shares * holding.currentPrice) / totalValue;
+    const shares = Number(holding.shares) || 0;
+    const currentPrice = Number(holding.currentPrice || holding.current_price || 0);
+    const weight = (shares * currentPrice) / totalValue;
     const beta = marketData[holding.symbol]?.beta || 1;
     weightedBeta += weight * beta;
   });
@@ -166,7 +176,9 @@ export const calculatePortfolioVolatility = (holdings) => {
   let weightedVolatility = 0;
   
   holdings.forEach(holding => {
-    const weight = (holding.shares * holding.currentPrice) / totalValue;
+    const shares = Number(holding.shares) || 0;
+    const currentPrice = Number(holding.currentPrice || holding.current_price || 0);
+    const weight = (shares * currentPrice) / totalValue;
     const volatility = holding.volatility || 0.2; // Default 20% volatility
     weightedVolatility += weight * volatility;
   });

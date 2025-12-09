@@ -8,13 +8,13 @@ const CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
 class DataInsights {
   constructor(supabaseClient, alphaVantageKey) {
     this.supabase = supabaseClient;
-    this.ALPHA_VANTAGE_KEY = alphaVantageKey;
+    this.ALPHA_VANTAGE_API_KEY = alphaVantageKey;
     this.ALPHA_VANTAGE_URL = process.env.ALPHA_VANTAGE_BASE_URL || 'https://www.alphavantage.co/query';
   }
 
   async getMarketData(symbol, functionType = 'GLOBAL_QUOTE', options = {}) {
-    if (!this.ALPHA_VANTAGE_KEY) {
-      logger.warn('Alpha Vantage key missing; market data will be unavailable.');
+    if (!this.ALPHA_VANTAGE_API_KEY) {
+      logger.warn('Alpha Vantage API key missing; market data will be unavailable.');
       return null;
     }
 
@@ -62,7 +62,7 @@ class DataInsights {
       const params = new URLSearchParams({
         function: functionType,
         symbol,
-        apikey: this.ALPHA_VANTAGE_KEY,
+        apikey: this.ALPHA_VANTAGE_API_KEY,
         datatype: 'json'
       });
 
@@ -250,7 +250,7 @@ class DataInsights {
       const params = new URLSearchParams({
         function: functionType,
         symbol,
-        apikey: this.ALPHA_VANTAGE_KEY,
+        apikey: this.ALPHA_VANTAGE_API_KEY,
         datatype: 'json',
         outputsize
       });

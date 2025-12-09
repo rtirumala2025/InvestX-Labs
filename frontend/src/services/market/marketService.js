@@ -1,10 +1,20 @@
 /**
- * Alpha Vantage Market Data Service
+ * Market Data Service
  * Provides real-time stock market data integration for InvestX Labs
+ * Uses backend API which handles Alpha Vantage integration
  */
 
-const ALPHA_VANTAGE_BASE_URL = process.env.REACT_APP_ALPHA_VANTAGE_BASE_URL || 'https://www.alphavantage.co/query';
-const API_KEY = process.env.REACT_APP_ALPHA_VANTAGE_API_KEY;
+// Backend API base URL
+const getApiBaseUrl = () => {
+  const explicit = process.env.REACT_APP_API_URL || process.env.REACT_APP_BACKEND_URL;
+  if (explicit) return explicit.replace(/\/$/, '');
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:5001';
+  }
+  return '';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Cache for API responses to avoid excessive calls
 const priceCache = new Map();
@@ -15,7 +25,7 @@ const STORAGE_CACHE_KEY = 'investx_market_cache';
 const STORAGE_CACHE_DURATION = 300000; // 5 minutes for localStorage cache
 
 /**
- * Get current stock quote from Alpha Vantage
+ * Get current stock quote from backend API
  * @param {string} symbol - Stock symbol (e.g., 'AAPL')
  * @returns {Promise<Object|null>} Quote data or null on failure
  */
@@ -24,11 +34,6 @@ export const getQuote = async (symbol) => {
   
   if (!symbol) {
     console.warn('📈 [MarketService] ❌ No symbol provided');
-    return null;
-  }
-
-  if (!API_KEY) {
-    console.warn('📈 [MarketService] ❌ Alpha Vantage API key not found in environment variables');
     return null;
   }
 
@@ -64,50 +69,40 @@ export const getQuote = async (symbol) => {
   }
 
   try {
-    const url = `${ALPHA_VANTAGE_BASE_URL}?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`;
+    const url = `${API_BASE_URL}/api/market/quote/${encodeURIComponent(symbol)}`;
     
-    console.log('📈 [MarketService] 🌐 Sending API request to Alpha Vantage:', url.replace(API_KEY, 'API_KEY_HIDDEN'));
+    console.log('📈 [MarketService] 🌐 Sending API request to backend:', url);
     
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const result = await response.json();
     
-    console.log('📈 [MarketService] 📥 Raw API response received for', symbol, ':', Object.keys(data));
+    console.log('📈 [MarketService] 📥 API response received for', symbol);
     
     // Check for API errors
-    if (data['Error Message']) {
-      console.error('📈 [MarketService] ❌ Alpha Vantage API Error:', data['Error Message']);
+    if (!result.success || !result.data) {
+      console.error('📈 [MarketService] ❌ API Error:', result.message || 'Unknown error');
       return null;
     }
 
-    if (data['Note']) {
-      console.warn('📈 [MarketService] ⚠️ Alpha Vantage API Note (rate limit):', data['Note']);
-      return null;
-    }
-
-    const quote = data['Global Quote'];
-    if (!quote) {
-      console.error('📈 [MarketService] ❌ No quote data found for symbol:', symbol);
-      return null;
-    }
+    const quoteData = result.data;
     
-    console.log('📈 [MarketService] 📊 Raw quote data for', symbol, ':', quote);
-
-    // Transform the response to a more usable format
+    // Transform the response to match expected format
     const transformedQuote = {
-      symbol: quote['01. symbol'],
-      open: parseFloat(quote['02. open']) || 0,
-      high: parseFloat(quote['03. high']) || 0,
-      low: parseFloat(quote['04. low']) || 0,
-      price: parseFloat(quote['05. price']) || 0,
-      volume: parseInt(quote['06. volume']) || 0,
-      latestTradingDay: quote['07. latest trading day'],
-      previousClose: parseFloat(quote['08. previous close']) || 0,
-      change: parseFloat(quote['09. change']) || 0,
-      changePercent: parseFloat(quote['10. change percent']?.replace('%', '')) || 0
+      symbol: quoteData.symbol || symbol.toUpperCase(),
+      open: parseFloat(quoteData.open) || 0,
+      high: parseFloat(quoteData.high) || 0,
+      low: parseFloat(quoteData.low) || 0,
+      price: parseFloat(quoteData.price) || 0,
+      volume: parseInt(quoteData.volume) || 0,
+      latestTradingDay: quoteData.latestTradingDay,
+      previousClose: parseFloat(quoteData.previousClose) || 0,
+      change: parseFloat(quoteData.change) || 0,
+      changePercent: parseFloat(quoteData.changePercent) || 0
     };
     
     console.log('📈 [MarketService] ✅ Transformed quote for', symbol, ':', {
@@ -191,39 +186,29 @@ export const getMultipleQuotes = async (symbols) => {
     return {};
   }
 
-  // Limit concurrent requests to respect API rate limits
-  const BATCH_SIZE = 5; // Alpha Vantage free tier: 5 calls per minute
+  // Fetch all quotes in parallel (backend handles rate limiting)
   const results = {};
   
-  console.log('📈 [MarketService] 🔄 Processing', symbols.length, 'symbols in batches of', BATCH_SIZE);
+  console.log('📈 [MarketService] 🔄 Fetching', symbols.length, 'symbols from backend API');
   
-  for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
-    const batch = symbols.slice(i, i + BATCH_SIZE);
-    const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
-    const totalBatches = Math.ceil(symbols.length / BATCH_SIZE);
+  try {
+    // Fetch all quotes in parallel - backend handles caching and rate limiting
+    const promises = symbols.map(symbol => 
+      getQuote(symbol).catch(err => {
+        console.warn('📈 [MarketService] ⚠️ Failed to fetch quote for', symbol, ':', err.message);
+        return null;
+      })
+    );
     
-    console.log('📈 [MarketService] 📦 Processing batch', batchNumber, 'of', totalBatches, ':', batch);
+    const batchResults = await Promise.all(promises);
     
-    try {
-      const promises = batch.map(symbol => getQuote(symbol));
-      const batchResults = await Promise.all(promises);
-      
-      console.log('📈 [MarketService] ✅ Batch', batchNumber, 'completed - received', batchResults.filter(r => r !== null).length, 'valid quotes');
-      
-      batch.forEach((symbol, index) => {
-        results[symbol] = batchResults[index];
-      });
-
-      // Add delay between batches to respect rate limits
-      if (i + BATCH_SIZE < symbols.length) {
-        console.log('📈 [MarketService] ⏳ Waiting 12 seconds before next batch to respect rate limits...');
-        await new Promise(resolve => setTimeout(resolve, 12000)); // 12 second delay
-        console.log('📈 [MarketService] ⏰ Delay complete, proceeding to next batch');
-      }
-    } catch (error) {
-      console.error('📈 [MarketService] ❌ Error fetching batch', batchNumber, ':', error);
-      // Continue with remaining batches
-    }
+    symbols.forEach((symbol, index) => {
+      results[symbol] = batchResults[index];
+    });
+    
+    console.log('📈 [MarketService] ✅ Completed - received', batchResults.filter(r => r !== null).length, 'valid quotes out of', symbols.length, 'requested');
+  } catch (error) {
+    console.error('📈 [MarketService] ❌ Error fetching quotes:', error);
   }
   
   const successCount = Object.values(results).filter(r => r !== null).length;
@@ -257,15 +242,17 @@ export const calculateLivePortfolioMetrics = (holdings, marketData) => {
 
   const enrichedHoldings = holdings.map(holding => {
     const quote = marketData[holding.symbol];
-    const currentPrice = quote?.price || holding.purchasePrice || 0;
-    const previousClose = quote?.previousClose || holding.purchasePrice || 0;
+    const shares = Number(holding.shares) || 0;
+    const purchasePrice = Number(holding.purchasePrice || holding.purchase_price || 0);
+    const currentPrice = quote?.price || purchasePrice || 0;
+    const previousClose = quote?.previousClose || purchasePrice || 0;
     
-    const value = holding.shares * currentPrice;
-    const costBasis = holding.shares * holding.purchasePrice;
+    const value = shares * currentPrice;
+    const costBasis = shares * purchasePrice;
     const gainLoss = value - costBasis;
     const gainLossPercentage = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
     
-    const dayChange = holding.shares * (currentPrice - previousClose);
+    const dayChange = shares * (currentPrice - previousClose);
     const dayChangePercentage = previousClose > 0 ? ((currentPrice - previousClose) / previousClose) * 100 : 0;
 
     totalValue += value;

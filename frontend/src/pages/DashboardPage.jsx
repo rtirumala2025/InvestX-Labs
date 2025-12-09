@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePortfolio } from '../hooks/usePortfolio';
 import { useAlphaVantageData } from '../hooks/useAlphaVantageData';
+import { useEducation } from '../contexts/EducationContext';
 import { calculatePerformanceMetrics } from '../services/portfolio/portfolioCalculations';
 import { logVerificationComplete } from '../utils/verificationLogger';
 import GlassCard from '../components/ui/GlassCard';
@@ -12,6 +13,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { SkeletonCard, SkeletonGrid } from '../components/common/SkeletonLoader';
 import { MarketProvider } from '../contexts/MarketContext';
 import { useApp } from '../contexts/AppContext';
+import LeaderboardWidget from '../components/leaderboard/LeaderboardWidget';
 
 // Lazy load heavy components
 const MarketTicker = lazy(() => import('../components/market/MarketTicker'));
@@ -36,6 +38,7 @@ function DashboardPageContent() {
     loading: marketLoading, 
     error: marketError 
   } = useAlphaVantageData(holdings || []);
+  const { progress: educationProgress, lessons } = useEducation();
 
   const [selectedChartTimeframe, setSelectedChartTimeframe] = React.useState('1M');
 
@@ -100,14 +103,40 @@ function DashboardPageContent() {
     
     console.log('🏠 [DashboardPage] 🔄 Using static calculations as fallback');
     const result = calculatePerformanceMetrics(holdings);
+    // Ensure dayChange fields are present (will be 0 without market data)
+    const staticResult = {
+      ...result,
+      dayChange: 0,
+      dayChangePercentage: 0
+    };
     console.log('🏠 [DashboardPage] 📊 Static metrics result:', {
-      totalValue: result.totalValue,
-      totalGainLoss: result.totalGainLoss
+      totalValue: staticResult.totalValue,
+      totalGainLoss: staticResult.totalGainLoss,
+      dayChange: staticResult.dayChange
     });
-    return result;
+    return staticResult;
   }, [liveMetrics, holdings]);
 
-  const learningProgress = userProfile?.learningProgress || 0;
+  // Calculate learning progress from education context
+  const learningProgress = React.useMemo(() => {
+    if (!educationProgress || !lessons) return 0;
+    
+    // Count total lessons across all modules
+    const totalLessons = Object.values(lessons).reduce((total, moduleLessons) => {
+      return total + (Array.isArray(moduleLessons) ? moduleLessons.length : 0);
+    }, 0);
+    
+    if (totalLessons === 0) return 0;
+    
+    // Count completed lessons
+    const completedLessons = Object.values(educationProgress).filter(
+      status => status === 'completed'
+    ).length;
+    
+    // Calculate percentage
+    const percentage = Math.round((completedLessons / totalLessons) * 100);
+    return Math.min(100, Math.max(0, percentage));
+  }, [educationProgress, lessons]);
   
   const { queueToast } = useApp();
 
@@ -588,6 +617,11 @@ function DashboardPageContent() {
                   View All Insights
                 </GlassButton>
               </GlassCard>
+            </motion.div>
+
+            {/* Leaderboard Widget */}
+            <motion.div variants={fadeIn} initial="hidden" animate="visible">
+              <LeaderboardWidget limit={5} showViewAll={true} />
             </motion.div>
           </div>
         </div>

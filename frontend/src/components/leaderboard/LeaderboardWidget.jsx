@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import { useLeaderboard } from "../../contexts/LeaderboardContext";
 import GlassButton from "../ui/GlassButton";
 import GlassCard from "../ui/GlassCard";
@@ -24,7 +25,7 @@ const StatPill = ({ icon, label, value, tone = "default" }) => {
   );
 };
 
-const LeaderboardWidget = ({ limit = 10 }) => {
+const LeaderboardWidget = ({ limit = 10, showViewAll = true }) => {
   const { leaderboard, loading, error, refreshLeaderboard } = useLeaderboard();
 
   const displayedEntries = useMemo(() => {
@@ -123,6 +124,17 @@ const LeaderboardWidget = ({ limit = 10 }) => {
           >
             🔄 Refresh
           </GlassButton>
+          {showViewAll && (
+            <GlassButton
+              as={Link}
+              to="/leaderboard"
+              variant="primary"
+              size="small"
+              title="View Full Leaderboard"
+            >
+              View All
+            </GlassButton>
+          )}
         </div>
       </div>
 
@@ -223,6 +235,19 @@ const LeaderboardWidget = ({ limit = 10 }) => {
               </motion.div>
             );
           })}
+        </div>
+      )}
+      
+      {showViewAll && displayedEntries.length > 0 && (
+        <div className="mt-6 pt-4 border-t border-white/10">
+          <GlassButton
+            as={Link}
+            to="/leaderboard"
+            variant="glass"
+            className="w-full"
+          >
+            View Full Leaderboard →
+          </GlassButton>
         </div>
       )}
     </GlassCard>
