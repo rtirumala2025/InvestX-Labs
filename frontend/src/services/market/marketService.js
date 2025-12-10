@@ -274,7 +274,9 @@ export const calculateLivePortfolioMetrics = (holdings, marketData) => {
 
   const totalGainLoss = totalValue - totalCostBasis;
   const totalGainLossPercentage = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
-  const dayChangePercentage = (totalValue - totalDayChange) > 0 ? (totalDayChange / (totalValue - totalDayChange)) * 100 : 0;
+  // Calculate day change percentage as percentage of total portfolio value
+  const previousTotalValue = totalValue - totalDayChange;
+  const dayChangePercentage = previousTotalValue > 0 ? (totalDayChange / previousTotalValue) * 100 : 0;
 
   return {
     totalValue,

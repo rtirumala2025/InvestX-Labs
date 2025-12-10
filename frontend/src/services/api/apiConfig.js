@@ -1,7 +1,11 @@
 import axios from 'axios';
 
 // Base API URL from environment variables or default to local development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/investx-labs/us-central1/api';
+// Support both Create React App (REACT_APP_*) and Vite (VITE_*) env vars
+const API_BASE_URL = process.env.REACT_APP_API_URL || 
+                     process.env.REACT_APP_BACKEND_URL || 
+                     import.meta.env?.VITE_API_URL || 
+                     'http://localhost:5001';
 
 // Create axios instance with default config
 const api = axios.create({
