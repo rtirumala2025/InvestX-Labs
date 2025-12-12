@@ -17,6 +17,7 @@
 import { stripEmojis } from './stripEmojis';
 
 // Elements to skip during sanitization
+// eslint-disable-next-line no-unused-vars
 const SKIP_SELECTORS = [
   'script',
   'style',

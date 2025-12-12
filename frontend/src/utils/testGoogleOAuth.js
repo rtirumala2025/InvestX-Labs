@@ -3,7 +3,6 @@
  * Run this in browser console to diagnose OAuth issues
  */
 
-import { signInWithGoogle } from '../services/supabase/auth';
 import { supabase } from '../services/supabase/config';
 
 export const testGoogleOAuth = async () => {

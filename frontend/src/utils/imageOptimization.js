@@ -31,7 +31,7 @@ export const getOptimizedImageUrl = (src, options = {}) => {
   } = options;
 
   // If CDN is enabled, use CDN URL transformation
-  if (CDN_ENABLED && src.startsWith('/') || src.startsWith('http')) {
+  if ((CDN_ENABLED && src.startsWith('/')) || src.startsWith('http')) {
     const params = new URLSearchParams();
     if (width) params.append('w', width);
     if (height) params.append('h', height);

@@ -53,7 +53,14 @@ describe('Emoji Sanitization Integration', () => {
     sanitizeElement(container);
     
     // Check that emojis are removed (or at least processed)
-    const paragraph = container.querySelector('p');
+    // Use Testing Library to render the sanitized content
+    const sanitizedHTML = container.innerHTML;
+    render(
+      <BrowserRouter>
+        <div dangerouslySetInnerHTML={{ __html: sanitizedHTML }} />
+      </BrowserRouter>
+    );
+    const paragraph = screen.getByText(/Test.*content/);
     expect(paragraph).toBeTruthy();
     
     // Clean up

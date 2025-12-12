@@ -18,7 +18,7 @@ export const calculatePortfolioPerformance = (portfolio, holdings, marketData) =
 
   // Calculate holdings value
   let holdingsValue = 0;
-  let totalCostBasis = 0;
+  let totalCostBasis = 0; // Reserved for future use
   let dailyChange = 0;
   let dailyChangePercent = 0;
 
