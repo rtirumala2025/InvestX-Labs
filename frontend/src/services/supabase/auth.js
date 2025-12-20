@@ -1,4 +1,5 @@
 import { supabase } from './config';
+import { checkOAuthHealth, OAuthHealthStatus } from './oauthHealthCheck';
 
 const createSupabaseError = (message, code = 'SUPABASE_UNAVAILABLE') => {
   const error = new Error(message);
@@ -118,23 +119,51 @@ const detectBlockedRequests = () => {
   return hasAdBlocker;
 };
 
-// Sign in with Google
-export const signInWithGoogle = async () => {
+// Sign in with Google - Bulletproof implementation with pre-validation
+export const signInWithGoogle = async (options = {}) => {
+  const { skipHealthCheck = false, retryCount = 0, maxRetries = 0 } = options;
+  
   try {
     console.log('🔐 [Auth] ========== STARTING GOOGLE OAUTH ==========');
-    console.log('🔐 [Auth] Step 1: Checking Supabase client...');
+    console.log('🔐 [Auth] Step 1: Pre-flight health check...');
     
+    // Pre-validate OAuth configuration (unless explicitly skipped)
+    // Make health check non-blocking - if it fails, we'll still try OAuth
+    if (!skipHealthCheck) {
+      try {
+        console.log('🔐 [Auth] Running health check (non-blocking)...');
+        const healthCheck = await checkOAuthHealth();
+        
+        if (healthCheck.status !== OAuthHealthStatus.HEALTHY) {
+          console.warn('🔐 [Auth] ⚠️ OAuth health check failed, but continuing anyway');
+          console.warn('🔐 [Auth] Errors:', healthCheck.errors);
+          console.warn('🔐 [Auth] Fixes:', healthCheck.fixes);
+          // Don't block - let OAuth attempt proceed and show actual error
+        } else {
+          console.log('🔐 [Auth] ✅ OAuth health check passed');
+        }
+      } catch (healthCheckError) {
+        console.warn('🔐 [Auth] ⚠️ Health check threw error, continuing anyway:', healthCheckError);
+        // Don't block OAuth flow if health check fails
+      }
+    }
+    
+    console.log('🔐 [Auth] Step 2: Validating Supabase client...');
     ensureAuthClient();
     
     if (!supabase?.auth) {
-      const error = new Error('Supabase auth client is not available');
+      const error = new Error('Supabase auth client is not available. Please check your environment variables (REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY) and restart the dev server.');
       console.error('🔐 [Auth] ❌', error.message);
       return { data: null, error };
     }
     
-    console.log('🔐 [Auth] ✅ Supabase client available');
-    console.log('🔐 [Auth] Step 2: Checking auth methods...');
-    console.log('🔐 [Auth] signInWithOAuth available:', typeof supabase.auth.signInWithOAuth === 'function');
+    if (typeof supabase.auth.signInWithOAuth !== 'function') {
+      const error = new Error('OAuth method not available. Supabase client may not be properly initialized.');
+      console.error('🔐 [Auth] ❌', error.message);
+      return { data: null, error };
+    }
+    
+    console.log('🔐 [Auth] ✅ Supabase client validated');
     
     // Warn if ad blocker might be interfering
     if (detectBlockedRequests()) {
@@ -144,6 +173,7 @@ export const signInWithGoogle = async () => {
     // Use the base origin for redirect - Supabase will handle the OAuth callback
     const redirectTo = `${window.location.origin}/dashboard`;
     console.log('🔐 [Auth] Step 3: Setting redirect URL:', redirectTo);
+    console.log('🔐 [Auth] Current origin:', window.location.origin);
     
     console.log('🔐 [Auth] Step 4: Calling signInWithOAuth...');
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -165,25 +195,79 @@ export const signInWithGoogle = async () => {
       console.error('🔐 [Auth] ❌ Google OAuth error:', error);
       console.error('🔐 [Auth] Error message:', error.message);
       console.error('🔐 [Auth] Error code:', error.code);
-      console.error('🔐 [Auth] Full error:', JSON.stringify(error, null, 2));
       
       // Provide helpful error message for common issues
       let helpfulMessage = error.message || 'Unknown OAuth error';
+      let actionSteps = [];
       
-      if (error.message?.includes('Unsupported provider') || error.message?.includes('provider not enabled') || error.message?.includes('not enabled')) {
-        helpfulMessage = 'Google OAuth provider is not enabled in Supabase. Please enable it in the Supabase dashboard: Authentication → Providers → Google → Enable.';
+      if (error.message?.includes('Unsupported provider') || 
+          error.message?.includes('provider not enabled') || 
+          error.message?.includes('not enabled') ||
+          (error.message?.toLowerCase().includes('google') && error.message?.toLowerCase().includes('disabled'))) {
+        helpfulMessage = 'Google OAuth provider is not enabled in Supabase.';
+        actionSteps = [
+          '1. Go to Supabase Dashboard: https://app.supabase.com',
+          '2. Navigate to: Authentication → Providers',
+          '3. Find "Google" in the list',
+          '4. Toggle "Enable Google provider" to ON',
+          '5. Add your Google OAuth Client ID and Client Secret',
+          '6. Save and try again'
+        ];
         console.error('🔐 [Auth] ❌ PROVIDER NOT ENABLED - Enable in Supabase Dashboard!');
       } else if (error.message?.includes('blocked') || error.message?.includes('ERR_BLOCKED')) {
-        helpfulMessage = 'Sign-in may be blocked by an ad blocker or privacy extension. Please disable it temporarily or add exceptions for Google OAuth domains.';
-      } else if (error.message?.includes('redirect_uri_mismatch') || error.message?.includes('redirect')) {
-        helpfulMessage = 'OAuth redirect URI mismatch. Please verify Google Cloud Console configuration and Supabase URL Configuration.';
-      } else if (error.message?.includes('invalid_client') || error.message?.includes('Client ID')) {
-        helpfulMessage = 'Invalid OAuth client configuration. Please check Supabase dashboard settings: Authentication → Providers → Google → Client ID and Secret.';
+        helpfulMessage = 'Sign-in may be blocked by an ad blocker or privacy extension.';
+        actionSteps = [
+          '1. Disable ad blockers temporarily',
+          '2. Add exceptions for: accounts.google.com, oauth2.googleapis.com',
+          '3. Try again'
+        ];
+      } else if (error.message?.includes('redirect_uri_mismatch') || 
+                 (error.message?.includes('redirect') && error.message?.includes('mismatch'))) {
+        helpfulMessage = 'OAuth redirect URI mismatch.';
+        actionSteps = [
+          '1. Check Google Cloud Console → APIs & Services → Credentials',
+          '2. Verify Authorized redirect URI includes: https://[your-project].supabase.co/auth/v1/callback',
+          '3. Check Supabase Dashboard → Authentication → URL Configuration',
+          '4. Ensure redirect URLs are whitelisted'
+        ];
+      } else if (error.message?.includes('invalid_client') || 
+                 error.message?.includes('Client ID') ||
+                 error.message?.includes('client_id')) {
+        helpfulMessage = 'Invalid OAuth client configuration.';
+        actionSteps = [
+          '1. Go to Supabase Dashboard → Authentication → Providers → Google',
+          '2. Verify Client ID and Client Secret are correct',
+          '3. Check Google Cloud Console to ensure credentials match',
+          '4. Save and try again'
+        ];
+      } else {
+        // Generic error - provide troubleshooting steps
+        actionSteps = [
+          '1. Check browser console for detailed error messages',
+          '2. Verify Google OAuth is enabled in Supabase Dashboard',
+          '3. Check that redirect URLs are configured correctly',
+          '4. Try refreshing the page and signing in again'
+        ];
       }
       
       const enhancedError = new Error(helpfulMessage);
       enhancedError.originalError = error;
       enhancedError.code = error.code || 'OAUTH_ERROR';
+      enhancedError.actionSteps = actionSteps;
+      
+      console.error('🔐 [Auth] Troubleshooting steps:', actionSteps);
+      
+      // Retry logic for transient errors (network issues, etc.)
+      if (retryCount < maxRetries && (
+        error.message?.includes('network') || 
+        error.message?.includes('fetch') ||
+        error.message?.includes('timeout')
+      )) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
+        console.log(`🔐 [Auth] Retrying in ${delay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return signInWithGoogle({ ...options, skipHealthCheck: true, retryCount: retryCount + 1, maxRetries });
+      }
       
       return { data: null, error: enhancedError };
     }
@@ -195,24 +279,35 @@ export const signInWithGoogle = async () => {
       console.log('🔐 [Auth] Redirect will go to:', redirectTo);
       console.log('🔐 [Auth] Step 6: Redirecting to Google OAuth...');
       
-      // Small delay to ensure logs are visible
-      setTimeout(() => {
-        window.location.href = data.url;
-      }, 100);
+      // Store redirect info in sessionStorage for post-OAuth handling
+      try {
+        sessionStorage.setItem('oauth_redirect_to', redirectTo);
+        sessionStorage.setItem('oauth_started_at', Date.now().toString());
+      } catch (e) {
+        console.warn('🔐 [Auth] Could not store OAuth state:', e);
+      }
+      
+      // Redirect immediately - no delay needed
+      window.location.href = data.url;
+      return { data, error: null };
     } else {
       console.error('🔐 [Auth] ❌ No OAuth URL in response!');
       console.error('🔐 [Auth] Response data:', data);
+      const error = new Error('OAuth URL was not generated. This usually means Google OAuth is not properly configured in Supabase.');
+      error.actionSteps = [
+        '1. Go to Supabase Dashboard → Authentication → Providers → Google',
+        '2. Ensure "Enable Google provider" is toggled ON',
+        '3. Verify Client ID and Client Secret are entered',
+        '4. Save and try again'
+      ];
       return { 
         data: null, 
-        error: new Error('OAuth URL was not generated. Please check Supabase configuration.') 
+        error
       };
     }
-    
-    return { data, error: null };
   } catch (error) {
     console.error('🔐 [Auth] ❌ Exception in signInWithGoogle:', error);
     console.error('🔐 [Auth] Error stack:', error.stack);
-    console.error('🔐 [Auth] Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     // Enhance error message for blocked requests
     if (error.message && (error.message.includes('blocked') || error.message.includes('ERR_BLOCKED'))) {

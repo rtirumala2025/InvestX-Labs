@@ -149,6 +149,13 @@ export function AuthProvider({ children }) {
           setCurrentUser(enrichedUser);
           persistProfile(enrichedUser);
 
+          // Don't auto-redirect if we're on login page - let the page handle navigation
+          // This prevents redirecting away from error messages
+          if (window.location.pathname === '/login' || window.location.pathname === '/signup') {
+            console.log('🔐 [AuthContext] User detected on login/signup page - skipping auto-redirect');
+            return;
+          }
+
           // Get the redirect URL from session storage
           const redirectUrl = sessionStorage.getItem('preAuthUrl') || '/dashboard';
           // Clear it immediately to prevent future redirects

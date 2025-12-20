@@ -3,7 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
 import App from './App';
 import './index.css';
+import './lovable/styles/lovable-dashboard.css';
 import { initEmojiSanitizer } from './utils/domEmojiSanitizer';
+// Import diagnostic utility (makes it available globally)
+import './utils/diagnoseGoogleOAuth';
 
 // Global error handler for unhandled promise rejections
 window.addEventListener('unhandledrejection', (event) => {

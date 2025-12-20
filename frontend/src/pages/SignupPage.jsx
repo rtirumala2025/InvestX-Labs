@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import OAuthHealthChecker from '../components/auth/OAuthHealthChecker';
 
 const SignupPage = () => {
   const [formData, setFormData] = useState({
@@ -207,6 +208,7 @@ const SignupPage = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              <OAuthHealthChecker />
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium text-gray-300 mb-2">

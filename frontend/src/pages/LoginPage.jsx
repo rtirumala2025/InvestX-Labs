@@ -7,6 +7,7 @@ import { supabase } from '../services/supabase/config';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import OAuthHealthChecker from '../components/auth/OAuthHealthChecker';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -18,8 +19,19 @@ const LoginPage = () => {
   });
   const [rateLimitRemaining, setRateLimitRemaining] = useState(null);
   const [sessionExpiryWarning, setSessionExpiryWarning] = useState(null);
-  const { signIn: login, signInWithGoogle } = useAuth();
+  const [preventRedirect, setPreventRedirect] = useState(false);
+  const { signIn: login, signInWithGoogle, currentUser } = useAuth();
   const navigate = useNavigate();
+  
+  // DON'T auto-redirect on login page - let the authentication flow handle redirects
+  // Auto-redirect causes issues when there's a stale session or when user is trying to sign in
+  // The AuthContext and successful login flows will handle navigation
+  useEffect(() => {
+    // Only log for debugging - don't redirect automatically
+    if (currentUser && !loading) {
+      console.log('🔐 [LoginPage] User detected on login page (not redirecting - let auth flow handle it)');
+    }
+  }, [currentUser, loading]);
 
   // Debug: Log when component mounts and clear stale sessions
   useEffect(() => {
@@ -133,60 +145,117 @@ const LoginPage = () => {
   };
 
   const handleGoogleSignIn = async (e) => {
+    // CRITICAL: Prevent any default behavior
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     
+    // CRITICAL: Log immediately to verify function is called
     console.log('🔐 [LoginPage] ========== handleGoogleSignIn CALLED ==========');
-    console.log('🔐 [LoginPage] Google sign-in button clicked', { e, loading });
+    
     setError('');
     setLoading(true);
+    setPreventRedirect(true);
     
     try {
       // Verify Supabase client is available
       if (!supabase || !supabase.auth) {
-        throw new Error('Supabase client is not available. Please refresh the page.');
+        const errorMsg = 'Supabase client is not available. Please refresh the page.';
+        console.error('🔐 [LoginPage] ❌', errorMsg);
+        throw new Error(errorMsg);
       }
       
+      console.log('🔐 [LoginPage] ✅ Supabase client verified');
+      console.log('🔐 [LoginPage] Calling signInWithGoogleService...');
+      
       // Call the service function directly
-      console.log('🔐 [LoginPage] Calling signInWithGoogleService directly');
       const result = await signInWithGoogleService();
+      
       console.log('🔐 [LoginPage] signInWithGoogleService result:', result);
+      console.log('🔐 [LoginPage] Result has error:', !!result.error);
+      console.log('🔐 [LoginPage] Result has data:', !!result.data);
+      console.log('🔐 [LoginPage] Result data URL:', result.data?.url);
       
       // Service function returns { data, error }
       if (result.error) {
-        console.error('🔐 [LoginPage] OAuth error received:', result.error);
+        console.error('🔐 [LoginPage] ❌ OAuth error received:', result.error);
+        console.error('🔐 [LoginPage] Error message:', result.error.message);
+        console.error('🔐 [LoginPage] Error code:', result.error.code);
+        console.error('🔐 [LoginPage] Error actionSteps:', result.error.actionSteps);
         throw result.error;
       }
       
-      // If we have a URL, redirect is happening
+      // If we have a URL, redirect is happening (OAuth succeeded)
       if (result.data?.url) {
-        console.log('🔐 [LoginPage] OAuth redirect URL received:', result.data.url);
+        console.log('🔐 [LoginPage] ✅ OAuth redirect URL received:', result.data.url);
+        console.log('🔐 [LoginPage] Redirecting to Google OAuth...');
         // The service function already redirects via window.location.href
         // Don't set loading to false as we're redirecting
         return;
       }
       
-      // If no redirect URL, navigate manually (shouldn't happen with OAuth)
-      console.log('🔐 [LoginPage] No redirect URL, navigating manually');
-      navigate('/dashboard');
+      // If no redirect URL and no error, this is unexpected - show error
+      console.error('🔐 [LoginPage] ❌ No OAuth URL and no error - OAuth not configured');
+      const noUrlError = new Error('OAuth URL was not generated. Google OAuth is not properly configured in Supabase.');
+      noUrlError.actionSteps = [
+        '1. Go to Supabase Dashboard: https://app.supabase.com',
+        '2. Navigate to: Authentication → Providers',
+        '3. Find "Google" in the list and click it',
+        '4. Toggle "Enable Google provider" to ON',
+        '5. Add your Google OAuth Client ID and Client Secret',
+        '6. Click "Save" and try again'
+      ];
+      throw noUrlError;
     } catch (error) {
-      console.error('🔐 [LoginPage] Google sign-in error:', error);
+      console.error('🔐 [LoginPage] ❌ Google sign-in error caught:', error);
       
-      // Provide helpful error messages
-      let errorMessage = error.message || 'Failed to sign in with Google';
+      // Build error message with action steps
+      let errorMessage = error?.message || 'Failed to sign in with Google';
+      let actionSteps = error?.actionSteps || [];
       
-      if (errorMessage.includes('provider') || errorMessage.includes('not enabled')) {
-        errorMessage = 'Google sign-in is not enabled in Supabase. Please enable it in the Supabase dashboard under Authentication → Providers → Google.';
-      } else if (errorMessage.includes('redirect') || errorMessage.includes('URI')) {
-        errorMessage = 'OAuth redirect URL mismatch. Please check Supabase URL Configuration and Google Cloud Console settings.';
-      } else if (errorMessage.includes('client') || errorMessage.includes('invalid')) {
-        errorMessage = 'Google OAuth client is not configured. Please add Client ID and Client Secret in Supabase dashboard.';
+      // If no action steps, provide default based on error message
+      if (actionSteps.length === 0) {
+        if (errorMessage.includes('provider') || errorMessage.includes('not enabled') || errorMessage.includes('disabled')) {
+          actionSteps = [
+            '1. Go to Supabase Dashboard: https://app.supabase.com',
+            '2. Navigate to: Authentication → Providers',
+            '3. Find "Google" and toggle it ON',
+            '4. Add your Google OAuth Client ID and Client Secret',
+            '5. Save and try again'
+          ];
+        } else if (errorMessage.includes('redirect') || errorMessage.includes('URI')) {
+          actionSteps = [
+            '1. Check Google Cloud Console → APIs & Services → Credentials',
+            '2. Verify Authorized redirect URI includes: https://[your-project].supabase.co/auth/v1/callback',
+            '3. Check Supabase Dashboard → Authentication → URL Configuration'
+          ];
+        } else if (errorMessage.includes('client') || errorMessage.includes('invalid')) {
+          actionSteps = [
+            '1. Go to Supabase Dashboard → Authentication → Providers → Google',
+            '2. Verify Client ID and Client Secret are correct',
+            '3. Check Google Cloud Console to ensure credentials match',
+            '4. Save and try again'
+          ];
+        } else {
+          actionSteps = [
+            '1. Check browser console (F12) for detailed error messages',
+            '2. Verify Google OAuth is enabled in Supabase Dashboard',
+            '3. Check that redirect URLs are configured correctly',
+            '4. Try refreshing the page and signing in again'
+          ];
+        }
       }
       
+      // Build final error message
+      if (actionSteps.length > 0) {
+        errorMessage += '\n\n📋 To fix this:\n' + actionSteps.map((step, idx) => `${idx + 1}. ${step}`).join('\n');
+      }
+      
+      console.error('🔐 [LoginPage] Setting error message:', errorMessage);
       setError(errorMessage);
       setLoading(false);
+      setPreventRedirect(false); // Allow redirects again after error is set
     }
   };
 
@@ -269,7 +338,8 @@ const LoginPage = () => {
               <p className="text-gray-300">Sign in to continue your learning journey</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <OAuthHealthChecker />
+            <form onSubmit={(e) => { e.preventDefault(); handleSubmit(e); }} className="space-y-6" noValidate>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                   Email address
@@ -310,7 +380,13 @@ const LoginPage = () => {
                   animate={{ opacity: 1, y: 0 }}
                   className="p-4 rounded-xl bg-red-500/20 border border-red-500/30 backdrop-blur-sm"
                 >
-                  <p className="text-red-300 text-sm">{error}</p>
+                  <div className="text-red-300 text-sm whitespace-pre-line font-mono text-xs">
+                    {error.split('\n').map((line, idx) => (
+                      <div key={idx} className={line.startsWith('📋') || line.match(/^\d+\./) ? 'mt-2 font-semibold' : ''}>
+                        {line}
+                      </div>
+                    ))}
+                  </div>
                   {rateLimitRemaining !== null && (
                     <p className="text-red-200 text-xs mt-2">
                       Retry in: {rateLimitRemaining} seconds
@@ -366,43 +442,55 @@ const LoginPage = () => {
                 </div>
               </div>
 
-              {/* Test button to verify clicks work */}
-              <button
-                type="button"
-                onClick={() => {
-                  alert('Test button works! Now try Google sign-in.');
-                  console.log('🔐 [LoginPage] Test button clicked');
-                }}
-                className="w-full mb-2 px-4 py-2 bg-red-500 text-white rounded"
-              >
-                TEST: Click me first
-              </button>
-
               <button
                 type="button"
                 id="google-signin-button"
                 onClick={async (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
+                  // CRITICAL: Prevent any default behavior and stop propagation IMMEDIATELY
+                  if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                  }
                   
+                  // Log immediately to verify handler is called
                   console.log('🔐 [LoginPage] ========== BUTTON CLICKED ==========');
-                  console.log('🔐 [LoginPage] Button clicked!', {
-                    event: e,
-                    loading,
-                    disabled: loading,
-                    timestamp: Date.now()
-                  });
+                  console.log('🔐 [LoginPage] Button click handler is running!');
+                  console.log('🔐 [LoginPage] Event:', e);
+                  console.log('🔐 [LoginPage] Event type:', e?.type);
+                  console.log('🔐 [LoginPage] Current target:', e?.currentTarget);
+                  console.log('🔐 [LoginPage] Button disabled?', e?.currentTarget?.disabled);
+                  console.log('🔐 [LoginPage] Loading state:', loading);
                   
-                  // Call the handler immediately
-                  handleGoogleSignIn(e).catch((error) => {
-                    console.error('🔐 [LoginPage] Error in handleGoogleSignIn:', error);
-                    setError(error.message || 'Failed to sign in with Google');
+                  // Set loading immediately and prevent auto-redirect
+                  setLoading(true);
+                  setError('');
+                  setPreventRedirect(true);
+                  
+                  try {
+                    await handleGoogleSignIn(e);
+                  } catch (err) {
+                    console.error('🔐 [LoginPage] ❌ Unhandled error in handleGoogleSignIn:', err);
+                    console.error('🔐 [LoginPage] Error details:', {
+                      message: err?.message,
+                      stack: err?.stack,
+                      name: err?.name,
+                      actionSteps: err?.actionSteps
+                    });
+                    
+                    // Build error message with action steps
+                    let errorMsg = err?.message || 'An unexpected error occurred';
+                    if (err?.actionSteps && err.actionSteps.length > 0) {
+                      errorMsg += '\n\n📋 To fix this:\n' + err.actionSteps.map((step, idx) => `${idx + 1}. ${step}`).join('\n');
+                    }
+                    
+                    setError(errorMsg);
                     setLoading(false);
-                  });
+                    setPreventRedirect(false); // Allow redirects again after error is set
+                  }
                 }}
                 disabled={loading}
                 className="w-full flex items-center justify-center px-6 py-4 text-lg font-medium rounded-xl border border-white/20 bg-white/8 hover:bg-white/15 text-white backdrop-blur-2xl backdrop-saturate-150 shadow-lg shadow-black/10 hover:shadow-xl hover:shadow-black/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ zIndex: 1000, position: 'relative' }}
               >
                 <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                   <path

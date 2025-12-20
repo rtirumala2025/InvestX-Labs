@@ -37,38 +37,30 @@ const LoginForm = () => {
     } catch (error) {
       console.error("Google sign-in error:", error);
 
-      // Provide more specific error messages
+      // Provide more specific error messages with action steps
+      let errorMessage = error.message || "Failed to sign in with Google. Please try again.";
+      const actionSteps = error.actionSteps || [];
+
       if (error.message && error.message.includes("blocked") || 
           error.code === 'BLOCKED_BY_CLIENT' ||
           error.message.includes("ERR_BLOCKED")) {
-        setError(
-          "Sign-in is being blocked by an ad blocker or privacy extension. Please disable it temporarily or add exceptions for accounts.google.com and oauth2.googleapis.com. See the troubleshooting guide for more help.",
-        );
+        errorMessage = "Sign-in is being blocked by an ad blocker or privacy extension. Please disable it temporarily or add exceptions for accounts.google.com and oauth2.googleapis.com.";
       } else if (error.message && error.message.includes("Popup blocked")) {
-        setError(
-          "Popup blocked. Please allow popups for this site and try again.",
-        );
+        errorMessage = "Popup blocked. Please allow popups for this site and try again.";
       } else if (error.message && error.message.includes("cancelled")) {
-        setError("Sign-in cancelled. Please try again.");
-      } else if (
-        error.message && error.message.includes("Firebase is not properly configured")
-      ) {
-        setError(
-          "Authentication service is not configured. Please contact support.",
-        );
-      } else if (error.message && error.message.includes("account already exists")) {
-        setError(
-          "An account already exists with this email using a different sign-in method.",
-        );
-      } else if (error.message && error.message.includes("not enabled")) {
-        setError("Google sign-in is not enabled. Please contact support.");
+        errorMessage = "Sign-in cancelled. Please try again.";
+      } else if (error.message && error.message.includes("not enabled") || 
+                 error.message && error.message.includes("provider")) {
+        errorMessage = "Google sign-in is not enabled in Supabase.\n\nTo fix:\n1. Go to Supabase Dashboard → Authentication → Providers\n2. Find 'Google' and toggle it ON\n3. Add your Google OAuth credentials\n4. Save and try again";
       } else if (error.message && error.message.includes("redirect_uri_mismatch")) {
-        setError("OAuth configuration error. Please contact support.");
+        errorMessage = "OAuth redirect URL mismatch.\n\nTo fix:\n1. Check Google Cloud Console → Credentials\n2. Verify redirect URI matches Supabase callback URL\n3. Check Supabase → Authentication → URL Configuration";
       } else if (error.message && error.message.includes("invalid_client")) {
-        setError("OAuth client configuration error. Please contact support.");
-      } else {
-        setError(error.message || "Failed to sign in with Google. Please try again.");
+        errorMessage = "OAuth client configuration error.\n\nTo fix:\n1. Go to Supabase Dashboard → Authentication → Providers → Google\n2. Verify Client ID and Client Secret are correct\n3. Save and try again";
+      } else if (actionSteps.length > 0) {
+        errorMessage = error.message + "\n\nTo fix this:\n" + actionSteps.join("\n");
       }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
